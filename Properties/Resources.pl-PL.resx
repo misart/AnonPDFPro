@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="Menu_File" xml:space="preserve"><value>&amp;Plik</value></data>
+  <data name="Menu_Options" xml:space="preserve"><value>Op&amp;cje</value></data>
+  <data name="Menu_Help" xml:space="preserve"><value>P&amp;omoc</value></data>
+  <data name="Menu_OpenPdf" xml:space="preserve"><value>Otwórz PDF</value></data>
+  <data name="Menu_OpenProject" xml:space="preserve"><value>Otwórz projekt</value></data>
+  <data name="Menu_OpenLast" xml:space="preserve"><value>Otwórz ostatni PDF i projekt</value></data>
+  <data name="Menu_SaveProjectAs" xml:space="preserve"><value>Zapisz projekt zaznaczeń jako</value></data>
+  <data name="Menu_SaveProject" xml:space="preserve"><value>Zapisz projekt zaznaczeń</value></data>
+  <data name="Menu_SavePdf" xml:space="preserve"><value>Zapisz PDF</value></data>
+  <data name="Menu_Exit" xml:space="preserve"><value>Koniec</value></data>
+  <data name="Menu_SplitPdf" xml:space="preserve"><value>Podziel plik PDF</value></data>
+  <data name="Menu_MergePdf" xml:space="preserve"><value>Scal pliki PDF</value></data>
+  <data name="Menu_DeletePage" xml:space="preserve"><value>Usuń stronę</value></data>
+  <data name="Menu_AddText" xml:space="preserve"><value>Dodaj napis</value></data>
+  <data name="Menu_CopyToClipboard" xml:space="preserve"><value>Kopiuj do schowka</value></data>
+  <data name="Menu_ExportGraphics" xml:space="preserve"><value>Eksport obiektów graficznych</value></data>
+  <data name="Menu_IgnorePdfRestrictions" xml:space="preserve"><value>Pomijaj ograniczenia PDF</value></data>
+  <data name="Menu_Language" xml:space="preserve"><value>Język</value></data>
+  <data name="Menu_Language_English" xml:space="preserve"><value>Angielski</value></data>
+  <data name="Menu_Language_Polish" xml:space="preserve"><value>Polski</value></data>
+  <data name="Menu_Language_System" xml:space="preserve"><value>Użyj języka systemu</value></data>
+  <data name="Menu_Help_Help" xml:space="preserve"><value>Instrukcja</value></data>
+  <data name="Menu_Help_Tutorial" xml:space="preserve"><value>Samouczek</value></data>
+  <data name="Menu_Help_About" xml:space="preserve"><value>O aplikacji</value></data>
+  <data name="Menu_Help_ShowLicense" xml:space="preserve"><value>Pokaż licencję</value></data>
+  <data name="Menu_Help_ThirdParty" xml:space="preserve"><value>Komponenty osób trzecich</value></data>
+
+  <data name="UI_ClearPage" xml:space="preserve"><value>Wyczyść stronę</value></data>
+  <data name="UI_ClearAll" xml:space="preserve"><value>Wyczyść wszystko</value></data>
+
+  <data name="Title_Error" xml:space="preserve"><value>Błąd</value></data>
+  <data name="Msg_HelpNotFound" xml:space="preserve"><value>Plik pomocy PDF nie został znaleziony w folderze aplikacji.</value></data>
+  <data name="Msg_OpenPdfError" xml:space="preserve"><value>Wystąpił problem z otwarciem pliku PDF: {0}</value></data>
+  <data name="Msg_FileOpenError" xml:space="preserve"><value>Wystąpił problem z otwarciem pliku: {0}</value></data>
+  <data name="Msg_LicenseNotFound" xml:space="preserve"><value>Plik licencji &quot;LICENSE&quot; nie został znaleziony w folderze aplikacji.</value></data>
+  <data name="Msg_NoticesNotFound" xml:space="preserve"><value>Plik z informacjami o komponentach &quot;THIRD-PARTY-NOTICES.md&quot; nie został znaleziony w folderze aplikacji.</value></data>
+
+  <data name="EditText_Title" xml:space="preserve"><value>Edytuj napis</value></data>
+  <data name="EditText_LabelText" xml:space="preserve"><value>Wprowadź tekst:</value></data>
+  <data name="EditText_ButtonFont" xml:space="preserve"><value>Wybierz czcionkę</value></data>
+  <data name="EditText_ButtonColor" xml:space="preserve"><value>Wybierz kolor</value></data>
+  <data name="EditText_GroupAlignment" xml:space="preserve"><value>Wyrównanie</value></data>
+  <data name="EditText_AlignLeft" xml:space="preserve"><value>Lewo</value></data>
+  <data name="EditText_AlignCenter" xml:space="preserve"><value>Środek</value></data>
+  <data name="EditText_AlignRight" xml:space="preserve"><value>Prawo</value></data>
+  <data name="EditText_EmptyError" xml:space="preserve"><value>Wprowadź jakiś tekst.</value></data>
+
+  <data name="Msg_ServiceUpdateInProgress" xml:space="preserve"><value>Aktualnie do {0} jest przeprowadzana aktualizacja aplikacji Anon PDF.</value></data>
+  <data name="Msg_ExportGraphics_Done" xml:space="preserve"><value>Eksport obiektów graficznych zakończony.
+
+Pliki zapisano w katalogu:
+{0}</value></data>
+  <data name="Msg_NewVersionDetectedMaintenance" xml:space="preserve"><value>Wykryto nowszą wersję aplikacji Anon PDF. Do {0} będzie przeprowadzana aktualizacja aplikacji.
+
+Proszę zapisać wyniki swojej pracy i wyłączyć program.
+
+Automatyczne wyłączenie nastąpi za 5 minut.</value></data>
+  <data name="Err_InvalidPdfFile" xml:space="preserve"><value>Ten plik PDF jest nieprawidłowy.
+
+Sprawdź czy możesz go otworzyć w innej aplikacji.</value></data>
+  <data name="Err_NoAssociatedPdfApp" xml:space="preserve"><value>Brak skojarzonej aplikacji PDF: {0}</value></data>
+  <data name="Msg_TextPositionInfo" xml:space="preserve"><value>{0} możliwość zmiany pozycji tekstu.</value></data>
+  <data name="Err_SelectValidProjectFile" xml:space="preserve"><value>Wybierz właściwy plik projektu.</value></data>
+  <data name="Err_InvalidProjectFormat" xml:space="preserve"><value>Ten format projektu jest nieprawidłowy.
+
+Skontaktuj się z autorem aplikacji.</value></data>
+  <data name="Msg_CannotLoadRecentFiles" xml:space="preserve"><value>Nie można załadować ostatnio używanych plików.</value></data>
+  <data name="Err_TooFewPages" xml:space="preserve"><value>Zbyt mała liczba stron w dokumencie!</value></data>
+  <data name="Msg_SearchNotFound" xml:space="preserve"><value>Nie znaleziono "{0}".</value></data>
+  <data name="Msg_NoIdentifiersFound" xml:space="preserve"><value>W dokumencie nie znaleziono poprawnych numerów PESEL, KW i innych identyfikatorów.</value></data>
+  <data name="Msg_NoSearchResultsOnPage" xml:space="preserve"><value>Na bieżącej stronie nie znaleziono wyników wyszukiwania.</value></data>
+  <data name="Err_Crop_OutsideBitmap" xml:space="preserve"><value>Zaznaczenie poza bitmapą lub zerowe: {0}</value></data>
+  <data name="Err_OCR" xml:space="preserve"><value>Błąd OCR: {0}</value></data>
+  <data name="Msg_NoSelectionsOnPage" xml:space="preserve"><value>Brak zaznaczeń na bieżącej stronie.</value></data>
+  <data name="Msg_TextsCopiedToClipboard" xml:space="preserve"><value>Teksty z zaznaczeń zostały skopiowane do schowka.</value></data>
+  <data name="Msg_NoTextFromSelections" xml:space="preserve"><value>Nie udało się pobrać tekstu z żadnego zaznaczenia.</value></data>
+  <data name="Err_InvalidPageNumberValue" xml:space="preserve"><value>Nieprawidłowy numer strony: '{0}'.</value></data>
+  <data name="Msg_FileListEmpty" xml:space="preserve"><value>Lista plików jest pusta.</value></data>
+  <data name="Merge_Success" xml:space="preserve"><value>Pliki zostały pomyślnie scalone.</value></data>
+  <data name="Merge_Err_Merge" xml:space="preserve"><value>Błąd podczas scalania: {0}</value></data>
+  <data name="Msg_NameSearchServiceUnavailable" xml:space="preserve"><value>Usługa umożliwiająca wyszukiwanie nazwisk jest obecnie niedostępna.</value></data>
+  <data name="Err_OutputInUse" xml:space="preserve"><value>Nie można zapisać pliku PDF. Plik wyjściowy jest obecnie używany.</value></data>
+  <data name="Err_CannotAnonymizePdf" xml:space="preserve"><value>Tego pliku PDF nie można zanonimizować!</value></data>
+  <data name="Msg_PreviewSavedPdf" xml:space="preserve"><value>Sprawdź zapisany dokument PDF na podglądzie.</value></data>
+  <data name="Msg_Confirm_OpenNewWithUnsavedSelections" xml:space="preserve"><value>Czy na pewno chcesz otworzyć nowy plik PDF?
+
+Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value></data>
+  <data name="Msg_Confirm_DeleteTextAnnotation" xml:space="preserve"><value>Czy na pewno chcesz usunąć ten napis?</value></data>
+  <data name="Msg_Confirm_ClearAllSelections" xml:space="preserve"><value>Czy na pewno chcesz usunąć wszystkie zaznaczenia z dokumentu?</value></data>
+  <data name="Msg_Confirm_DiscardUnsavedRedactions" xml:space="preserve"><value>Masz niezapisane zmiany redakcyjne w dokumencie.
+
+Czy na pewno chcesz je utracić?</value></data>
+  <data name="Msg_OpenPdfFirst" xml:space="preserve"><value>Otwórz najpierw plik PDF.</value></data>
+  <data name="Msg_DragDrop_UnsupportedFileType" xml:space="preserve"><value>Jest to nieobsługiwany typ pliku. Przeciągnij plik PDF lub plik .pap.</value></data>
+  <data name="Msg_NoPasswordOpenCancelled" xml:space="preserve"><value>Nie podano hasła – otwarcie anulowane.</value></data>
+  <data name="Err_IncorrectPassword" xml:space="preserve"><value>Niepoprawne hasło – spróbuj ponownie.</value></data>
+  <data name="Err_LoadRecentFiles" xml:space="preserve"><value>Wystąpił błąd podczas wczytywania ostatnich plików: {0}</value></data>
+  <data name="Msg_Confirm_NameSearchSlow" xml:space="preserve"><value>Uwaga, opcja wyszukiwania nazwisk w treści może być czasochłonna
+
+oraz może nie zwracać poprawnych wyników.
+
+Czy chcesz kontynuować?</value></data>
+  <data name="Err_UnhandledException" xml:space="preserve"><value>Wystąpił nieobsłużony błąd aplikacji:
+
+{0}
+
+Szczegóły zapisano w:
+{1}</value></data>
+  <data name="Title_CriticalAppError" xml:space="preserve"><value>Błąd krytyczny aplikacji</value></data>
+  <data name="Msg_ProjectSaved" xml:space="preserve"><value>Zapisano bieżący stan prac nad projektem
+pod wybraną nazwą.</value></data>
+  <data name="Msg_Closing_UnsavedSelectionsPrefix" xml:space="preserve"><value>Masz zdefiniowane zaznaczenia w treści
+
+</value></data>
+  <data name="Msg_Confirm_CloseApp" xml:space="preserve"><value>Czy na pewno chcesz zamknąć aplikację?</value></data>
+  <data name="Msg_LoadedPdf" xml:space="preserve"><value>Załadowano:
+PDF: {0}</value></data>
+  <data name="Msg_LoadedProjectLine" xml:space="preserve"><value>
+Projekt: {0}</value></data>
+  <data name="PwdPrompt_Title_CanChangeRemove" xml:space="preserve"><value>Możesz zmienić lub usunąć hasło PDF</value></data>
+  <data name="PwdPrompt_Title_Enter" xml:space="preserve"><value>Podaj hasło PDF</value></data>
+  <data name="PwdPrompt_Label_Password" xml:space="preserve"><value>Hasło:</value></data>
+  <data name="Dialog_Filter_PDF" xml:space="preserve"><value>Pliki PDF (*.pdf)|*.pdf</value></data>
+  <data name="Dialog_Filter_PAP" xml:space="preserve"><value>Pliki PAP (*.pap)|*.pap</value></data>
+  <data name="Dialog_Title_OpenPdf" xml:space="preserve"><value>Wybierz plik PDF</value></data>
+  <data name="Dialog_Title_SavePdfAs" xml:space="preserve"><value>Zapisz plik PDF pod inną nazwą niż bieżąca</value></data>
+  <data name="Dialog_Title_OpenPap" xml:space="preserve"><value>Wybierz plik projektu AnonPDF</value></data>
+  <data name="Dialog_Title_SavePap" xml:space="preserve"><value>Podaj nazwę pliku projektu AnonPDF</value></data>
+  <data name="About_Message" xml:space="preserve"><value>Nazwa aplikacji: {0}
+Wersja: {1}
+Firma: {2}
+{3}
+
+Opis: {4}
+
+Licencje i komponenty:
+- iText 7 (AGPL-3.0)
+- PDFiumSharp / PDFium
+- Newtonsoft.Json (MIT)
+- BouncyCastle (MIT)
+- TesseractOCR (.NET) (Apache-2.0)
+
+Kod źródłowy dostępny zgodnie z AGPL-3.0 (zobacz plik LICENSE).
+Repozytorium: https://github.com/umszczecin/AnonPDF</value></data>
+
+</root>

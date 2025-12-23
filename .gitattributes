@@ -1,0 +1,31 @@
+# Normalize line endings for Visual Studio on Windows
+
+# Text files with CRLF
+*.sln          text eol=crlf
+*.cs           text eol=crlf
+*.csproj       text eol=crlf
+*.vb           text eol=crlf
+*.resx         text eol=crlf
+*.settings     text eol=crlf
+*.config       text eol=crlf
+*.targets      text eol=crlf
+*.props        text eol=crlf
+*.tt           text eol=crlf
+
+# Common text with LF
+*.md           text eol=lf
+*.sh           text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+
+# Binary files
+*.pdf          binary
+*.ico          binary
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.exe          binary
+*.dll          binary
+*.nupkg        binary
+
