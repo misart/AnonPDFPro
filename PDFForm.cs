@@ -1931,7 +1931,7 @@ namespace AnonPDF
             ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
             if (!(panel is ZoomPanel)) return;
 
-            // 1) Oblicz dynamicznie min & max scale dla TEJ strony
+            // 1) Calculate dynamically min and max scale for THIS page
             int panelWidth = panel.ClientSize.Width;
             int panelHeight = panel.ClientSize.Height;
 
@@ -1979,9 +1979,9 @@ namespace AnonPDF
 
         private void PageNumberTextBox_KeyPress(object sender, KeyPressEventArgs e)
         {
-            // Pozwalamy na wciskanie jedynie cyfr i klawiszy kontrolnych (np. Backspace).
-            // char.IsControl(e.KeyChar) -> klawisze kontrolne (np. backspace)
-            // char.IsDigit(e.KeyChar)   -> cyfry (0-9)
+            // We only allow you to press numbers and control keys.
+            // char.IsControl(e.KeyChar) -> control keys (e.g. Backspace)
+            // char.IsDigit(e.KeyChar)   -> numbers (0-9)
             if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
             {
                 // If pressed key is not a digit nor a control key,
@@ -2044,7 +2044,7 @@ namespace AnonPDF
             {
                 if (regKey != null)
                 {
-                    // Iterujemy po wszystkich wpisach
+                    // Iterating through all entries
                     foreach (string regValueName in regKey.GetValueNames())
                     {
                         string keyLower = regValueName.ToLowerInvariant();
@@ -2158,7 +2158,7 @@ namespace AnonPDF
                         pdfCanvas.BeginText()
                                  .SetFontAndSize(font, 14)
                                  .MoveText(50, shiftStart)
-                                 .ShowText("Lista podpisów kwalifikowanych w oryginalnym dokumencie (przed anonimizacją):")
+                                 .ShowText(Resources.Signatures_Report_Title)
                                  .EndText();
 
                         shiftStart -= 10;
@@ -2172,7 +2172,7 @@ namespace AnonPDF
                                 pdfCanvas.BeginText()
                                      .SetFontAndSize(font, 12)
                                      .MoveText(50, shiftStart)
-                                     .ShowText($"   Sygnatariusz: {sig.SignerName}")
+                                     .ShowText($"   {Resources.Signatures_Report_Field_SignerName}: {sig.SignerName}")
                                      .EndText();
                             }
                             if (sig.SignerTitle != "")
@@ -2181,7 +2181,7 @@ namespace AnonPDF
                                 pdfCanvas.BeginText()
                                  .SetFontAndSize(font, 12)
                                  .MoveText(50, shiftStart)
-                                 .ShowText($"   Tytuł: {sig.SignerTitle}")
+                                 .ShowText($"   {Resources.Signatures_Report_Field_SignerTitle}: {sig.SignerTitle}")
                                  .EndText();
                             }
                             if (sig.SignDate.ToString() != "")
@@ -2190,7 +2190,7 @@ namespace AnonPDF
                                 pdfCanvas.BeginText()
                                  .SetFontAndSize(font, 12)
                                  .MoveText(50, shiftStart)
-                                 .ShowText($"   Data: {sig.SignDate}")
+                                 .ShowText($"   {Resources.Signatures_Report_Field_SignDate}: {sig.SignDate}")
                                  .EndText();
                             }
                             shiftStart -= 10;
@@ -2202,7 +2202,7 @@ namespace AnonPDF
                         PdfAcroForm form = PdfAcroForm.GetAcroForm(pdfDoc, false);
                         if (form != null)
                         {
-                            // Pobierz wszystkie pola formularza
+                            // Get all form fields
                             IDictionary<string, PdfFormField> fields = form.GetFormFields();
 
                             // Collect signature field keys for removal
@@ -2229,7 +2229,7 @@ namespace AnonPDF
                     PdfAcroForm form = PdfAcroForm.GetAcroForm(pdfDoc, false);
                     if (form != null)
                     {
-                        // Pobierz wszystkie pola formularza
+                        // Get all form fields
                         IDictionary<string, PdfFormField> fields = form.GetFormFields();
                         foreach (var field in fields)
                         {
@@ -2241,7 +2241,7 @@ namespace AnonPDF
                                     var page = widget.GetPage();
                                     if (page == null) continue;
 
-                                    // 1) Pobierz /AP /N (normal appearance) jako Form XObject
+                                    // 1) Get /AP /N (normal appearance) as Form XObject
                                     var apDict = widget.GetAppearanceDictionary();
                                     if (apDict == null) continue;
                                     var nStream = apDict.GetAsStream(PdfName.N);
@@ -2267,7 +2267,7 @@ namespace AnonPDF
                                     }
 
 
-                                    // Korekta DPI dla pdfCoordinates
+                                    // DPI correction for pdfCoordinates
                                     float scaleX = 72f / dpiX; // Scaling factor for X axis
                                     float scaleY = 72f / dpiY; // Scaling factor for Y axis
                                     RectangleF scaledAnnotationBounds = new RectangleF(
@@ -2322,9 +2322,6 @@ namespace AnonPDF
                     // Optionally remove signature dictionary from document catalog
                     pdfDoc.GetCatalog().Remove(PdfName.Perms);
                 }
-
-
-                //sss
 
 
                 PdfCleanUpTool cleanUpTool = new PdfCleanUpTool(pdfDoc);
@@ -2413,9 +2410,7 @@ namespace AnonPDF
                     int rotation = page.GetRotation();
 
                     // Coordinate conversion - assume ConvertToPdfCoordinates works similarly to redaction blocks
-
-
-                    // Pobierz DPI z pdfViewer
+                    // Get DPI from pdfViewer
                     float dpiX, dpiY;
                     using (Graphics g = pdfViewer.CreateGraphics())
                     {
@@ -2446,10 +2441,6 @@ namespace AnonPDF
                         adjustedX = pdfCoordinates.X + (pdfCoordinates.Width / 2); // Center of rectangle
                     }
 
-                    // Draw a rectangle around pdfCoordinates (optional visual aid)
-                    
-
-
                     layoutCanvas.ShowTextAligned(
                         para,
                         adjustedX,
@@ -2477,8 +2468,13 @@ namespace AnonPDF
                     }
                 }
 
-                MessageBox.Show(this, Resources.Msg_PreviewSavedPdf, Resources.Title_Success,
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var info = pdfDoc.GetDocumentInfo();
+
+                // Custom fields
+                info.SetMoreInfo("iTextCopyright", "This document was processed using iText Core / Community under the AGPLv3 license. Copyright (c) iText Group NV.");
+                info.SetMoreInfo("iTextLicense", "For more information see https://www.gnu.org/licenses/agpl-3.0.html and https://itextpdf.com/.");
+
+                MessageBox.Show(this, Resources.Msg_PreviewSavedPdf, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

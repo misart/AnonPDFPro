@@ -46,7 +46,7 @@
     
     mimetype: application/x-microsoft.net.object.binary.base64
     value   : The object must be serialized with 
-            : System.Serialization.Formatters.Binary.BinaryFormatter
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
             : and then encoded with base64 encoding.
     
     mimetype: application/x-microsoft.net.object.soap.base64
@@ -60,6 +60,7 @@
             : and then encoded with base64 encoding.
     -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
       <xsd:complexType>
         <xsd:choice maxOccurs="unbounded">
@@ -68,9 +69,10 @@
               <xsd:sequence>
                 <xsd:element name="value" type="xsd:string" minOccurs="0" />
               </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" />
+              <xsd:attribute name="name" use="required" type="xsd:string" />
               <xsd:attribute name="type" type="xsd:string" />
               <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="assembly">
@@ -85,9 +87,10 @@
                 <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
                 <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
               </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
               <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
               <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
             </xsd:complexType>
           </xsd:element>
           <xsd:element name="resheader">
@@ -109,241 +112,627 @@
     <value>2.0</value>
   </resheader>
   <resheader name="reader">
-    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <resheader name="writer">
-    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Menu_File" xml:space="preserve"><value>&amp;Plik</value></data>
-  <data name="Menu_Options" xml:space="preserve"><value>Op&amp;cje</value></data>
-  <data name="Menu_Help" xml:space="preserve"><value>P&amp;omoc</value></data>
-  <data name="Menu_OpenPdf" xml:space="preserve"><value>Otwórz PDF</value></data>
-  <data name="Menu_OpenProject" xml:space="preserve"><value>Otwórz projekt</value></data>
-  <data name="Menu_OpenLast" xml:space="preserve"><value>Otwórz ostatni PDF i projekt</value></data>
-  <data name="Menu_SaveProjectAs" xml:space="preserve"><value>Zapisz projekt zaznaczeń jako</value></data>
-  <data name="Menu_SaveProject" xml:space="preserve"><value>Zapisz projekt zaznaczeń</value></data>
-  <data name="Menu_SavePdf" xml:space="preserve"><value>Zapisz PDF</value></data>
-  <data name="Menu_Exit" xml:space="preserve"><value>Koniec</value></data>
-  <data name="Menu_SplitPdf" xml:space="preserve"><value>Podziel plik PDF</value></data>
-  <data name="Menu_MergePdf" xml:space="preserve"><value>Scal pliki PDF</value></data>
-  <data name="Menu_DeletePage" xml:space="preserve"><value>Usuń stronę</value></data>
-  <data name="Menu_AddText" xml:space="preserve"><value>Dodaj napis</value></data>
-  <data name="Menu_CopyToClipboard" xml:space="preserve"><value>Kopiuj do schowka</value></data>
-  <data name="Menu_ExportGraphics" xml:space="preserve"><value>Eksport obiektów graficznych</value></data>
-  <data name="Menu_IgnorePdfRestrictions" xml:space="preserve"><value>Pomijaj ograniczenia PDF</value></data>
-  <data name="Menu_Language" xml:space="preserve"><value>Język</value></data>
-  <data name="Menu_Language_English" xml:space="preserve"><value>Angielski</value></data>
-  <data name="Menu_Language_Polish" xml:space="preserve"><value>Polski</value></data>
-  <data name="Menu_Language_System" xml:space="preserve"><value>Użyj języka systemu</value></data>
-  <data name="Menu_Help_Help" xml:space="preserve"><value>Instrukcja</value></data>
-  <data name="Menu_Help_Tutorial" xml:space="preserve"><value>Samouczek</value></data>
-  <data name="Menu_Help_About" xml:space="preserve"><value>O aplikacji</value></data>
-  <data name="Menu_Help_ShowLicense" xml:space="preserve"><value>Pokaż licencję</value></data>
-  <data name="Menu_Help_ThirdParty" xml:space="preserve"><value>Komponenty osób trzecich</value></data>
-  <data name="UI_ClearPage" xml:space="preserve"><value>Wyczyść stronę</value></data>
-  <data name="UI_ClearAll" xml:space="preserve"><value>Wyczyść wszystko</value></data>
-  <data name="Title_Error" xml:space="preserve"><value>Błąd</value></data>
-  <data name="Title_Info" xml:space="preserve"><value>Informacja</value></data>
-  <data name="Title_Warning" xml:space="preserve"><value>Ostrzeżenie</value></data>
-  <data name="Title_Success" xml:space="preserve"><value>Sukces</value></data>
-  <data name="Title_Confirmation" xml:space="preserve"><value>Potwierdzenie</value></data>
-  <data name="UI_PageLabelFormat" xml:space="preserve"><value>Strona {0}</value></data>
-  <data name="UI_Group_Selections" xml:space="preserve"><value>Zaznaczenia</value></data>
-  <data name="UI_Group_Signatures" xml:space="preserve"><value>Podpisy</value></data>
-  <data name="UI_Group_Search" xml:space="preserve"><value>Wyszukiwanie</value></data>
-  <data name="UI_Group_Pages" xml:space="preserve"><value>Strony</value></data>
-  <data name="UI_Group_PagesToRemove" xml:space="preserve"><value>Strony do usunięcia</value></data>
-  <data name="UI_Group_Filter" xml:space="preserve"><value>Filtr</value></data>
-  <data name="UI_Button_SavePdf" xml:space="preserve"><value>Zapisz PDF</value></data>
-  <data name="UI_Button_OpenPdf" xml:space="preserve"><value>Otwórz PDF</value></data>
-  <data name="UI_Button_OpenProject" xml:space="preserve"><value>Otwórz projekt</value></data>
-  <data name="UI_Button_SaveProject" xml:space="preserve"><value>Zapisz projekt</value></data>
-  <data name="UI_Button_SaveProjectAs" xml:space="preserve"><value>Zapisz projekt jako</value></data>
-  <data name="UI_Check_HighlightColor" xml:space="preserve"><value>Wyróżnienie kolorem</value></data>
-  <data name="UI_Check_PreviewAfterSave" xml:space="preserve"><value>Podgląd po zapisaniu</value></data>
-  <data name="UI_Check_SafeMode" xml:space="preserve"><value>Tryb graficzny</value></data>
-  <data name="UI_Check_SetPassword" xml:space="preserve"><value>Ustawienie hasła</value></data>
-  <data name="UI_Radio_Signatures_Remove" xml:space="preserve"><value>Usunięte</value></data>
-  <data name="UI_Radio_Signatures_Original" xml:space="preserve"><value>Oryginalne</value></data>
-  <data name="UI_Radio_Signatures_Report" xml:space="preserve"><value>Raport</value></data>
-  <data name="UI_Button_PersonalData" xml:space="preserve"><value>Identyfikatory</value></data>
-  <data name="Merge_Title" xml:space="preserve"><value>Scalanie plików PDF</value></data>
-  <data name="Merge_AddFiles" xml:space="preserve"><value>Dodaj pliki...</value></data>
-  <data name="Merge_AddDirectory" xml:space="preserve"><value>Dodaj katalog...</value></data>
-  <data name="Merge_RemoveSelected" xml:space="preserve"><value>Usuń zaznaczone</value></data>
-  <data name="Merge_ClearList" xml:space="preserve"><value>Wyczyść listę</value></data>
-  <data name="Merge_Up" xml:space="preserve"><value>W górę</value></data>
-  <data name="Merge_Down" xml:space="preserve"><value>W dół</value></data>
-  <data name="Merge_OK" xml:space="preserve"><value>OK</value></data>
-  <data name="Merge_Cancel" xml:space="preserve"><value>Anuluj</value></data>
-  <data name="Delete_Title" xml:space="preserve"><value>Wybierz zakres stron</value></data>
-  <data name="Delete_Label_Start" xml:space="preserve"><value>Strona początkowa:</value></data>
-  <data name="Delete_Label_End" xml:space="preserve"><value>Strona końcowa:</value></data>
-  <data name="Delete_Label_Step" xml:space="preserve"><value>Krok:</value></data>
-  <data name="Delete_Radio_Apply" xml:space="preserve"><value>Wybierz do usunięcia</value></data>
-  <data name="Delete_Radio_Cancel" xml:space="preserve"><value>Anuluj wybór</value></data>
-  <data name="Delete_Err_StartGreater" xml:space="preserve"><value>Strona początkowa nie może być większa od końcowej.</value></data>
-  <data name="Delete_Err_NoData" xml:space="preserve"><value>Podaj chociaż jeden numer strony lub krok podziału!</value></data>
-  <data name="Split_Title" xml:space="preserve"><value>Podział dokumentu PDF</value></data>
-  <data name="Split_FileLabel" xml:space="preserve"><value>Wybierz plik PDF:</value></data>
-  <data name="Split_Browse" xml:space="preserve"><value>Przeglądaj...</value></data>
-  <data name="Split_PageCountLabel" xml:space="preserve"><value>Liczba stron: {0}</value></data>
-  <data name="Split_PagesLabel" xml:space="preserve"><value>Podaj numery stron do podziału (oddzielone przecinkami):</value></data>
-  <data name="Split_StepLabel" xml:space="preserve"><value>Podaj krok podziału:</value></data>
-  <data name="Split_Dlg_Title" xml:space="preserve"><value>Wybierz plik PDF</value></data>
-  <data name="Split_Err_ReadFile" xml:space="preserve"><value>Błąd przy odczycie pliku PDF:\n{0}</value></data>
-  <data name="Split_PageCountUnknown" xml:space="preserve"><value>Liczba stron: ?</value></data>
-  <data name="Split_Err_SelectFile" xml:space="preserve"><value>Proszę wybrać istniejący plik PDF.</value></data>
-  <!-- Tooltips -->
-  <data name="Tooltip_LoadPdf" xml:space="preserve"><value>Otwórz plik PDF do anonimizacji.</value></data>
-  <data name="Tooltip_SetPassword" xml:space="preserve"><value>Gdy zaznaczone — plik PDF zostanie zabezpieczony hasłem.</value></data>
-  <data name="Tooltip_SafeMode" xml:space="preserve"><value>Tryb graficzny — bez bezpośredniej ingerencji w treść.</value></data>
-  <data name="Tooltip_RemovePage" xml:space="preserve"><value>Zaznacz stronę do usunięcia.</value></data>
-  <data name="Tooltip_RemovePageRange" xml:space="preserve"><value>Wybierz zakres stron do usunięcia lub do anulowania usunięcia.</value></data>
-  <data name="Tooltip_Signatures_Report" xml:space="preserve"><value>Wygeneruj raport podpisów na dodatkowej stronie.</value></data>
-  <data name="Tooltip_Signatures_Original" xml:space="preserve"><value>Pozostaw podpisy kwalifikowane w pliku.</value></data>
-  <data name="Tooltip_Signatures_Remove" xml:space="preserve"><value>Usuń podpisy kwalifikowane przed zapisaniem.</value></data>
-  <data name="Tooltip_PageNumber" xml:space="preserve"><value>Wprowadź numer strony i naciśnij Enter.</value></data>
-  <data name="Tooltip_FirstPage" xml:space="preserve"><value>Pierwsza strona.</value></data>
-  <data name="Tooltip_NextPage" xml:space="preserve"><value>Następna strona.</value></data>
-  <data name="Tooltip_PrevPage" xml:space="preserve"><value>Poprzednia strona.</value></data>
-  <data name="Tooltip_LastPage" xml:space="preserve"><value>Ostatnia strona.</value></data>
-  <data name="Tooltip_ZoomMin" xml:space="preserve"><value>Zmniejsz do minimum. CTRL + rolka w dół.</value></data>
-  <data name="Tooltip_ZoomMax" xml:space="preserve"><value>Powiększ do maksimum. CTRL + rolka w górę.</value></data>
-  <data name="Tooltip_ZoomOut" xml:space="preserve"><value>Pomniejsz stronę. CTRL + rolka w dół.</value></data>
-  <data name="Tooltip_ZoomIn" xml:space="preserve"><value>Powiększ stronę. CTRL + rolka w górę.</value></data>
-  <data name="Tooltip_Search" xml:space="preserve"><value>Kliknij, aby wyszukać.</value></data>
-  <data name="Tooltip_SearchToSelection" xml:space="preserve"><value>Oznacz wyniki wyszukiwania do anonimizacji.
-Ponowne kliknięcie usunie zaznaczenia.</value></data>
-  <data name="Tooltip_SearchClear" xml:space="preserve"><value>Wyczyść wynik wyszukiwania.</value></data>
-  <data name="Tooltip_PersonalData" xml:space="preserve"><value>Wyszukaj identyfikatory (PESEL, KW, itp.).</value></data>
-  <data name="Tooltip_PreviewAfterSave" xml:space="preserve"><value>Pokaż zapisany plik PDF po zakończeniu.</value></data>
-  <data name="Tooltip_SaveProject" xml:space="preserve"><value>Zapisz projekt z oznaczeniami pod wcześniejszą nazwą.</value></data>
-  <data name="Tooltip_SaveProjectAs" xml:space="preserve"><value>Zapisz projekt z oznaczeniami pod wybraną nazwą.</value></data>
-  <data name="Tooltip_OpenProject" xml:space="preserve"><value>Otwórz projekt z oznaczeniami do anonimizacji.</value></data>
-  <data name="Tooltip_HighlightColor" xml:space="preserve"><value>W zapisie zaznaczenia będą wyróżnione kolorem.</value></data>
-  <data name="Tooltip_SelectionFirst" xml:space="preserve"><value>Pierwsza strona z zaznaczeniami.</value></data>
-  <data name="Tooltip_SelectionNext" xml:space="preserve"><value>Następna strona z zaznaczeniami.</value></data>
-  <data name="Tooltip_SelectionPrev" xml:space="preserve"><value>Poprzednia strona z zaznaczeniami.</value></data>
-  <data name="Tooltip_SelectionLast" xml:space="preserve"><value>Ostatnia strona z zaznaczeniami.</value></data>
-  <data name="Tooltip_Marker" xml:space="preserve"><value>Tryb marker — maluj pociągnięciami.</value></data>
-  <data name="Tooltip_Box" xml:space="preserve"><value>Tryb box — zaznacz prostokątem.</value></data>
-  <data name="Tooltip_ClearPage" xml:space="preserve"><value>Usuń zaznaczenia z bieżącej strony.</value></data>
-  <data name="Tooltip_ClearAll" xml:space="preserve"><value>Usuń wszystkie zaznaczenia z dokumentu.</value></data>
-  <data name="Tooltip_SavePdf" xml:space="preserve"><value>Zapisz zanonimizowany plik PDF pod wybraną nazwą.</value></data>
-  <data name="Tooltip_PagesList" xml:space="preserve"><value>Kliknij pozycję, aby wyświetlić stronę.</value></data>
-  <!-- Messages -->
-  <data name="Split_Success" xml:space="preserve"><value>Dokument PDF został podzielony.</value></data>
-  <data name="Err_InvalidPageNumber" xml:space="preserve"><value>Podaj poprawny numer strony.</value></data>
-  <data name="Err_AllPagesMarked" xml:space="preserve"><value>Nie można zapisać — wszystkie strony oznaczone do usunięcia.</value></data>
-  <data name="Err_Save" xml:space="preserve"><value>Błąd podczas zapisywania: {0}</value></data>
-  <data name="Tutorial_NotFound" xml:space="preserve"><value>Samouczek nie został odnaleziony w lokalizacji:
-{0}</value></data>
-  <data name="Tutorial_OpenError" xml:space="preserve"><value>Nie można uruchomić samouczka:
-{0}</value></data>
-  <data name="UI_Filter_AllPages" xml:space="preserve"><value>Wszystkie strony</value></data>
-  <data name="UI_Filter_AllCategories" xml:space="preserve"><value>Wszystkie kategorie</value></data>
-  <data name="UI_Filter_Selections" xml:space="preserve"><value>Zaznaczenia</value></data>
-  <data name="UI_Filter_Annotations" xml:space="preserve"><value>Napisy</value></data>
-  <data name="UI_Filter_Searches" xml:space="preserve"><value>Wyszukania</value></data>
-  <data name="UI_Filter_Deletions" xml:space="preserve"><value>Usunięcia</value></data>
-  <data name="Msg_HelpNotFound" xml:space="preserve"><value>Plik pomocy PDF nie został znaleziony w folderze aplikacji.</value></data>
-  <data name="Msg_OpenPdfError" xml:space="preserve"><value>Wystąpił problem z otwarciem pliku PDF: {0}</value></data>
-  <data name="Msg_FileOpenError" xml:space="preserve"><value>Wystąpił problem z otwarciem pliku: {0}</value></data>
-  <data name="Msg_LicenseNotFound" xml:space="preserve"><value>Plik licencji &quot;LICENSE&quot; nie został znaleziony w folderze aplikacji.</value></data>
-  <data name="Msg_NoticesNotFound" xml:space="preserve"><value>Plik z informacjami o komponentach &quot;THIRD-PARTY-NOTICES.md&quot; nie został znaleziony w folderze aplikacji.</value></data>
-  <data name="EditText_Title" xml:space="preserve"><value>Edytuj napis</value></data>
-  <data name="EditText_LabelText" xml:space="preserve"><value>Wprowadź tekst:</value></data>
-  <data name="EditText_ButtonFont" xml:space="preserve"><value>Wybierz czcionkę</value></data>
-  <data name="EditText_ButtonColor" xml:space="preserve"><value>Wybierz kolor</value></data>
-  <data name="EditText_GroupAlignment" xml:space="preserve"><value>Wyrównanie</value></data>
-  <data name="EditText_AlignLeft" xml:space="preserve"><value>Lewo</value></data>
-  <data name="EditText_AlignCenter" xml:space="preserve"><value>Środek</value></data>
-  <data name="EditText_AlignRight" xml:space="preserve"><value>Prawo</value></data>
-  <data name="EditText_EmptyError" xml:space="preserve"><value>Wprowadź jakiś tekst.</value></data>
-
-  <data name="Msg_ServiceUpdateInProgress" xml:space="preserve"><value>Aktualnie do {0} jest przeprowadzana aktualizacja aplikacji Anon PDF.</value></data>
-  <data name="Msg_ExportGraphics_Done" xml:space="preserve"><value>Eksport obiektów graficznych zakończony.
+  <data name="Menu_File" xml:space="preserve">
+    <value>&amp;Plik</value>
+  </data>
+  <data name="Menu_Options" xml:space="preserve">
+    <value>Op&amp;cje</value>
+  </data>
+  <data name="Menu_Help" xml:space="preserve">
+    <value>P&amp;omoc</value>
+  </data>
+  <data name="Menu_OpenPdf" xml:space="preserve">
+    <value>Otwórz PDF</value>
+  </data>
+  <data name="Menu_OpenProject" xml:space="preserve">
+    <value>Otwórz projekt</value>
+  </data>
+  <data name="Menu_OpenLast" xml:space="preserve">
+    <value>Otwórz ostatni PDF i projekt</value>
+  </data>
+  <data name="Menu_SaveProjectAs" xml:space="preserve">
+    <value>Zapisz projekt zaznaczeń jako</value>
+  </data>
+  <data name="Menu_SaveProject" xml:space="preserve">
+    <value>Zapisz projekt zaznaczeń</value>
+  </data>
+  <data name="Menu_SavePdf" xml:space="preserve">
+    <value>Zapisz PDF</value>
+  </data>
+  <data name="Menu_Exit" xml:space="preserve">
+    <value>Koniec</value>
+  </data>
+  <data name="Menu_SplitPdf" xml:space="preserve">
+    <value>Podziel plik PDF</value>
+  </data>
+  <data name="Menu_MergePdf" xml:space="preserve">
+    <value>Scal pliki PDF</value>
+  </data>
+  <data name="Menu_DeletePage" xml:space="preserve">
+    <value>Usuń stronę</value>
+  </data>
+  <data name="Menu_AddText" xml:space="preserve">
+    <value>Dodaj napis</value>
+  </data>
+  <data name="Menu_CopyToClipboard" xml:space="preserve">
+    <value>Kopiuj do schowka</value>
+  </data>
+  <data name="Menu_ExportGraphics" xml:space="preserve">
+    <value>Eksport obiektów graficznych</value>
+  </data>
+  <data name="Menu_IgnorePdfRestrictions" xml:space="preserve">
+    <value>Pomijaj ograniczenia PDF</value>
+  </data>
+  <data name="Menu_Language" xml:space="preserve">
+    <value>Język</value>
+  </data>
+  <data name="Menu_Language_English" xml:space="preserve">
+    <value>Angielski</value>
+  </data>
+  <data name="Menu_Language_Polish" xml:space="preserve">
+    <value>Polski</value>
+  </data>
+  <data name="Menu_Language_System" xml:space="preserve">
+    <value>Użyj języka systemu</value>
+  </data>
+  <data name="Menu_Help_Help" xml:space="preserve">
+    <value>Instrukcja</value>
+  </data>
+  <data name="Menu_Help_Tutorial" xml:space="preserve">
+    <value>Samouczek</value>
+  </data>
+  <data name="Menu_Help_About" xml:space="preserve">
+    <value>O aplikacji</value>
+  </data>
+  <data name="Menu_Help_ShowLicense" xml:space="preserve">
+    <value>Pokaż licencję</value>
+  </data>
+  <data name="Menu_Help_ThirdParty" xml:space="preserve">
+    <value>Komponenty osób trzecich</value>
+  </data>
+  <data name="UI_ClearPage" xml:space="preserve">
+    <value>Wyczyść stronę</value>
+  </data>
+  <data name="UI_ClearAll" xml:space="preserve">
+    <value>Wyczyść wszystko</value>
+  </data>
+  <data name="Title_Error" xml:space="preserve">
+    <value>Błąd</value>
+  </data>
+  <data name="Title_Info" xml:space="preserve">
+    <value>Informacja</value>
+  </data>
+  <data name="Title_Warning" xml:space="preserve">
+    <value>Ostrzeżenie</value>
+  </data>
+  <data name="Title_Success" xml:space="preserve">
+    <value>Sukces</value>
+  </data>
+  <data name="Title_Confirmation" xml:space="preserve">
+    <value>Potwierdzenie</value>
+  </data>
+  <data name="UI_PageLabelFormat" xml:space="preserve">
+    <value>Strona {0}</value>
+  </data>
+  <data name="UI_Group_Selections" xml:space="preserve">
+    <value>Zaznaczenia</value>
+  </data>
+  <data name="UI_Group_Signatures" xml:space="preserve">
+    <value>Podpisy</value>
+  </data>
+  <data name="UI_Group_Search" xml:space="preserve">
+    <value>Wyszukiwanie</value>
+  </data>
+  <data name="UI_Group_Pages" xml:space="preserve">
+    <value>Strony</value>
+  </data>
+  <data name="UI_Group_PagesToRemove" xml:space="preserve">
+    <value>Strony do usunięcia</value>
+  </data>
+  <data name="UI_Group_Filter" xml:space="preserve">
+    <value>Filtr</value>
+  </data>
+  <data name="UI_Button_SavePdf" xml:space="preserve">
+    <value>Zapisz PDF</value>
+  </data>
+  <data name="UI_Button_OpenPdf" xml:space="preserve">
+    <value>Otwórz PDF</value>
+  </data>
+  <data name="UI_Button_OpenProject" xml:space="preserve">
+    <value>Otwórz projekt</value>
+  </data>
+  <data name="UI_Button_SaveProject" xml:space="preserve">
+    <value>Zapisz projekt</value>
+  </data>
+  <data name="UI_Button_SaveProjectAs" xml:space="preserve">
+    <value>Zapisz projekt jako</value>
+  </data>
+  <data name="UI_Check_HighlightColor" xml:space="preserve">
+    <value>Wyróżnienie kolorem</value>
+  </data>
+  <data name="UI_Check_PreviewAfterSave" xml:space="preserve">
+    <value>Podgląd po zapisaniu</value>
+  </data>
+  <data name="UI_Check_SafeMode" xml:space="preserve">
+    <value>Tryb graficzny</value>
+  </data>
+  <data name="UI_Check_SetPassword" xml:space="preserve">
+    <value>Ustawienie hasła</value>
+  </data>
+  <data name="UI_Radio_Signatures_Remove" xml:space="preserve">
+    <value>Usunięte</value>
+  </data>
+  <data name="UI_Radio_Signatures_Original" xml:space="preserve">
+    <value>Oryginalne</value>
+  </data>
+  <data name="UI_Radio_Signatures_Report" xml:space="preserve">
+    <value>Raport</value>
+  </data>
+  <data name="UI_Button_PersonalData" xml:space="preserve">
+    <value>Identyfikatory</value>
+  </data>
+  <data name="Merge_Title" xml:space="preserve">
+    <value>Scalanie plików PDF</value>
+  </data>
+  <data name="Merge_AddFiles" xml:space="preserve">
+    <value>Dodaj pliki...</value>
+  </data>
+  <data name="Merge_AddDirectory" xml:space="preserve">
+    <value>Dodaj katalog...</value>
+  </data>
+  <data name="Merge_RemoveSelected" xml:space="preserve">
+    <value>Usuń zaznaczone</value>
+  </data>
+  <data name="Merge_ClearList" xml:space="preserve">
+    <value>Wyczyść listę</value>
+  </data>
+  <data name="Merge_Up" xml:space="preserve">
+    <value>W górę</value>
+  </data>
+  <data name="Merge_Down" xml:space="preserve">
+    <value>W dół</value>
+  </data>
+  <data name="Merge_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Merge_Cancel" xml:space="preserve">
+    <value>Anuluj</value>
+  </data>
+  <data name="Delete_Title" xml:space="preserve">
+    <value>Wybierz zakres stron</value>
+  </data>
+  <data name="Delete_Label_Start" xml:space="preserve">
+    <value>Strona początkowa:</value>
+  </data>
+  <data name="Delete_Label_End" xml:space="preserve">
+    <value>Strona końcowa:</value>
+  </data>
+  <data name="Delete_Label_Step" xml:space="preserve">
+    <value>Krok:</value>
+  </data>
+  <data name="Delete_Radio_Apply" xml:space="preserve">
+    <value>Wybierz do usunięcia</value>
+  </data>
+  <data name="Delete_Radio_Cancel" xml:space="preserve">
+    <value>Anuluj wybór</value>
+  </data>
+  <data name="Delete_Err_StartGreater" xml:space="preserve">
+    <value>Strona początkowa nie może być większa od końcowej.</value>
+  </data>
+  <data name="Delete_Err_NoData" xml:space="preserve">
+    <value>Podaj chociaż jeden numer strony lub krok podziału!</value>
+  </data>
+  <data name="Split_Title" xml:space="preserve">
+    <value>Podział dokumentu PDF</value>
+  </data>
+  <data name="Split_FileLabel" xml:space="preserve">
+    <value>Wybierz plik PDF:</value>
+  </data>
+  <data name="Split_Browse" xml:space="preserve">
+    <value>Przeglądaj...</value>
+  </data>
+  <data name="Split_PageCountLabel" xml:space="preserve">
+    <value>Liczba stron: {0}</value>
+  </data>
+  <data name="Split_PagesLabel" xml:space="preserve">
+    <value>Podaj numery stron do podziału (oddzielone przecinkami):</value>
+  </data>
+  <data name="Split_StepLabel" xml:space="preserve">
+    <value>Podaj krok podziału:</value>
+  </data>
+  <data name="Split_Dlg_Title" xml:space="preserve">
+    <value>Wybierz plik PDF</value>
+  </data>
+  <data name="Split_Err_ReadFile" xml:space="preserve">
+    <value>Błąd przy odczycie pliku PDF:\n{0}</value>
+  </data>
+  <data name="Split_PageCountUnknown" xml:space="preserve">
+    <value>Liczba stron: ?</value>
+  </data>
+  <data name="Split_Err_SelectFile" xml:space="preserve">
+    <value>Proszę wybrać istniejący plik PDF.</value>
+  </data>
+  <data name="Tooltip_LoadPdf" xml:space="preserve">
+    <value>Otwórz plik PDF do anonimizacji.</value>
+  </data>
+  <data name="Tooltip_SetPassword" xml:space="preserve">
+    <value>Gdy zaznaczone — plik PDF zostanie zabezpieczony hasłem.</value>
+  </data>
+  <data name="Tooltip_SafeMode" xml:space="preserve">
+    <value>Tryb graficzny — bez bezpośredniej ingerencji w treść.</value>
+  </data>
+  <data name="Tooltip_RemovePage" xml:space="preserve">
+    <value>Zaznacz stronę do usunięcia.</value>
+  </data>
+  <data name="Tooltip_RemovePageRange" xml:space="preserve">
+    <value>Wybierz zakres stron do usunięcia lub do anulowania usunięcia.</value>
+  </data>
+  <data name="Tooltip_Signatures_Report" xml:space="preserve">
+    <value>Wygeneruj raport podpisów na dodatkowej stronie.</value>
+  </data>
+  <data name="Tooltip_Signatures_Original" xml:space="preserve">
+    <value>Pozostaw podpisy kwalifikowane w pliku.</value>
+  </data>
+  <data name="Tooltip_Signatures_Remove" xml:space="preserve">
+    <value>Usuń podpisy kwalifikowane przed zapisaniem.</value>
+  </data>
+  <data name="Tooltip_PageNumber" xml:space="preserve">
+    <value>Wprowadź numer strony i naciśnij Enter.</value>
+  </data>
+  <data name="Tooltip_FirstPage" xml:space="preserve">
+    <value>Pierwsza strona.</value>
+  </data>
+  <data name="Tooltip_NextPage" xml:space="preserve">
+    <value>Następna strona.</value>
+  </data>
+  <data name="Tooltip_PrevPage" xml:space="preserve">
+    <value>Poprzednia strona.</value>
+  </data>
+  <data name="Tooltip_LastPage" xml:space="preserve">
+    <value>Ostatnia strona.</value>
+  </data>
+  <data name="Tooltip_ZoomMin" xml:space="preserve">
+    <value>Zmniejsz do minimum. CTRL + rolka w dół.</value>
+  </data>
+  <data name="Tooltip_ZoomMax" xml:space="preserve">
+    <value>Powiększ do maksimum. CTRL + rolka w górę.</value>
+  </data>
+  <data name="Tooltip_ZoomOut" xml:space="preserve">
+    <value>Pomniejsz stronę. CTRL + rolka w dół.</value>
+  </data>
+  <data name="Tooltip_ZoomIn" xml:space="preserve">
+    <value>Powiększ stronę. CTRL + rolka w górę.</value>
+  </data>
+  <data name="Tooltip_Search" xml:space="preserve">
+    <value>Kliknij, aby wyszukać.</value>
+  </data>
+  <data name="Tooltip_SearchToSelection" xml:space="preserve">
+    <value>Oznacz wyniki wyszukiwania do anonimizacji.
+Ponowne kliknięcie usunie zaznaczenia.</value>
+  </data>
+  <data name="Tooltip_SearchClear" xml:space="preserve">
+    <value>Wyczyść wynik wyszukiwania.</value>
+  </data>
+  <data name="Tooltip_PersonalData" xml:space="preserve">
+    <value>Wyszukaj identyfikatory (PESEL, KW, itp.).</value>
+  </data>
+  <data name="Tooltip_PreviewAfterSave" xml:space="preserve">
+    <value>Pokaż zapisany plik PDF po zakończeniu.</value>
+  </data>
+  <data name="Tooltip_SaveProject" xml:space="preserve">
+    <value>Zapisz projekt z oznaczeniami pod wcześniejszą nazwą.</value>
+  </data>
+  <data name="Tooltip_SaveProjectAs" xml:space="preserve">
+    <value>Zapisz projekt z oznaczeniami pod wybraną nazwą.</value>
+  </data>
+  <data name="Tooltip_OpenProject" xml:space="preserve">
+    <value>Otwórz projekt z oznaczeniami do anonimizacji.</value>
+  </data>
+  <data name="Tooltip_HighlightColor" xml:space="preserve">
+    <value>W zapisie zaznaczenia będą wyróżnione kolorem.</value>
+  </data>
+  <data name="Tooltip_SelectionFirst" xml:space="preserve">
+    <value>Pierwsza strona z zaznaczeniami.</value>
+  </data>
+  <data name="Tooltip_SelectionNext" xml:space="preserve">
+    <value>Następna strona z zaznaczeniami.</value>
+  </data>
+  <data name="Tooltip_SelectionPrev" xml:space="preserve">
+    <value>Poprzednia strona z zaznaczeniami.</value>
+  </data>
+  <data name="Tooltip_SelectionLast" xml:space="preserve">
+    <value>Ostatnia strona z zaznaczeniami.</value>
+  </data>
+  <data name="Tooltip_Marker" xml:space="preserve">
+    <value>Tryb marker — maluj pociągnięciami.</value>
+  </data>
+  <data name="Tooltip_Box" xml:space="preserve">
+    <value>Tryb box — zaznacz prostokątem.</value>
+  </data>
+  <data name="Tooltip_ClearPage" xml:space="preserve">
+    <value>Usuń zaznaczenia z bieżącej strony.</value>
+  </data>
+  <data name="Tooltip_ClearAll" xml:space="preserve">
+    <value>Usuń wszystkie zaznaczenia z dokumentu.</value>
+  </data>
+  <data name="Tooltip_SavePdf" xml:space="preserve">
+    <value>Zapisz zanonimizowany plik PDF pod wybraną nazwą.</value>
+  </data>
+  <data name="Tooltip_PagesList" xml:space="preserve">
+    <value>Kliknij pozycję, aby wyświetlić stronę.</value>
+  </data>
+  <data name="Split_Success" xml:space="preserve">
+    <value>Dokument PDF został podzielony.</value>
+  </data>
+  <data name="Err_InvalidPageNumber" xml:space="preserve">
+    <value>Podaj poprawny numer strony.</value>
+  </data>
+  <data name="Err_AllPagesMarked" xml:space="preserve">
+    <value>Nie można zapisać — wszystkie strony oznaczone do usunięcia.</value>
+  </data>
+  <data name="Err_Save" xml:space="preserve">
+    <value>Błąd podczas zapisywania: {0}</value>
+  </data>
+  <data name="Tutorial_NotFound" xml:space="preserve">
+    <value>Samouczek nie został odnaleziony w lokalizacji:
+{0}</value>
+  </data>
+  <data name="Tutorial_OpenError" xml:space="preserve">
+    <value>Nie można uruchomić samouczka:
+{0}</value>
+  </data>
+  <data name="UI_Filter_AllPages" xml:space="preserve">
+    <value>Wszystkie strony</value>
+  </data>
+  <data name="UI_Filter_AllCategories" xml:space="preserve">
+    <value>Wszystkie kategorie</value>
+  </data>
+  <data name="UI_Filter_Selections" xml:space="preserve">
+    <value>Zaznaczenia</value>
+  </data>
+  <data name="UI_Filter_Annotations" xml:space="preserve">
+    <value>Napisy</value>
+  </data>
+  <data name="UI_Filter_Searches" xml:space="preserve">
+    <value>Wyszukania</value>
+  </data>
+  <data name="UI_Filter_Deletions" xml:space="preserve">
+    <value>Usunięcia</value>
+  </data>
+  <data name="Msg_HelpNotFound" xml:space="preserve">
+    <value>Plik pomocy PDF nie został znaleziony w folderze aplikacji.</value>
+  </data>
+  <data name="Msg_OpenPdfError" xml:space="preserve">
+    <value>Wystąpił problem z otwarciem pliku PDF: {0}</value>
+  </data>
+  <data name="Msg_FileOpenError" xml:space="preserve">
+    <value>Wystąpił problem z otwarciem pliku: {0}</value>
+  </data>
+  <data name="Msg_LicenseNotFound" xml:space="preserve">
+    <value>Plik licencji "LICENSE" nie został znaleziony w folderze aplikacji.</value>
+  </data>
+  <data name="Msg_NoticesNotFound" xml:space="preserve">
+    <value>Plik z informacjami o komponentach "THIRD-PARTY-NOTICES.md" nie został znaleziony w folderze aplikacji.</value>
+  </data>
+  <data name="EditText_Title" xml:space="preserve">
+    <value>Edytuj napis</value>
+  </data>
+  <data name="EditText_LabelText" xml:space="preserve">
+    <value>Wprowadź tekst:</value>
+  </data>
+  <data name="EditText_ButtonFont" xml:space="preserve">
+    <value>Wybierz czcionkę</value>
+  </data>
+  <data name="EditText_ButtonColor" xml:space="preserve">
+    <value>Wybierz kolor</value>
+  </data>
+  <data name="EditText_GroupAlignment" xml:space="preserve">
+    <value>Wyrównanie</value>
+  </data>
+  <data name="EditText_AlignLeft" xml:space="preserve">
+    <value>Lewo</value>
+  </data>
+  <data name="EditText_AlignCenter" xml:space="preserve">
+    <value>Środek</value>
+  </data>
+  <data name="EditText_AlignRight" xml:space="preserve">
+    <value>Prawo</value>
+  </data>
+  <data name="EditText_EmptyError" xml:space="preserve">
+    <value>Wprowadź jakiś tekst.</value>
+  </data>
+  <data name="Msg_ServiceUpdateInProgress" xml:space="preserve">
+    <value>Aktualnie do {0} jest przeprowadzana aktualizacja aplikacji Anon PDF.</value>
+  </data>
+  <data name="Msg_ExportGraphics_Done" xml:space="preserve">
+    <value>Eksport obiektów graficznych zakończony.
 
 Pliki zapisano w katalogu:
-{0}</value></data>
-  <data name="Msg_NewVersionDetectedMaintenance" xml:space="preserve"><value>Wykryto nowszą wersję aplikacji Anon PDF. Do {0} będzie przeprowadzana aktualizacja aplikacji.
+{0}</value>
+  </data>
+  <data name="Msg_NewVersionDetectedMaintenance" xml:space="preserve">
+    <value>Wykryto nowszą wersję aplikacji Anon PDF. Do {0} będzie przeprowadzana aktualizacja aplikacji.
 
 Proszę zapisać wyniki swojej pracy i wyłączyć program.
 
-Automatyczne wyłączenie nastąpi za 5 minut.</value></data>
-  <data name="Err_InvalidPdfFile" xml:space="preserve"><value>Ten plik PDF jest nieprawidłowy.
+Automatyczne wyłączenie nastąpi za 5 minut.</value>
+  </data>
+  <data name="Err_InvalidPdfFile" xml:space="preserve">
+    <value>Ten plik PDF jest nieprawidłowy.
 
-Sprawdź czy możesz go otworzyć w innej aplikacji.</value></data>
-  <data name="Err_NoAssociatedPdfApp" xml:space="preserve"><value>Brak skojarzonej aplikacji PDF: {0}</value></data>
-  <data name="Msg_TextPositionInfo" xml:space="preserve"><value>{0} możliwość zmiany pozycji tekstu.</value></data>
-  <data name="Err_SelectValidProjectFile" xml:space="preserve"><value>Wybierz właściwy plik projektu.</value></data>
-  <data name="Err_InvalidProjectFormat" xml:space="preserve"><value>Ten format projektu jest nieprawidłowy.
+Sprawdź czy możesz go otworzyć w innej aplikacji.</value>
+  </data>
+  <data name="Err_NoAssociatedPdfApp" xml:space="preserve">
+    <value>Brak skojarzonej aplikacji PDF: {0}</value>
+  </data>
+  <data name="Msg_TextPositionInfo" xml:space="preserve">
+    <value>{0} możliwość zmiany pozycji tekstu.</value>
+  </data>
+  <data name="Err_SelectValidProjectFile" xml:space="preserve">
+    <value>Wybierz właściwy plik projektu.</value>
+  </data>
+  <data name="Err_InvalidProjectFormat" xml:space="preserve">
+    <value>Ten format projektu jest nieprawidłowy.
 
-Skontaktuj się z autorem aplikacji.</value></data>
-  <data name="Msg_CannotLoadRecentFiles" xml:space="preserve"><value>Nie można załadować ostatnio używanych plików.</value></data>
-  <data name="Err_TooFewPages" xml:space="preserve"><value>Zbyt mała liczba stron w dokumencie!</value></data>
-  <data name="Msg_SearchNotFound" xml:space="preserve"><value>Nie znaleziono "{0}".</value></data>
-  <data name="Msg_NoIdentifiersFound" xml:space="preserve"><value>W dokumencie nie znaleziono poprawnych numerów PESEL, KW i innych identyfikatorów.</value></data>
-  <data name="Msg_NoSearchResultsOnPage" xml:space="preserve"><value>Na bieżącej stronie nie znaleziono wyników wyszukiwania.</value></data>
-  <data name="Err_Crop_OutsideBitmap" xml:space="preserve"><value>Zaznaczenie poza bitmapą lub zerowe: {0}</value></data>
-  <data name="Err_OCR" xml:space="preserve"><value>Błąd OCR: {0}</value></data>
-  <data name="Msg_NoSelectionsOnPage" xml:space="preserve"><value>Brak zaznaczeń na bieżącej stronie.</value></data>
-  <data name="Msg_TextsCopiedToClipboard" xml:space="preserve"><value>Teksty z zaznaczeń zostały skopiowane do schowka.</value></data>
-  <data name="Msg_NoTextFromSelections" xml:space="preserve"><value>Nie udało się pobrać tekstu z żadnego zaznaczenia.</value></data>
-  <data name="Err_InvalidPageNumberValue" xml:space="preserve"><value>Nieprawidłowy numer strony: '{0}'.</value></data>
-  <data name="Msg_FileListEmpty" xml:space="preserve"><value>Lista plików jest pusta.</value></data>
-  <data name="Merge_Success" xml:space="preserve"><value>Pliki zostały pomyślnie scalone.</value></data>
-  <data name="Merge_Err_Merge" xml:space="preserve"><value>Błąd podczas scalania: {0}</value></data>
-  <data name="Msg_NameSearchServiceUnavailable" xml:space="preserve"><value>Usługa umożliwiająca wyszukiwanie nazwisk jest obecnie niedostępna.</value></data>
-  <data name="Err_OutputInUse" xml:space="preserve"><value>Nie można zapisać pliku PDF. Plik wyjściowy jest obecnie używany.</value></data>
-  <data name="Err_CannotAnonymizePdf" xml:space="preserve"><value>Tego pliku PDF nie można zanonimizować!</value></data>
-  <data name="Msg_PreviewSavedPdf" xml:space="preserve"><value>Sprawdź zapisany dokument PDF na podglądzie.</value></data>
-  <data name="Msg_Confirm_OpenNewWithUnsavedSelections" xml:space="preserve"><value>Czy na pewno chcesz otworzyć nowy plik PDF?
+Skontaktuj się z autorem aplikacji.</value>
+  </data>
+  <data name="Msg_CannotLoadRecentFiles" xml:space="preserve">
+    <value>Nie można załadować ostatnio używanych plików.</value>
+  </data>
+  <data name="Err_TooFewPages" xml:space="preserve">
+    <value>Zbyt mała liczba stron w dokumencie!</value>
+  </data>
+  <data name="Msg_SearchNotFound" xml:space="preserve">
+    <value>Nie znaleziono "{0}".</value>
+  </data>
+  <data name="Msg_NoIdentifiersFound" xml:space="preserve">
+    <value>W dokumencie nie znaleziono poprawnych numerów PESEL, KW i innych identyfikatorów.</value>
+  </data>
+  <data name="Msg_NoSearchResultsOnPage" xml:space="preserve">
+    <value>Na bieżącej stronie nie znaleziono wyników wyszukiwania.</value>
+  </data>
+  <data name="Err_Crop_OutsideBitmap" xml:space="preserve">
+    <value>Zaznaczenie poza bitmapą lub zerowe: {0}</value>
+  </data>
+  <data name="Err_OCR" xml:space="preserve">
+    <value>Błąd OCR: {0}</value>
+  </data>
+  <data name="Msg_NoSelectionsOnPage" xml:space="preserve">
+    <value>Brak zaznaczeń na bieżącej stronie.</value>
+  </data>
+  <data name="Msg_TextsCopiedToClipboard" xml:space="preserve">
+    <value>Teksty z zaznaczeń zostały skopiowane do schowka.</value>
+  </data>
+  <data name="Msg_NoTextFromSelections" xml:space="preserve">
+    <value>Nie udało się pobrać tekstu z żadnego zaznaczenia.</value>
+  </data>
+  <data name="Err_InvalidPageNumberValue" xml:space="preserve">
+    <value>Nieprawidłowy numer strony: '{0}'.</value>
+  </data>
+  <data name="Msg_FileListEmpty" xml:space="preserve">
+    <value>Lista plików jest pusta.</value>
+  </data>
+  <data name="Merge_Success" xml:space="preserve">
+    <value>Pliki zostały pomyślnie scalone.</value>
+  </data>
+  <data name="Merge_Err_Merge" xml:space="preserve">
+    <value>Błąd podczas scalania: {0}</value>
+  </data>
+  <data name="Msg_NameSearchServiceUnavailable" xml:space="preserve">
+    <value>Usługa umożliwiająca wyszukiwanie nazwisk jest obecnie niedostępna.</value>
+  </data>
+  <data name="Err_OutputInUse" xml:space="preserve">
+    <value>Nie można zapisać pliku PDF. Plik wyjściowy jest obecnie używany.</value>
+  </data>
+  <data name="Err_CannotAnonymizePdf" xml:space="preserve">
+    <value>Tego pliku PDF nie można zanonimizować!</value>
+  </data>
+  <data name="Msg_PreviewSavedPdf" xml:space="preserve">
+    <value>Sprawdź zapisany dokument PDF na podglądzie.</value>
+  </data>
+  <data name="Msg_Confirm_OpenNewWithUnsavedSelections" xml:space="preserve">
+    <value>Czy na pewno chcesz otworzyć nowy plik PDF?
 
-Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value></data>
-  <data name="Msg_Confirm_DeleteTextAnnotation" xml:space="preserve"><value>Czy na pewno chcesz usunąć ten napis?</value></data>
-  <data name="Msg_Confirm_ClearAllSelections" xml:space="preserve"><value>Czy na pewno chcesz usunąć wszystkie zaznaczenia z dokumentu?</value></data>
-  <data name="Msg_Confirm_DiscardUnsavedRedactions" xml:space="preserve"><value>Masz niezapisane zmiany redakcyjne w dokumencie.
+Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value>
+  </data>
+  <data name="Msg_Confirm_DeleteTextAnnotation" xml:space="preserve">
+    <value>Czy na pewno chcesz usunąć ten napis?</value>
+  </data>
+  <data name="Msg_Confirm_ClearAllSelections" xml:space="preserve">
+    <value>Czy na pewno chcesz usunąć wszystkie zaznaczenia z dokumentu?</value>
+  </data>
+  <data name="Msg_Confirm_DiscardUnsavedRedactions" xml:space="preserve">
+    <value>Masz niezapisane zmiany redakcyjne w dokumencie.
 
-Czy na pewno chcesz je utracić?</value></data>
-  <data name="Msg_OpenPdfFirst" xml:space="preserve"><value>Otwórz najpierw plik PDF.</value></data>
-  <data name="Msg_DragDrop_UnsupportedFileType" xml:space="preserve"><value>Jest to nieobsługiwany typ pliku. Przeciągnij plik PDF lub plik .pap.</value></data>
-  <data name="Msg_NoPasswordOpenCancelled" xml:space="preserve"><value>Nie podano hasła – otwarcie anulowane.</value></data>
-  <data name="Err_IncorrectPassword" xml:space="preserve"><value>Niepoprawne hasło – spróbuj ponownie.</value></data>
-  <data name="Err_LoadRecentFiles" xml:space="preserve"><value>Wystąpił błąd podczas wczytywania ostatnich plików: {0}</value></data>
-  <data name="Msg_Confirm_NameSearchSlow" xml:space="preserve"><value>Uwaga, opcja wyszukiwania nazwisk w treści może być czasochłonna
+Czy na pewno chcesz je utracić?</value>
+  </data>
+  <data name="Msg_OpenPdfFirst" xml:space="preserve">
+    <value>Otwórz najpierw plik PDF.</value>
+  </data>
+  <data name="Msg_DragDrop_UnsupportedFileType" xml:space="preserve">
+    <value>Jest to nieobsługiwany typ pliku. Przeciągnij plik PDF lub plik .pap.</value>
+  </data>
+  <data name="Msg_NoPasswordOpenCancelled" xml:space="preserve">
+    <value>Nie podano hasła – otwarcie anulowane.</value>
+  </data>
+  <data name="Err_IncorrectPassword" xml:space="preserve">
+    <value>Niepoprawne hasło – spróbuj ponownie.</value>
+  </data>
+  <data name="Err_LoadRecentFiles" xml:space="preserve">
+    <value>Wystąpił błąd podczas wczytywania ostatnich plików: {0}</value>
+  </data>
+  <data name="Msg_Confirm_NameSearchSlow" xml:space="preserve">
+    <value>Uwaga, opcja wyszukiwania nazwisk w treści może być czasochłonna
 
 oraz może nie zwracać poprawnych wyników.
 
-Czy chcesz kontynuować?</value></data>
-  <data name="Err_UnhandledException" xml:space="preserve"><value>Wystąpił nieobsłużony błąd aplikacji:
+Czy chcesz kontynuować?</value>
+  </data>
+  <data name="Err_UnhandledException" xml:space="preserve">
+    <value>Wystąpił nieobsłużony błąd aplikacji:
 
 {0}
 
 Szczegóły zapisano w:
-{1}</value></data>
-  <data name="Title_CriticalAppError" xml:space="preserve"><value>Błąd krytyczny aplikacji</value></data>
-  <data name="Msg_ProjectSaved" xml:space="preserve"><value>Zapisano bieżący stan prac nad projektem
-pod wybraną nazwą.</value></data>
-  <data name="Msg_Closing_UnsavedSelectionsPrefix" xml:space="preserve"><value>Masz zdefiniowane zaznaczenia w treści
+{1}</value>
+  </data>
+  <data name="Title_CriticalAppError" xml:space="preserve">
+    <value>Błąd krytyczny aplikacji</value>
+  </data>
+  <data name="Msg_ProjectSaved" xml:space="preserve">
+    <value>Zapisano bieżący stan prac nad projektem
+pod wybraną nazwą.</value>
+  </data>
+  <data name="Msg_Closing_UnsavedSelectionsPrefix" xml:space="preserve">
+    <value>Masz zdefiniowane zaznaczenia w treści
 
-</value></data>
-  <data name="Msg_Confirm_CloseApp" xml:space="preserve"><value>Czy na pewno chcesz zamknąć aplikację?</value></data>
-  <data name="Msg_LoadedPdf" xml:space="preserve"><value>Załadowano:
-PDF: {0}</value></data>
-  <data name="Msg_LoadedProjectLine" xml:space="preserve"><value>
-Projekt: {0}</value></data>
-  <data name="PwdPrompt_Title_CanChangeRemove" xml:space="preserve"><value>Możesz zmienić lub usunąć hasło PDF</value></data>
-  <data name="PwdPrompt_Title_Enter" xml:space="preserve"><value>Podaj hasło PDF</value></data>
-  <data name="PwdPrompt_Label_Password" xml:space="preserve"><value>Hasło:</value></data>
-  <data name="Dialog_Filter_PDF" xml:space="preserve"><value>Pliki PDF (*.pdf)|*.pdf</value></data>
-  <data name="Dialog_Filter_PAP" xml:space="preserve"><value>Pliki PAP (*.pap)|*.pap</value></data>
-  <data name="Dialog_Title_OpenPdf" xml:space="preserve"><value>Wybierz plik PDF</value></data>
-  <data name="Dialog_Title_SavePdfAs" xml:space="preserve"><value>Zapisz plik PDF pod inną nazwą niż bieżąca</value></data>
-  <data name="Dialog_Title_OpenPap" xml:space="preserve"><value>Wybierz plik projektu AnonPDF</value></data>
-  <data name="Dialog_Title_SavePap" xml:space="preserve"><value>Podaj nazwę pliku projektu AnonPDF</value></data>
-  <data name="About_Message" xml:space="preserve"><value>Nazwa aplikacji: {0}
+</value>
+  </data>
+  <data name="Msg_Confirm_CloseApp" xml:space="preserve">
+    <value>Czy na pewno chcesz zamknąć aplikację?</value>
+  </data>
+  <data name="Msg_LoadedPdf" xml:space="preserve">
+    <value>Załadowano:
+PDF: {0}</value>
+  </data>
+  <data name="Msg_LoadedProjectLine" xml:space="preserve">
+    <value>
+Projekt: {0}</value>
+  </data>
+  <data name="PwdPrompt_Title_CanChangeRemove" xml:space="preserve">
+    <value>Możesz zmienić lub usunąć hasło PDF</value>
+  </data>
+  <data name="PwdPrompt_Title_Enter" xml:space="preserve">
+    <value>Podaj hasło PDF</value>
+  </data>
+  <data name="PwdPrompt_Label_Password" xml:space="preserve">
+    <value>Hasło:</value>
+  </data>
+  <data name="Dialog_Filter_PDF" xml:space="preserve">
+    <value>Pliki PDF (*.pdf)|*.pdf</value>
+  </data>
+  <data name="Dialog_Filter_PAP" xml:space="preserve">
+    <value>Pliki PAP (*.pap)|*.pap</value>
+  </data>
+  <data name="Dialog_Title_OpenPdf" xml:space="preserve">
+    <value>Wybierz plik PDF</value>
+  </data>
+  <data name="Dialog_Title_SavePdfAs" xml:space="preserve">
+    <value>Zapisz plik PDF pod inną nazwą niż bieżąca</value>
+  </data>
+  <data name="Dialog_Title_OpenPap" xml:space="preserve">
+    <value>Wybierz plik projektu AnonPDF</value>
+  </data>
+  <data name="Dialog_Title_SavePap" xml:space="preserve">
+    <value>Podaj nazwę pliku projektu AnonPDF</value>
+  </data>
+  <data name="About_Message" xml:space="preserve">
+    <value>Nazwa aplikacji: {0}
 Wersja: {1}
 Firma: {2}
 {3}
@@ -358,6 +747,18 @@ Licencje i komponenty:
 - TesseractOCR (.NET) (Apache-2.0)
 
 Kod źródłowy dostępny zgodnie z AGPL-3.0 (zobacz plik LICENSE).
-Repozytorium: https://github.com/umszczecin/AnonPDF</value></data>
-
+Repozytorium: https://github.com/umszczecin/AnonPDF</value>
+  </data>
+  <data name="Signatures_Report_Title" xml:space="preserve">
+    <value>Lista podpisów kwalifikowanych w oryginalnym dokumencie (przed anonimizacją):</value>
+  </data>
+  <data name="Signatures_Report_Field_SignerName" xml:space="preserve">
+    <value>Sygnatariusz</value>
+  </data>
+  <data name="Signatures_Report_Field_SignerTitle" xml:space="preserve">
+    <value>Tytuł</value>
+  </data>
+  <data name="Signatures_Report_Field_SignDate" xml:space="preserve">
+    <value>Data</value>
+  </data>
 </root>

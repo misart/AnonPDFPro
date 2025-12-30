@@ -65,6 +65,7 @@ namespace AnonPDF.Properties {
         ///Wersja: {1}
         ///Firma: {2}
         ///{3}
+        ///
         ///Opis: {4}
         ///
         ///Licencje i komponenty:
@@ -74,7 +75,8 @@ namespace AnonPDF.Properties {
         ///- BouncyCastle (MIT)
         ///- TesseractOCR (.NET) (Apache-2.0)
         ///
-        ///Kod źródłowy dostępny zgodnie z AGPL-3.0 (zobacz plik LICENSE)..
+        ///Kod źródłowy dostępny zgodnie z AGPL-3.0 (zobacz plik LICENSE).
+        ///Repozytorium: https://github.com/umszczecin/AnonPDF.
         /// </summary>
         internal static string About_Message {
             get {
@@ -1107,6 +1109,42 @@ namespace AnonPDF.Properties {
         internal static string PwdPrompt_Title_Enter {
             get {
                 return ResourceManager.GetString("PwdPrompt_Title_Enter", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Data.
+        /// </summary>
+        internal static string Signatures_Report_Field_SignDate {
+            get {
+                return ResourceManager.GetString("Signatures_Report_Field_SignDate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Sygnatariusz.
+        /// </summary>
+        internal static string Signatures_Report_Field_SignerName {
+            get {
+                return ResourceManager.GetString("Signatures_Report_Field_SignerName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Tytuł.
+        /// </summary>
+        internal static string Signatures_Report_Field_SignerTitle {
+            get {
+                return ResourceManager.GetString("Signatures_Report_Field_SignerTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Lista podpisów kwalifikowanych w oryginalnym dokumencie (przed anonimizacją):.
+        /// </summary>
+        internal static string Signatures_Report_Title {
+            get {
+                return ResourceManager.GetString("Signatures_Report_Title", resourceCulture);
             }
         }
         

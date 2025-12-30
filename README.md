@@ -29,6 +29,29 @@ AnonPDF is a Windows (WinForms) application for PDF anonymization. It lets you r
 
 The help file `UserGuide_*.pdf` is copied to the output (bin) directory during build.
 
+## Debugging in Visual Studio (iText `FontCache` NullReferenceException)
+
+When debugging AnonPDF in Visual Studio, you may see the debugger break with an exception similar to:
+
+> System.NullReferenceException  
+> Source = itext.io  
+> at iText.IO.Font.FontCache..cctor()
+
+This typically happens when working with signed PDFs (e.g. when calling `SignatureUtil`) and is caused by internal initialization logic in iText.  
+The exception is **handled internally by iText** and does **not** indicate a real error in AnonPDF, but Visual Studio may still break on it by default.
+
+If this keeps interrupting your debugging session, you can safely adjust your debugger settings:
+
+1. In Visual Studio, go to  
+   **Tools -> Options -> Debugging -> General**
+2. Make sure:
+   - **Enable Just My Code** is **checked**.
+   - You do **not** have a global setting that breaks on **all** thrown CLR exceptions.
+3. Optionally, open the **Exception Settings** window and uncheck  
+   **Break when thrown** for **Common Language Runtime Exceptions**.
+
+After these changes, the internal iText `FontCache` exception will no longer stop the debugger, while AnonPDF will continue to run normally.
+
 ## Usage
 - Open a PDF and navigate pages.
 - Draw redaction areas, add annotations, remove pages.
