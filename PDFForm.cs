@@ -20,9 +20,9 @@ using iText.Forms;
 using iText.Signatures;
 using iText.Kernel.Colors;
 using iText.Kernel.Pdf.Xobject;
+using iText.Commons.Bouncycastle.Cert;
 using PDFiumSharp;
 using Newtonsoft.Json;
-using Org.BouncyCastle.Asn1.X509;
 using PDFiumSharp.Enums;
 using System.Threading.Tasks;
 using iText.Kernel.Pdf.Canvas.Parser;
@@ -963,7 +963,7 @@ namespace AnonPDF
                     }
                 }
             }
-            catch (iText.Kernel.Exceptions.BadPasswordException)
+            catch (BadPasswordException)
             {
                 lockedFile = inputSplitPdfPath;
             }
@@ -2203,7 +2203,7 @@ namespace AnonPDF
                         if (form != null)
                         {
                             // Get all form fields
-                            IDictionary<string, PdfFormField> fields = form.GetFormFields();
+                            IDictionary<string, PdfFormField> fields = form.GetAllFormFields();
 
                             // Collect signature field keys for removal
                             // (cannot modify collection during iteration)
@@ -2230,7 +2230,7 @@ namespace AnonPDF
                     if (form != null)
                     {
                         // Get all form fields
-                        IDictionary<string, PdfFormField> fields = form.GetFormFields();
+                        IDictionary<string, PdfFormField> fields = form.GetAllFormFields();
                         foreach (var field in fields)
                         {
                             if (field.Value is PdfSignatureFormField sigField)
@@ -5087,33 +5087,22 @@ namespace AnonPDF
 
                 foreach (string name in sigNames)
                 {
-                    // For each signature get PdfPKCS7 object
                     PdfPKCS7 pkcs7 = signUtil.ReadSignatureData(name);
 
                     DateTime signDate = pkcs7.GetSignDate().ToLocalTime();
-                    var signingCertificate = pkcs7.GetSigningCertificate();
-                    X509Name xName = signingCertificate.SubjectDN;
-                    string dnText = xName.ToString();
-                    string cert_cn = "";
-                    var cn_obj = xName.GetValueList(X509Name.CN);
-                    if (cn_obj.Count > 0)
-                    {
-                        cert_cn = cn_obj[0].ToString();
-                    }
-                    string cert_t = "";
-                    var t_obj = xName.GetValueList(X509Name.T);
-                    if (t_obj.Count > 0)
-                    {
-                        cert_t = t_obj[0].ToString();
-                    }
+
+                    IX509Certificate cert = pkcs7.GetSigningCertificate();
+                    var subject = CertificateInfo.GetSubjectFields(cert);
+
+                    string certCn = subject.GetField("CN") ?? "";
+                    string certT = subject.GetField("T") ?? "";
 
                     signatures.Add(new SignatureInfo
                     {
-                        SignerName = cert_cn,
-                        SignerTitle = cert_t,
-                        SignDate = signDate,
+                        SignerName = certCn,
+                        SignerTitle = certT,
+                        SignDate = signDate
                     });
-
                 }
             }
 
@@ -5129,12 +5118,6 @@ namespace AnonPDF
             }
 
             bool isMarked = pagesToRemove.Contains(currentPage);
-
-            //ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-            //int pageNumber = ((PageItemStatus)currentItem.Tag).PageNumber;
-            //bool hasSelections = ((PageItemStatus)currentItem.Tag).HasSelections;
-            //bool hasSearchResults = ((PageItemStatus)currentItem.Tag).HasSearchResults;
-            //bool hasTextAnnotations = ((PageItemStatus)currentItem.Tag).HasTextAnnotations;
 
             PageItemStatus status = allPageStatuses[currentPage - 1];
             if (isMarked)

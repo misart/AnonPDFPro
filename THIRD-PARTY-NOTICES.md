@@ -2,7 +2,7 @@
 
 This project includes third-party components. Their licenses and notices are summarized below. Full texts are included where available in the local `packages/` folder or linked to upstream sources.
 
-- iText 7 (itext7, itext7.commons, itext7.pdfsweep)
+- iText 9.5.0 (itext9, itext9.commons, itext9.pdfsweep)
   - License: GNU Affero General Public License v3.0 (AGPL-3.0)
   - Full text: see `packages/itext7.pdfsweep.3.0.0/gnu-agpl-v3.0.md` and `LICENSE`.
 
@@ -32,7 +32,7 @@ This project includes third-party components. Their licenses and notices are sum
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-- BouncyCastle.Cryptography 2.5.1
+- BouncyCastle.Cryptography 2.6.2
   - License: MIT
   - License text:
 
