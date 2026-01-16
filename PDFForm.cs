@@ -43,6 +43,7 @@ using iText.Kernel.Font;
 using TesseractOCR;
 using System.Data.SqlClient;
 
+
 // Suppress spell-check warning for project name 'AnonPDF'
 #pragma warning disable SPELL
 namespace AnonPDF
@@ -2037,52 +2038,174 @@ namespace AnonPDF
             pageNumberTextBox.SelectAll();
         }
 
+        private static string NormalizeFontName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return string.Empty;
+
+            // Remove suffixes like "(TrueType)" / "(OpenType)"
+            int idx = name.IndexOf('(');
+            if (idx >= 0)
+                name = name.Substring(0, idx);
+
+            name = name.Trim();
+
+            // Normalize whitespace to single spaces
+            name = string.Join(" ", name.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
+
+            return name;
+        }
+
+        private static string RemoveWidthTokens(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return name;
+
+            // Practical fallback for width/condensed/expanded variants that may not appear in registry names
+            string[] tokensToRemove =
+            {
+                "semi condensed",
+                "semicondensed",                
+                "semi expanded",
+                "semiexpanded",
+                "narrow",
+                "wide",
+                "condensed",
+                "expanded"
+            };
+
+            string lowered = name.ToLowerInvariant();
+
+            foreach (var token in tokensToRemove)
+            {
+                lowered = lowered.Replace(token, "");
+            }
+
+            // Normalize whitespace after token removal
+            string cleaned = string.Join(" ",
+                lowered.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
+
+            return cleaned;
+        }
+
         private string GetFontFilePathFromRegistry(string fontFamilyName, FontStyle style)
         {
-            // Open registry key containing font information
-            using (Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"))
+            if (string.IsNullOrWhiteSpace(fontFamilyName))
+                return null;
+
+            // Collect font registry entries from both HKLM and HKCU
+            var entries = new List<(string DisplayName, string FileValue)>();
+
+            void ReadFontsKey(Microsoft.Win32.RegistryKey root)
             {
-                if (regKey != null)
+                using (var regKey = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"))
                 {
-                    // Iterating through all entries
-                    foreach (string regValueName in regKey.GetValueNames())
+                    if (regKey == null)
+                        return;
+
+                    foreach (string valueName in regKey.GetValueNames())
                     {
-                        string keyLower = regValueName.ToLowerInvariant();
-                        string familyLower = fontFamilyName.ToLowerInvariant();
-
-                        // Check if entry contains family name
-                        if (!keyLower.Contains(familyLower))
+                        object value = regKey.GetValue(valueName);
+                        if (value == null)
                             continue;
 
-                        // If style is Bold, check if key contains "bold"
-                        if (style.HasFlag(FontStyle.Bold) && !keyLower.Contains("bold"))
-                            continue;
-                        // If style is Italic, check if key contains "italic"
-                        if (style.HasFlag(FontStyle.Italic) && !keyLower.Contains("italic"))
-                            continue;
-
-                        // We can additionally check if entry contains "(trueType)" – then we most likely have TrueType font
-                        if (!keyLower.Contains("truetype"))
-                            continue;
-
-                        // If key matches, get value – i.e. file name
-                        object fontFileObj = regKey.GetValue(regValueName);
-                        if (fontFileObj != null)
-                        {
-                            string fontFile = fontFileObj.ToString();
-                            // If not full path, combine with fonts folder
-                            if (!Path.IsPathRooted(fontFile))
-                            {
-                                string fontsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-                                fontFile = Path.Combine(fontsFolder, fontFile);
-                            }
-                            if (File.Exists(fontFile))
-                                return fontFile;
-                        }
+                        entries.Add((valueName, value.ToString()));
                     }
                 }
             }
-            return null; // If no match found
+
+            ReadFontsKey(Microsoft.Win32.Registry.LocalMachine);
+            ReadFontsKey(Microsoft.Win32.Registry.CurrentUser);
+
+            if (entries.Count == 0)
+                return null;
+
+            // Normalize the target font family name (remove suffixes like "(TrueType)", normalize spaces, etc.)
+            string targetNormalized = NormalizeFontName(fontFamilyName);
+
+            // Some fonts are stored in registry under a "base" family name only (e.g. Bahnschrift),
+            // while GDI/UI can show width variants like "Bahnschrift Condensed".
+            // This base-normalized value is used as a fallback match.
+            string targetBaseNormalized = NormalizeFontName(RemoveWidthTokens(fontFamilyName));
+
+            // Find the best matching registry entry using a simple scoring approach
+            var candidates = new List<(int Score, string ValueName, string FileValue)>();
+
+            foreach (var entry in entries)
+            {
+                string regValueName = entry.DisplayName ?? string.Empty;
+
+                // Normalize registry display name for comparisons
+                string regNormalized = NormalizeFontName(regValueName);
+                string regBaseNormalized = NormalizeFontName(RemoveWidthTokens(regValueName));
+
+                // Prefer TrueType/OpenType entries when possible
+                bool isTrueTypeOrOpenType =
+                    regValueName.IndexOf("truetype", StringComparison.OrdinalIgnoreCase) >= 0
+                    || regValueName.IndexOf("opentype", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                // Name matching score:
+                // exact match > starts-with > contains > base-name fallback
+                int nameScore = 0;
+
+                if (string.Equals(regNormalized, targetNormalized, StringComparison.OrdinalIgnoreCase))
+                    nameScore = 100;
+                else if (regNormalized.StartsWith(targetNormalized, StringComparison.OrdinalIgnoreCase))
+                    nameScore = 80;
+                else if (regNormalized.IndexOf(targetNormalized, StringComparison.OrdinalIgnoreCase) >= 0)
+                    nameScore = 60;
+                else if (!string.IsNullOrEmpty(targetBaseNormalized))
+                {
+                    // Base-name fallback (important for e.g. Bahnschrift Condensed -> Bahnschrift)
+                    if (string.Equals(regBaseNormalized, targetBaseNormalized, StringComparison.OrdinalIgnoreCase))
+                        nameScore = 55;
+                    else if (regBaseNormalized.StartsWith(targetBaseNormalized, StringComparison.OrdinalIgnoreCase))
+                        nameScore = 45;
+                    else if (regBaseNormalized.IndexOf(targetBaseNormalized, StringComparison.OrdinalIgnoreCase) >= 0)
+                        nameScore = 35;
+                }
+
+                if (nameScore == 0)
+                    continue;
+
+                // Style score:
+                // Try to prefer Bold/Italic entries if they exist in registry value names,
+                // but do NOT reject if they don't exist (many fonts are represented by a single file entry).
+                int styleScore = 0;
+                string regLower = regValueName.ToLowerInvariant();
+
+                if (style.HasFlag(FontStyle.Bold) && regLower.Contains("bold"))
+                    styleScore += 20;
+
+                if (style.HasFlag(FontStyle.Italic) && (regLower.Contains("italic") || regLower.Contains("oblique")))
+                    styleScore += 20;
+
+                // Small bonus for TrueType/OpenType entries (optional but useful)
+                int typeScore = isTrueTypeOrOpenType ? 5 : 0;
+
+                int totalScore = nameScore + styleScore + typeScore;
+                candidates.Add((totalScore, entry.DisplayName, entry.FileValue));
+            }
+
+            if (candidates.Count == 0)
+                return null;
+
+            // Select the best-scored entry
+            var best = candidates.OrderByDescending(c => c.Score).First();
+
+            // Build the final path:
+            // if value is just a file name (e.g. "arial.ttf"), combine it with the system Fonts folder.
+            string fontFile = best.FileValue;
+            if (string.IsNullOrWhiteSpace(fontFile))
+                return null;
+
+            if (!Path.IsPathRooted(fontFile))
+            {
+                string fontsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+                fontFile = Path.Combine(fontsFolder, fontFile);
+            }
+
+            return File.Exists(fontFile) ? fontFile : null;
         }
 
         void RedactText(string inputFile, string outputFile)
