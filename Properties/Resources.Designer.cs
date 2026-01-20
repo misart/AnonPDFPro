@@ -69,7 +69,7 @@ namespace AnonPDF.Properties {
         ///Opis: {4}
         ///
         ///Licencje i komponenty:
-        ///- iText 7 (AGPL-3.0)
+        ///- iText 9 (AGPL-3.0)
         ///- PDFiumSharp / PDFium
         ///- Newtonsoft.Json (MIT)
         ///- BouncyCastle (MIT)
