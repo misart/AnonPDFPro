@@ -579,6 +579,31 @@ namespace AnonPDF
             }
         }
 
+        private static SizeF GetAnnotationSize(string text, Font font, int rotation)
+        {
+            Size textSize = TextRenderer.MeasureText(text, font);
+            rotation = NormalizeRotation(rotation);
+            if (rotation == 90 || rotation == 270)
+                return new SizeF(textSize.Height, textSize.Width);
+            return new SizeF(textSize.Width, textSize.Height);
+        }
+
+        private static PointF GetRotationOffsetForBounds(int rotation, float width, float height)
+        {
+            rotation = NormalizeRotation(rotation);
+            switch (rotation)
+            {
+                case 90:
+                    return new PointF(height, 0f);
+                case 180:
+                    return new PointF(width, height);
+                case 270:
+                    return new PointF(0f, width);
+                default:
+                    return new PointF(0f, 0f);
+            }
+        }
+
         private void AddEditAnnotation(TextAnnotation annotation = null)
         {
             using (EditTextDialog dlg = new EditTextDialog())
@@ -590,12 +615,13 @@ namespace AnonPDF
                     dlg.AnnotationFont = annotation.AnnotationFont;
                     dlg.AnnotationColor = annotation.AnnotationColor;
                     dlg.AnnotationAlignment = annotation.AnnotationAlignment;
+                    dlg.AnnotationRotation = annotation.AnnotationRotation;
                 }
 
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
                     // Calculate text size using the selected font
-                    Size textSize = TextRenderer.MeasureText(dlg.AnnotationText, dlg.AnnotationFont);
+                    SizeF textSize = GetAnnotationSize(dlg.AnnotationText, dlg.AnnotationFont, dlg.AnnotationRotation);
 
                     ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
 
@@ -612,6 +638,7 @@ namespace AnonPDF
                         annotation.AnnotationFont = dlg.AnnotationFont;
                         annotation.AnnotationColor = dlg.AnnotationColor;
                         annotation.AnnotationAlignment = dlg.AnnotationAlignment;
+                        annotation.AnnotationRotation = dlg.AnnotationRotation;
                         annotation.AnnotationBounds = new RectangleF(
                             annotation.AnnotationBounds.X,
                             annotation.AnnotationBounds.Y,
@@ -628,7 +655,8 @@ namespace AnonPDF
                             AnnotationText = dlg.AnnotationText,
                             AnnotationFont = dlg.AnnotationFont,
                             AnnotationColor = dlg.AnnotationColor,
-                            AnnotationAlignment = dlg.AnnotationAlignment
+                            AnnotationAlignment = dlg.AnnotationAlignment,
+                            AnnotationRotation = dlg.AnnotationRotation
                         };
 
                         // 1) panel dimensions
@@ -2658,6 +2686,7 @@ namespace AnonPDF
                     float fontSize = (float)annotation.AnnotationFont.Size;
                         
                     int rotation = GetEffectiveRotationDegrees(annotation.PageNumber);
+                    int annotationRotation = NormalizeRotation(annotation.AnnotationRotation);
 
                     // Coordinate conversion - assume ConvertToPdfCoordinates works similarly to redaction blocks
                     // Get DPI from pdfViewer
@@ -2701,7 +2730,13 @@ namespace AnonPDF
                        annotation.AnnotationBounds.Width * scaleX,
                        annotation.AnnotationBounds.Height * scaleY
                     );
-                    float rectWidth = scaledAnnotationBounds.Width;
+                    float layoutWidth = scaledAnnotationBounds.Width;
+                    float layoutHeight = scaledAnnotationBounds.Height;
+                    if (annotationRotation == 90 || annotationRotation == 270)
+                    {
+                        layoutWidth = scaledAnnotationBounds.Height;
+                        layoutHeight = scaledAnnotationBounds.Width;
+                    }
                     float maxGdiWidthPt = 0f;
                     float maxPdfWidth = 0f;
                     for (int i = 0; i < lines.Length; i++)
@@ -2723,10 +2758,15 @@ namespace AnonPDF
                     if (string.IsNullOrEmpty(textValue))
                         continue;
 
-                    float textRotation = (float)(rotation * Math.PI / 180.0);
+                    int combinedRotation = NormalizeRotation(rotation - annotationRotation);
+                    float textRotation = (float)(combinedRotation * Math.PI / 180.0);
 
                     float cos = (float)Math.Cos(textRotation);
                     float sin = (float)Math.Sin(textRotation);
+                    float annotationRotationRadians = (float)(annotationRotation * Math.PI / 180.0);
+                    float rotCos = (float)Math.Cos(annotationRotationRadians);
+                    float rotSin = (float)Math.Sin(annotationRotationRadians);
+                    PointF rotationOffset = GetRotationOffsetForBounds(annotationRotation, layoutWidth, layoutHeight);
 
                     pdfCanvas.SaveState();
                     pdfCanvas.BeginText();
@@ -2742,19 +2782,25 @@ namespace AnonPDF
                         string lineText = lines[i];
                         float lineWidthPt = gdiLineWidthsPt[i];
 
-                        float anchorX = scaledAnnotationBounds.X;
+                        float localX = 0f;
                         switch (annotation.AnnotationAlignment)
                         {
                             case HorizontalAlignment.Center:
-                                anchorX = scaledAnnotationBounds.X + (rectWidth - lineWidthPt) / 2f;
+                                localX = (layoutWidth - lineWidthPt) / 2f;
                                 break;
                             case HorizontalAlignment.Right:
-                                anchorX = scaledAnnotationBounds.X + (rectWidth - lineWidthPt);
+                                localX = layoutWidth - lineWidthPt;
                                 break;
                         }
 
-                        float baselineY = scaledAnnotationBounds.Y + i * lineHeightPt + gdiAscentPt;
-                        PointF baselineView = new PointF(anchorX, baselineY);
+                        float localY = i * lineHeightPt;
+                        float localBaseX = localX;
+                        float localBaseY = localY + gdiAscentPt;
+                        float rotatedX = localBaseX * rotCos - localBaseY * rotSin + rotationOffset.X;
+                        float rotatedY = localBaseX * rotSin + localBaseY * rotCos + rotationOffset.Y;
+                        PointF baselineView = new PointF(
+                            scaledAnnotationBounds.X + rotatedX,
+                            scaledAnnotationBounds.Y + rotatedY);
                         PointF baselinePdf = ConvertPointToPdfCoordinates(baselineView, annotation.PageNumber, rotation);
 
                         pdfCanvas.SetTextMatrix(cos, sin, -sin, cos, baselinePdf.X, baselinePdf.Y);
@@ -3920,19 +3966,41 @@ namespace AnonPDF
                 // DPI correction coefficient (assuming PDF uses 72 DPI)
                 float dpiCorrection = 72f / e.Graphics.DpiY; // DpiY to DPI w pionie dla bitmapy
 
+                int annotationRotation = NormalizeRotation(annotation.AnnotationRotation);
+                float layoutWidth = rect.Width;
+                float layoutHeight = rect.Height;
+                if (annotationRotation == 90 || annotationRotation == 270)
+                {
+                    layoutWidth = rect.Height;
+                    layoutHeight = rect.Width;
+                }
+
                 // Render text with scaled font
                 using (SolidBrush brush = new SolidBrush(annotation.AnnotationColor))
                 {
                     float scaledFontSize = annotation.AnnotationFont.Size * scaleFactor * dpiCorrection;
                     using (Font scaledFont = new Font(annotation.AnnotationFont.FontFamily, scaledFontSize, annotation.AnnotationFont.Style))
                     {
+                        float rotationRadians = (float)(annotationRotation * Math.PI / 180.0);
+                        float rotCos = (float)Math.Cos(rotationRadians);
+                        float rotSin = (float)Math.Sin(rotationRadians);
+                        PointF rotationOffset = GetRotationOffsetForBounds(annotationRotation, layoutWidth, layoutHeight);
+                        float offsetX = rotationOffset.X;
+                        float offsetY = rotationOffset.Y;
+
+                        RectangleF layoutRect = new RectangleF(0, 0, layoutWidth, layoutHeight);
+                        var state = e.Graphics.Save();
+                        e.Graphics.Transform = new System.Drawing.Drawing2D.Matrix(
+                            rotCos, rotSin, -rotSin, rotCos,
+                            rect.X + offsetX, rect.Y + offsetY);
                         e.Graphics.DrawString(
                             annotation.AnnotationText,  // Tekst adnotacji
                             scaledFont,                  // Przeskalowana czcionka
                             brush,                       // Kolor tekstu
-                            (RectangleF)rect,            // Obszar renderowania (przeskalowany)
+                            layoutRect,                  // Obszar renderowania
                             stringFormat               // Alignment settings
                         );
+                        e.Graphics.Restore(state);
                     }
                 }
 
@@ -6406,6 +6474,8 @@ namespace AnonPDF
 
         public HorizontalAlignment AnnotationAlignment { get; set; }
 
+        public int AnnotationRotation { get; set; }
+
         public RectangleF AnnotationBounds { get; set; }
 
         public bool AnnotationIsLocked { get; set; }
@@ -6417,6 +6487,7 @@ namespace AnonPDF
             AnnotationFont = new Font("Arial", 12);
             AnnotationColor = System.Drawing.Color.Black;
             AnnotationAlignment = HorizontalAlignment.Left; // Default left alignment
+            AnnotationRotation = 0;
             AnnotationBounds = new RectangleF(0, 0, 100, 30); // Example rectangular area
             AnnotationIsLocked = false;
         }
@@ -6429,6 +6500,7 @@ namespace AnonPDF
             AnnotationFont = font;
             AnnotationColor = color;
             AnnotationAlignment = alignment;
+            AnnotationRotation = 0;
             AnnotationBounds = bounds;
             AnnotationIsLocked = isLocked;
         }
@@ -6436,7 +6508,7 @@ namespace AnonPDF
         public override string ToString()
         {
             // Optional, facilitates debugging and displaying annotation information.
-            return $"{AnnotationText} - {AnnotationFont.FontFamily.Name}, {AnnotationFont.Size} pt, {AnnotationColor.Name}, {AnnotationAlignment}, {AnnotationIsLocked}";
+            return $"{AnnotationText} - {AnnotationFont.FontFamily.Name}, {AnnotationFont.Size} pt, {AnnotationColor.Name}, {AnnotationAlignment}, {AnnotationRotation}, {AnnotationIsLocked}";
         }
     }
 
@@ -6451,6 +6523,11 @@ namespace AnonPDF
         private RadioButton rbLeft;
         private RadioButton rbCenter;
         private RadioButton rbRight;
+        private GroupBox groupBoxRotation;
+        private RadioButton rbRotate0;
+        private RadioButton rbRotate90;
+        private RadioButton rbRotate180;
+        private RadioButton rbRotate270;
         private Button btnOK;
         private Button btnCancel;
 
@@ -6459,6 +6536,7 @@ namespace AnonPDF
         public Font AnnotationFont { get; set; }
         public System.Drawing.Color AnnotationColor { get; set; }
         public HorizontalAlignment AnnotationAlignment { get; set; }
+        public int AnnotationRotation { get; set; }
 
         public EditTextDialog()
         {
@@ -6467,6 +6545,8 @@ namespace AnonPDF
             if (AnnotationText == null) AnnotationText = "";
             if (AnnotationFont == null) AnnotationFont = new Font("Arial", 12);
             if (AnnotationColor == System.Drawing.Color.Empty) AnnotationColor = System.Drawing.Color.Black;
+            if (AnnotationRotation != 90 && AnnotationRotation != 180 && AnnotationRotation != 270)
+                AnnotationRotation = 0;
 
             InitializeComponents();
         }
@@ -6477,7 +6557,7 @@ namespace AnonPDF
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
             this.Width = 440;
-            this.Height = 380;
+            this.Height = 430;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
 
@@ -6567,12 +6647,59 @@ namespace AnonPDF
             rbCenter.CheckedChanged += RadioButton_CheckedChanged;
             rbRight.CheckedChanged += RadioButton_CheckedChanged;
 
+            // GroupBox for rotation selection
+            groupBoxRotation = new GroupBox
+            {
+                Text = Resources.EditText_GroupRotation,
+                Location = new Point(10, 260),
+                Size = new Size(400, 50)
+            };
+
+            rbRotate0 = new RadioButton
+            {
+                Text = "0",
+                Location = new Point(10, 20),
+                AutoSize = true,
+                Checked = true
+            };
+
+            rbRotate90 = new RadioButton
+            {
+                Text = "90",
+                Location = new Point(90, 20),
+                AutoSize = true
+            };
+
+            rbRotate180 = new RadioButton
+            {
+                Text = "180",
+                Location = new Point(180, 20),
+                AutoSize = true
+            };
+
+            rbRotate270 = new RadioButton
+            {
+                Text = "270",
+                Location = new Point(280, 20),
+                AutoSize = true
+            };
+
+            groupBoxRotation.Controls.Add(rbRotate0);
+            groupBoxRotation.Controls.Add(rbRotate90);
+            groupBoxRotation.Controls.Add(rbRotate180);
+            groupBoxRotation.Controls.Add(rbRotate270);
+
+            rbRotate0.CheckedChanged += RotationRadioButton_CheckedChanged;
+            rbRotate90.CheckedChanged += RotationRadioButton_CheckedChanged;
+            rbRotate180.CheckedChanged += RotationRadioButton_CheckedChanged;
+            rbRotate270.CheckedChanged += RotationRadioButton_CheckedChanged;
+
 
             // OK and Cancel buttons
             btnOK = new Button
             {
                 Text = Resources.Merge_OK,
-                Location = new Point(220, 290),
+                Location = new Point(220, 330),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.OK
             };
@@ -6581,7 +6708,7 @@ namespace AnonPDF
             btnCancel = new Button
             {
                 Text = Resources.Merge_Cancel,
-                Location = new Point(320, 290),
+                Location = new Point(320, 330),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.Cancel
             };
@@ -6593,6 +6720,7 @@ namespace AnonPDF
             this.Controls.Add(lblFontDisplay);
             this.Controls.Add(btnColor);
             this.Controls.Add(groupBoxAlignment);
+            this.Controls.Add(groupBoxRotation);
             this.Controls.Add(btnOK);
             this.Controls.Add(btnCancel);
 
@@ -6620,6 +6748,22 @@ namespace AnonPDF
                     break;
                 case HorizontalAlignment.Right:
                     rbRight.Checked = true;
+                    break;
+            }
+
+            switch (AnnotationRotation)
+            {
+                case 90:
+                    rbRotate90.Checked = true;
+                    break;
+                case 180:
+                    rbRotate180.Checked = true;
+                    break;
+                case 270:
+                    rbRotate270.Checked = true;
+                    break;
+                default:
+                    rbRotate0.Checked = true;
                     break;
             }
         }
@@ -6664,6 +6808,26 @@ namespace AnonPDF
             txtText.SelectionAlignment = AnnotationAlignment;
             txtText.DeselectAll();
 
+        }
+
+        private void RotationRadioButton_CheckedChanged(object sender, EventArgs e)
+        {
+            if (rbRotate0.Checked)
+            {
+                AnnotationRotation = 0;
+            }
+            else if (rbRotate90.Checked)
+            {
+                AnnotationRotation = 90;
+            }
+            else if (rbRotate180.Checked)
+            {
+                AnnotationRotation = 180;
+            }
+            else if (rbRotate270.Checked)
+            {
+                AnnotationRotation = 270;
+            }
         }
 
         private void BtnFont_Click(object sender, EventArgs e)

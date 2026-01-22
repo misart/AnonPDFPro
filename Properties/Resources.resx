@@ -540,6 +540,9 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   <data name="EditText_GroupAlignment" xml:space="preserve">
     <value>Wyrównanie</value>
   </data>
+  <data name="EditText_GroupRotation" xml:space="preserve">
+    <value>Obrót</value>
+  </data>
   <data name="EditText_AlignLeft" xml:space="preserve">
     <value>Lewo</value>
   </data>

@@ -273,6 +273,12 @@ namespace AnonPDF.Properties {
             }
         }
         
+        internal static string EditText_GroupRotation {
+            get {
+                return ResourceManager.GetString("EditText_GroupRotation", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Looks up a localized string similar to Wprowadź tekst:.
         /// </summary>
