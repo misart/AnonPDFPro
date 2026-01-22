@@ -581,11 +581,33 @@ namespace AnonPDF
 
         private static SizeF GetAnnotationSize(string text, Font font, int rotation)
         {
-            Size textSize = TextRenderer.MeasureText(text, font);
+            if (text == null)
+                text = string.Empty;
+
+            string normalized = text.Replace("\r\n", "\n").Replace("\r", "\n");
+            string[] lines = normalized.Split(new[] { '\n' }, StringSplitOptions.None);
+            float maxWidth = 0f;
+            float lineHeight;
+
+            using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
+            using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
+            {
+                format.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.MeasureTrailingSpaces;
+                format.Trimming = StringTrimming.None;
+                lineHeight = font.GetHeight(g);
+                foreach (string line in lines)
+                {
+                    SizeF size = g.MeasureString(line, font, int.MaxValue, format);
+                    if (size.Width > maxWidth)
+                        maxWidth = size.Width;
+                }
+            }
+
+            float height = Math.Max(lineHeight * Math.Max(lines.Length, 1), lineHeight);
             rotation = NormalizeRotation(rotation);
             if (rotation == 90 || rotation == 270)
-                return new SizeF(textSize.Height, textSize.Width);
-            return new SizeF(textSize.Width, textSize.Height);
+                return new SizeF(height, maxWidth);
+            return new SizeF(maxWidth, height);
         }
 
         private static PointF GetRotationOffsetForBounds(int rotation, float width, float height)
@@ -604,6 +626,22 @@ namespace AnonPDF
             }
         }
 
+        private static void ApplyAnnotationFromDialog(TextAnnotation annotation, EditTextDialog dlg)
+        {
+            SizeF textSize = GetAnnotationSize(dlg.AnnotationText, dlg.AnnotationFont, dlg.AnnotationRotation);
+            annotation.AnnotationText = dlg.AnnotationText;
+            annotation.AnnotationFont = dlg.AnnotationFont;
+            annotation.AnnotationColor = dlg.AnnotationColor;
+            annotation.AnnotationAlignment = dlg.AnnotationAlignment;
+            annotation.AnnotationRotation = dlg.AnnotationRotation;
+            annotation.AnnotationBounds = new RectangleF(
+                annotation.AnnotationBounds.X,
+                annotation.AnnotationBounds.Y,
+                textSize.Width,
+                textSize.Height
+            );
+        }
+
         private void AddEditAnnotation(TextAnnotation annotation = null)
         {
             using (EditTextDialog dlg = new EditTextDialog())
@@ -616,6 +654,14 @@ namespace AnonPDF
                     dlg.AnnotationColor = annotation.AnnotationColor;
                     dlg.AnnotationAlignment = annotation.AnnotationAlignment;
                     dlg.AnnotationRotation = annotation.AnnotationRotation;
+                    dlg.ApplyChanges = () =>
+                    {
+                        ApplyAnnotationFromDialog(annotation, dlg);
+                        pdfViewer.Invalidate();
+                        projectWasChangedAfterLastSave = true;
+                        saveProjectButton.Enabled = true;
+                        saveProjectMenuItem.Enabled = true;
+                    };
                 }
 
                 if (dlg.ShowDialog() == DialogResult.OK)
@@ -634,17 +680,7 @@ namespace AnonPDF
                     {
                         // Edit mode – updating existing annotation,
                         // preserving its original position (X, Y) and updating dimensions
-                        annotation.AnnotationText = dlg.AnnotationText;
-                        annotation.AnnotationFont = dlg.AnnotationFont;
-                        annotation.AnnotationColor = dlg.AnnotationColor;
-                        annotation.AnnotationAlignment = dlg.AnnotationAlignment;
-                        annotation.AnnotationRotation = dlg.AnnotationRotation;
-                        annotation.AnnotationBounds = new RectangleF(
-                            annotation.AnnotationBounds.X,
-                            annotation.AnnotationBounds.Y,
-                            boxWidth,
-                            boxHeight
-                        );
+                        ApplyAnnotationFromDialog(annotation, dlg);
                     }
                     else
                     {
@@ -2679,8 +2715,13 @@ namespace AnonPDF
                     var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
 
                     string fontPath = GetFontFilePathFromRegistry(annotation.AnnotationFont.FontFamily.Name, annotation.AnnotationFont.Style);
-
-                    PdfFont pdfFont = PdfFontFactory.CreateFont(fontPath, PdfEncodings.CP1250, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+                    PdfFont pdfFont = PdfFontFactory.CreateFont(fontPath, PdfEncodings.IDENTITY_H, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+                    PdfFont symbolFont = null;
+                    string symbolFontPath = GetFontFilePathFromRegistry("Segoe UI Symbol", FontStyle.Regular);
+                    if (!string.IsNullOrEmpty(symbolFontPath))
+                    {
+                        symbolFont = PdfFontFactory.CreateFont(symbolFontPath, PdfEncodings.IDENTITY_H, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+                    }
 
                     string textValue = annotation.AnnotationText ?? string.Empty;
                     float fontSize = (float)annotation.AnnotationFont.Size;
@@ -2739,10 +2780,53 @@ namespace AnonPDF
                     }
                     float maxGdiWidthPt = 0f;
                     float maxPdfWidth = 0f;
+                    var lineRuns = new List<List<(string Text, PdfFont Font)>>();
+                    var pdfLineWidths = new List<float>();
+                    List<(string Text, PdfFont Font)> BuildRuns(string line)
+                    {
+                        var runs = new List<(string Text, PdfFont Font)>();
+                        if (string.IsNullOrEmpty(line))
+                            return runs;
+
+                        PdfFont currentFont = pdfFont;
+                        var buffer = new System.Text.StringBuilder();
+
+                        foreach (char ch in line)
+                        {
+                            int code = ch;
+                            PdfFont nextFont = pdfFont;
+                            if (!pdfFont.ContainsGlyph(code) && symbolFont != null && symbolFont.ContainsGlyph(code))
+                            {
+                                nextFont = symbolFont;
+                            }
+
+                            if (nextFont != currentFont && buffer.Length > 0)
+                            {
+                                runs.Add((buffer.ToString(), currentFont));
+                                buffer.Clear();
+                            }
+                            currentFont = nextFont;
+                            buffer.Append(ch);
+                        }
+
+                        if (buffer.Length > 0)
+                        {
+                            runs.Add((buffer.ToString(), currentFont));
+                        }
+
+                        return runs;
+                    }
                     for (int i = 0; i < lines.Length; i++)
                     {
                         float lineGdiWidth = gdiLineWidthsPt[i];
-                        float linePdfWidth = pdfFont.GetWidth(lines[i], fontSize);
+                        var runs = BuildRuns(lines[i]);
+                        lineRuns.Add(runs);
+                        float linePdfWidth = 0f;
+                        foreach (var run in runs)
+                        {
+                            linePdfWidth += run.Font.GetWidth(run.Text, fontSize);
+                        }
+                        pdfLineWidths.Add(linePdfWidth);
                         if (lineGdiWidth > maxGdiWidthPt)
                         {
                             maxGdiWidthPt = lineGdiWidth;
@@ -2781,6 +2865,7 @@ namespace AnonPDF
                     {
                         string lineText = lines[i];
                         float lineWidthPt = gdiLineWidthsPt[i];
+                        var runs = lineRuns[i];
 
                         float localX = 0f;
                         switch (annotation.AnnotationAlignment)
@@ -2806,7 +2891,19 @@ namespace AnonPDF
                         pdfCanvas.SetTextMatrix(cos, sin, -sin, cos, baselinePdf.X, baselinePdf.Y);
                         if (!string.IsNullOrEmpty(lineText))
                         {
-                            pdfCanvas.ShowText(lineText);
+                            if (runs.Count > 0)
+                            {
+                                foreach (var run in runs)
+                                {
+                                    pdfCanvas.SetFontAndSize(run.Font, fontSize);
+                                    pdfCanvas.ShowText(run.Text);
+                                }
+                            }
+                            else
+                            {
+                                pdfCanvas.SetFontAndSize(pdfFont, fontSize);
+                                pdfCanvas.ShowText(lineText);
+                            }
                         }
                     }
                     pdfCanvas.EndText();
@@ -6528,6 +6625,8 @@ namespace AnonPDF
         private RadioButton rbRotate90;
         private RadioButton rbRotate180;
         private RadioButton rbRotate270;
+        private GroupBox groupBoxSymbols;
+        private FlowLayoutPanel symbolsPanel;
         private Button btnOK;
         private Button btnCancel;
 
@@ -6537,6 +6636,8 @@ namespace AnonPDF
         public System.Drawing.Color AnnotationColor { get; set; }
         public HorizontalAlignment AnnotationAlignment { get; set; }
         public int AnnotationRotation { get; set; }
+        public Action ApplyChanges { get; set; }
+        private bool suppressAutoApply;
 
         public EditTextDialog()
         {
@@ -6557,7 +6658,7 @@ namespace AnonPDF
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
             this.Width = 440;
-            this.Height = 430;
+            this.Height = 470;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
 
@@ -6578,6 +6679,7 @@ namespace AnonPDF
                 Size = new Size(400, 100),
                 WordWrap = false
             };
+            txtText.TextChanged += TxtText_TextChanged;
             
 
             // Font picker button
@@ -6694,12 +6796,43 @@ namespace AnonPDF
             rbRotate180.CheckedChanged += RotationRadioButton_CheckedChanged;
             rbRotate270.CheckedChanged += RotationRadioButton_CheckedChanged;
 
+            // GroupBox for symbol gallery
+            groupBoxSymbols = new GroupBox
+            {
+                Text = Resources.EditText_GroupSymbols,
+                Location = new Point(10, 310),
+                Size = new Size(400, 70)
+            };
+
+            symbolsPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoSize = false,
+                WrapContents = false,
+                FlowDirection = FlowDirection.LeftToRight,
+                Padding = new Padding(6, 5, 6, 5)
+            };
+
+            string[] symbols = { "─", "°", "²", "³", "§", "•", "✓", "✗", "→", "±" };
+            foreach (string symbol in symbols)
+            {
+                Button btnSymbol = new Button
+                {
+                    Text = symbol,
+                    Size = new Size(32, 28),
+                    Margin = new Padding(4, 0, 0, 0),
+                    TabStop = false
+                };
+                btnSymbol.Click += SymbolButton_Click;
+                symbolsPanel.Controls.Add(btnSymbol);
+            }
+            groupBoxSymbols.Controls.Add(symbolsPanel);
 
             // OK and Cancel buttons
             btnOK = new Button
             {
                 Text = Resources.Merge_OK,
-                Location = new Point(220, 330),
+                Location = new Point(240, 390),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.OK
             };
@@ -6708,7 +6841,7 @@ namespace AnonPDF
             btnCancel = new Button
             {
                 Text = Resources.Merge_Cancel,
-                Location = new Point(320, 330),
+                Location = new Point(330, 390),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.Cancel
             };
@@ -6721,6 +6854,7 @@ namespace AnonPDF
             this.Controls.Add(btnColor);
             this.Controls.Add(groupBoxAlignment);
             this.Controls.Add(groupBoxRotation);
+            this.Controls.Add(groupBoxSymbols);
             this.Controls.Add(btnOK);
             this.Controls.Add(btnCancel);
 
@@ -6732,6 +6866,7 @@ namespace AnonPDF
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+            suppressAutoApply = true;
             // Load previously set values into form controls
             txtText.Text = AnnotationText;
             // Update the font label
@@ -6766,6 +6901,7 @@ namespace AnonPDF
                     rbRotate0.Checked = true;
                     break;
             }
+            suppressAutoApply = false;
         }
 
         private void UpdateFontDisplay()
@@ -6789,6 +6925,11 @@ namespace AnonPDF
             txtText.ForeColor = AnnotationColor;
         }
 
+        private void TxtText_TextChanged(object sender, EventArgs e)
+        {
+            TryApplyChanges();
+        }
+
 
         private void RadioButton_CheckedChanged(object sender, EventArgs e)
         {
@@ -6807,6 +6948,7 @@ namespace AnonPDF
             txtText.SelectAll();
             txtText.SelectionAlignment = AnnotationAlignment;
             txtText.DeselectAll();
+            TryApplyChanges();
 
         }
 
@@ -6828,6 +6970,7 @@ namespace AnonPDF
             {
                 AnnotationRotation = 270;
             }
+            TryApplyChanges();
         }
 
         private void BtnFont_Click(object sender, EventArgs e)
@@ -6839,6 +6982,7 @@ namespace AnonPDF
                 {
                     AnnotationFont = fontDialog.Font;
                     UpdateFontDisplay();
+                    TryApplyChanges();
                 }
             }
         }
@@ -6854,6 +6998,7 @@ namespace AnonPDF
                 {
                     AnnotationColor = colorDialog.Color;
                     txtText.ForeColor = AnnotationColor;
+                    TryApplyChanges();
                 }
             }
         }
@@ -6867,6 +7012,25 @@ namespace AnonPDF
                 return;
             }
             AnnotationText = txtText.Text.Trim();
+        }
+
+        private void SymbolButton_Click(object sender, EventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                txtText.SelectedText = btn.Text;
+                txtText.Focus();
+            }
+        }
+
+        private void TryApplyChanges()
+        {
+            if (ApplyChanges == null || suppressAutoApply)
+                return;
+            if (string.IsNullOrWhiteSpace(txtText.Text))
+                return;
+            AnnotationText = txtText.Text;
+            ApplyChanges?.Invoke();
         }
     }
 

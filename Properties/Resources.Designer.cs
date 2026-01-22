@@ -279,6 +279,12 @@ namespace AnonPDF.Properties {
             }
         }
         
+        internal static string EditText_GroupSymbols {
+            get {
+                return ResourceManager.GetString("EditText_GroupSymbols", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Looks up a localized string similar to Wprowadź tekst:.
         /// </summary>

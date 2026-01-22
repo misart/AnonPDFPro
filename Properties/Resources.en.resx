@@ -543,6 +543,9 @@ Click again to remove marks.</value>
   <data name="EditText_GroupRotation" xml:space="preserve">
     <value>Rotation</value>
   </data>
+  <data name="EditText_GroupSymbols" xml:space="preserve">
+    <value>Symbols</value>
+  </data>
   <data name="EditText_AlignLeft" xml:space="preserve">
     <value>Left</value>
   </data>

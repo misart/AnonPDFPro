@@ -543,6 +543,9 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   <data name="EditText_GroupRotation" xml:space="preserve">
     <value>Obrót</value>
   </data>
+  <data name="EditText_GroupSymbols" xml:space="preserve">
+    <value>Znaczki</value>
+  </data>
   <data name="EditText_AlignLeft" xml:space="preserve">
     <value>Lewo</value>
   </data>
