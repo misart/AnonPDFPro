@@ -144,6 +144,12 @@
   <data name="Menu_SavePdf" xml:space="preserve">
     <value>Zapisz PDF</value>
   </data>
+  <data name="Menu_RecentFiles" xml:space="preserve">
+    <value>Ostatnio otwierane pliki</value>
+  </data>
+  <data name="Menu_RecentFiles_Empty" xml:space="preserve">
+    <value>Brak</value>
+  </data>
   <data name="Menu_Exit" xml:space="preserve">
     <value>Koniec</value>
   </data>

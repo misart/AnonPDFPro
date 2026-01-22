@@ -89,6 +89,7 @@
             this.saveProjectMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.savePdfMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
+            this.recentFilesMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuOptionsItem = new System.Windows.Forms.ToolStripMenuItem();
             this.splitPdfToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -842,6 +843,7 @@
             this.saveProjectMenuItem,
             this.savePdfMenuItem,
             this.toolStripMenuItem1,
+            this.recentFilesMenuItem,
             this.exitMenuItem});
             this.menuFileItem.Name = "menuFileItem";
             this.menuFileItem.Size = new System.Drawing.Size(38, 20);
@@ -907,6 +909,13 @@
             // 
             this.toolStripMenuItem1.Name = "toolStripMenuItem1";
             this.toolStripMenuItem1.Size = new System.Drawing.Size(258, 6);
+            // 
+            // recentFilesMenuItem
+            // 
+            this.recentFilesMenuItem.Name = "recentFilesMenuItem";
+            this.recentFilesMenuItem.Size = new System.Drawing.Size(261, 22);
+            this.recentFilesMenuItem.Text = "Ostatnio otwierane pliki";
+            this.recentFilesMenuItem.DropDownOpening += new System.EventHandler(this.RecentFilesMenuItem_DropDownOpening);
             // 
             // exitMenuItem
             // 
@@ -1281,6 +1290,7 @@
         private System.Windows.Forms.ToolStripMenuItem saveProjectMenuItem;
         private System.Windows.Forms.ToolStripMenuItem savePdfMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem1;
+        private System.Windows.Forms.ToolStripMenuItem recentFilesMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem2;
         private System.Windows.Forms.Button zoomMaxButton;

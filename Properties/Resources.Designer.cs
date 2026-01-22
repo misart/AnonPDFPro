@@ -671,6 +671,24 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("Menu_SavePdf", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Ostatnio otwierane pliki.
+        /// </summary>
+        internal static string Menu_RecentFiles {
+            get {
+                return ResourceManager.GetString("Menu_RecentFiles", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Brak.
+        /// </summary>
+        internal static string Menu_RecentFiles_Empty {
+            get {
+                return ResourceManager.GetString("Menu_RecentFiles_Empty", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Zapisz projekt zaznaczeń.

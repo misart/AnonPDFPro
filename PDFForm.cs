@@ -56,6 +56,7 @@ namespace AnonPDF
         private string inputProjectPath = "";
         private int currentPage = 1;
         private int numPages = 0;
+        private const int RecentFilesLimit = 10;
 
         private readonly string tutorialProcessName = "AnonPDFTutorial";
 
@@ -322,6 +323,7 @@ namespace AnonPDF
             saveProjectAsMenuItem.Text = Resources.Menu_SaveProjectAs;
             saveProjectMenuItem.Text = Resources.Menu_SaveProject;
             savePdfMenuItem.Text = Resources.Menu_SavePdf;
+            recentFilesMenuItem.Text = Resources.Menu_RecentFiles;
             exitMenuItem.Text = Resources.Menu_Exit;
 
             // Options menu
@@ -1320,6 +1322,7 @@ namespace AnonPDF
 
             // Load setting "Ignore PDF restrictions"
             ignorePdfRestrictionsToolStripMenuItem.Checked = Properties.Settings.Default.IgnorePdfRestrictions;
+            UpdateRecentFilesMenu();
         }
 
         private void IgnorePdfRestrictionsToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
@@ -3237,13 +3240,13 @@ namespace AnonPDF
             UpdateNavigationButtons(currentPage);
             UpdateWindowTitle();
             ExtractSignatures();
+            AddRecentFile(inputPdfPath);
         }
 
-        private void LoadPdfButton_Click(object sender, EventArgs e)
+        private bool ConfirmOpenNewPdf()
         {
             if (redactionBlocks.Count > 0 && projectWasChangedAfterLastSave)
             {
-                //inputProjectPath == ""
                 string msqOutText = Resources.Msg_Confirm_OpenNewWithUnsavedSelections;
                 DialogResult result = MessageBox.Show(this,
                     msqOutText,
@@ -3253,13 +3256,33 @@ namespace AnonPDF
                     MessageBoxDefaultButton.Button2
                 );
 
-                // If user selects "No", cancel closing
                 if (result == DialogResult.No)
                 {
-                    return;
+                    return false;
                 }
             }
 
+            return true;
+        }
+
+        private void OpenPdfFromPath(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            if (!ConfirmOpenNewPdf())
+            {
+                return;
+            }
+
+            inputPdfPath = filePath;
+            LoadPdf();
+        }
+
+        private void LoadPdfButton_Click(object sender, EventArgs e)
+        {
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Filter = Resources.Dialog_Filter_PDF,
@@ -3268,11 +3291,7 @@ namespace AnonPDF
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                inputPdfPath = openFileDialog.FileName;
-                
-                
-
-                LoadPdf();
+                OpenPdfFromPath(openFileDialog.FileName);
             }
         }
 
@@ -4590,6 +4609,7 @@ namespace AnonPDF
                     UpdateSelectionNavigationButtons();
                     UpdateWindowTitle();
                     projectWasChangedAfterLastSave = false;
+                    AddRecentFile(inputProjectPathTemp);
                 }
                 catch (Exception)
                 {
@@ -5307,8 +5327,178 @@ namespace AnonPDF
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, string.Format(Resources.Err_LoadRecentFiles, ex.Message),
-                    Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(this, string.Format(Resources.Err_LoadRecentFiles, ex.Message),
+                        Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private List<string> LoadRecentFiles()
+        {
+            string raw = Properties.Settings.Default.RecentFiles;
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return new List<string>();
+            }
+
+            try
+            {
+                var files = JsonConvert.DeserializeObject<List<string>>(raw);
+                return files ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        private void SaveRecentFiles(List<string> files)
+        {
+            Properties.Settings.Default.RecentFiles = JsonConvert.SerializeObject(files);
+            Properties.Settings.Default.Save();
+        }
+
+        private void AddRecentFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            string ext = Path.GetExtension(filePath);
+            if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(ext, ".pap", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            string fullPath = Path.GetFullPath(filePath);
+            var files = LoadRecentFiles();
+            files.RemoveAll(path => string.Equals(path, fullPath, StringComparison.OrdinalIgnoreCase));
+            files.Insert(0, fullPath);
+
+            while (files.Count > RecentFilesLimit)
+            {
+                files.RemoveAt(files.Count - 1);
+            }
+
+            SaveRecentFiles(files);
+            UpdateRecentFilesMenu();
+        }
+
+        private void RemoveRecentFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            var files = LoadRecentFiles();
+            int removedCount = files.RemoveAll(path => string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase));
+            if (removedCount > 0)
+            {
+                SaveRecentFiles(files);
+            }
+        }
+
+        private void UpdateRecentFilesMenu()
+        {
+            if (recentFilesMenuItem == null)
+            {
+                return;
+            }
+
+            recentFilesMenuItem.DropDownItems.Clear();
+
+            var files = LoadRecentFiles();
+            var uniqueFiles = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in files)
+            {
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    continue;
+                }
+
+                string ext = Path.GetExtension(path);
+                if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(ext, ".pap", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (seen.Add(path))
+                {
+                    uniqueFiles.Add(path);
+                }
+            }
+
+            if (uniqueFiles.Count == 0)
+            {
+                var emptyItem = new ToolStripMenuItem(Resources.Menu_RecentFiles_Empty);
+                emptyItem.Enabled = false;
+                recentFilesMenuItem.DropDownItems.Add(emptyItem);
+                recentFilesMenuItem.Enabled = false;
+                return;
+            }
+
+            recentFilesMenuItem.Enabled = true;
+
+            int count = Math.Min(uniqueFiles.Count, RecentFilesLimit);
+            for (int i = 0; i < count; i++)
+            {
+                string path = uniqueFiles[i];
+                string fileName = Path.GetFileName(path);
+                var item = new ToolStripMenuItem($"{i + 1}. {fileName}");
+                item.Tag = path;
+                item.ToolTipText = path;
+                item.AutoToolTip = true;
+                if (!File.Exists(path))
+                {
+                    item.ForeColor = System.Drawing.Color.Gray;
+                }
+                item.Click += RecentFileMenuItem_Click;
+                recentFilesMenuItem.DropDownItems.Add(item);
+            }
+        }
+
+        private void RecentFilesMenuItem_DropDownOpening(object sender, EventArgs e)
+        {
+            UpdateRecentFilesMenu();
+        }
+
+        private void RecentFileMenuItem_Click(object sender, EventArgs e)
+        {
+            if (sender is ToolStripMenuItem menuItem && menuItem.Tag is string filePath)
+            {
+                OpenRecentFile(filePath);
+            }
+        }
+
+        private void OpenRecentFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                return;
+            }
+
+            if (!File.Exists(filePath))
+            {
+                MessageBox.Show(this, Resources.Msg_CannotLoadRecentFiles, Resources.Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                RemoveRecentFile(filePath);
+                UpdateRecentFilesMenu();
+                return;
+            }
+
+            string ext = Path.GetExtension(filePath);
+            if (string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenPdfFromPath(filePath);
+                return;
+            }
+
+            if (string.Equals(ext, ".pap", StringComparison.OrdinalIgnoreCase))
+            {
+                LoadRedactionBlocks(filePath);
             }
         }
 
