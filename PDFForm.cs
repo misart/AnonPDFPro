@@ -86,6 +86,7 @@ namespace AnonPDF
         private int wheelResistanceCurentValue = 0;
         private readonly int wheelResistanceMaxValue = 5;
         private HashSet<int> pagesToRemove = new HashSet<int>();
+        private Dictionary<int, int> pageRotationOffsets = new Dictionary<int, int>();
 
         private readonly Timer zoomTimer;
         private bool zoomPending = false;
@@ -327,6 +328,7 @@ namespace AnonPDF
             splitPdfToolStripMenuItem.Text = Resources.Menu_SplitPdf;
             mergePdfToolStripMenuItem.Text = Resources.Menu_MergePdf;
             deletePageMenuItem.Text = Resources.Menu_DeletePage;
+            rotatePageMenuItem.Text = Resources.Menu_RotatePage;
             addTextMenuItem.Text = Resources.Menu_AddText;
             copyToClipboardMenuItem.Text = Resources.Menu_CopyToClipboard;
             exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
@@ -411,6 +413,7 @@ namespace AnonPDF
             var filterAnnotations = Resources.UI_Filter_Annotations;
             var filterSearches = Resources.UI_Filter_Searches;
             var filterDeletions = Resources.UI_Filter_Deletions;
+            var filterRotations = Resources.UI_Filter_Rotations;
 
             int selIndex = filterComboBox.SelectedIndex;
             filterComboBox.Items.Clear();
@@ -421,6 +424,7 @@ namespace AnonPDF
                 filterSelections,
                 filterSearches,
                 filterDeletions,
+                filterRotations,
                 filterAnnotations
             });
             filterComboBox.SelectedIndex = selIndex >= 0 && selIndex < filterComboBox.Items.Count ? selIndex : 0;
@@ -432,6 +436,7 @@ namespace AnonPDF
             _comboItemColors[filterAnnotations] = System.Drawing.Color.Green;
             _comboItemColors[filterSearches] = System.Drawing.Color.FromArgb(255, 255, 215, 0);
             _comboItemColors[filterDeletions] = System.Drawing.Color.Black;
+            _comboItemColors[filterRotations] = System.Drawing.Color.FromArgb(255, 140, 169, 255);
         }
 
         private void UpdateHelpMenuAvailability()
@@ -1088,6 +1093,7 @@ namespace AnonPDF
             var filterAnnotations = Resources.UI_Filter_Annotations;
             var filterSearches = Resources.UI_Filter_Searches;
             var filterDeletions = Resources.UI_Filter_Deletions;
+            var filterRotations = Resources.UI_Filter_Rotations;
 
             Func<PageItemStatus, bool> predicate = filter switch
             {
@@ -1095,7 +1101,8 @@ namespace AnonPDF
                 var f when f == filterAnnotations => s => s.HasTextAnnotations,
                 var f when f == filterSearches => s => s.HasSearchResults,
                 var f when f == filterDeletions => s => s.MarkedForDeletion,
-                _ => s => s.HasSelections || s.HasTextAnnotations || s.HasSearchResults || s.MarkedForDeletion
+                var f when f == filterRotations => s => s.HasRotation,
+                _ => s => s.HasSelections || s.HasTextAnnotations || s.HasSearchResults || s.MarkedForDeletion || s.HasRotation
             };
 
             // Add only those statuses that pass the predicate
@@ -1287,6 +1294,7 @@ namespace AnonPDF
 
         private void UpdateItemTag(ListViewItem item, int pageNumber, bool hasSelections, bool hasSearchResults, bool markedForDeletion, bool hasTextAnnotations = false)
         {
+            bool hasRotation = pageRotationOffsets.ContainsKey(pageNumber);
             // Create new PageItemStatus object with new values
             PageItemStatus newStatus = new PageItemStatus()
             {
@@ -1294,7 +1302,8 @@ namespace AnonPDF
                 HasSelections = hasSelections,
                 HasSearchResults = hasSearchResults,
                 MarkedForDeletion = markedForDeletion,
-                HasTextAnnotations = hasTextAnnotations
+                HasTextAnnotations = hasTextAnnotations,
+                HasRotation = hasRotation
             };
 
             // Assign new object to Tag property
@@ -1313,7 +1322,6 @@ namespace AnonPDF
 
                 // Set the dimensions of the rectangles
                 int rectangleWidth = 10;                       // rectangle width
-                int rectangleHeight = e.Bounds.Height / 4;      // divide the element height into 4 equal parts
                 int x = e.Bounds.Left + 2;        // margines od lewej
                 int offset = 0;                        // how much we have drawn from the bottom
 
@@ -1323,8 +1331,11 @@ namespace AnonPDF
                     (status.HasSelections,     System.Drawing.Color.Red),
                     (status.HasSearchResults,  System.Drawing.Color.FromArgb(255, 255, 215, 0)),
                     (status.MarkedForDeletion, System.Drawing.Color.Black),
+                    (status.HasRotation,        System.Drawing.Color.FromArgb(255, 140, 169, 255)),
                     (status.HasTextAnnotations, System.Drawing.Color.Green)
                 };
+                int gap = 1;
+                int rectangleHeight = Math.Max(2, (e.Bounds.Height - (statusColors.Length - 1) * gap) / statusColors.Length);
 
                 // Draw only those rectangles whose flag is true,
                 // each subsequent one "from bottom" shifted by rectangleHeight
@@ -1333,8 +1344,8 @@ namespace AnonPDF
                     if (!item.Flag)
                         continue;
 
-                    int y = e.Bounds.Bottom - rectangleHeight - offset * rectangleHeight;
-                    var rect = new DrawingRectangle(x, y, rectangleWidth, rectangleHeight - 2);
+                    int y = e.Bounds.Bottom - rectangleHeight - offset * (rectangleHeight + gap);
+                    var rect = new DrawingRectangle(x, y, rectangleWidth, rectangleHeight);
 
                     using (var brush = new SolidBrush(item.Color))
                         e.Graphics.FillRectangle(brush, rect);
@@ -1628,6 +1639,115 @@ namespace AnonPDF
             }
         }
 
+        private static int NormalizeRotation(int rotation)
+        {
+            rotation %= 360;
+            if (rotation < 0)
+                rotation += 360;
+            return rotation;
+        }
+
+        private static int OrientationToDegrees(PageOrientations orientation)
+        {
+            switch (orientation)
+            {
+                case PageOrientations.Rotated90CW:
+                    return 90;
+                case PageOrientations.Rotated180:
+                    return 180;
+                case PageOrientations.Rotated90CCW:
+                    return 270;
+                default:
+                    return 0;
+            }
+        }
+
+        private int GetRotationOffset(int pageNumber)
+        {
+            return pageRotationOffsets.TryGetValue(pageNumber, out int offset) ? offset : 0;
+        }
+
+        private void SetRotationOffset(int pageNumber, int offset)
+        {
+            offset = NormalizeRotation(offset);
+            if (offset == 0)
+            {
+                pageRotationOffsets.Remove(pageNumber);
+            }
+            else
+            {
+                pageRotationOffsets[pageNumber] = offset;
+            }
+        }
+
+        private int GetBaseRotationDegrees(int pageNumber)
+        {
+            if (pdf == null || pageNumber < 1 || pageNumber > pdf.Pages.Count)
+                return 0;
+
+            return OrientationToDegrees(pdf.Pages[pageNumber - 1].Orientation);
+        }
+
+        private int GetEffectiveRotationDegrees(int pageNumber)
+        {
+            int baseRotation = GetBaseRotationDegrees(pageNumber);
+            int offset = GetRotationOffset(pageNumber);
+            return NormalizeRotation(baseRotation + offset);
+        }
+
+        private (float Width, float Height) GetPageSizeWithOffset(int pageNumber)
+        {
+            if (pdf == null || pageNumber < 1 || pageNumber > pdf.Pages.Count)
+                return (0f, 0f);
+
+            var page = pdf.Pages[pageNumber - 1];
+            float width = (float)page.Width;
+            float height = (float)page.Height;
+            int offset = GetRotationOffset(pageNumber);
+
+            if (offset == 90 || offset == 270)
+            {
+                float tmp = width;
+                width = height;
+                height = tmp;
+            }
+
+            return (width, height);
+        }
+
+        private static RectangleF RotateRectClockwise(RectangleF rect, float pageWidth, float pageHeight)
+        {
+            return new RectangleF(
+                pageHeight - rect.Y - rect.Height,
+                rect.X,
+                rect.Height,
+                rect.Width);
+        }
+
+        private static RotateFlipType GetRotateFlipForOffset(int offset)
+        {
+            switch (offset)
+            {
+                case 90:
+                    return RotateFlipType.Rotate90FlipNone;
+                case 180:
+                    return RotateFlipType.Rotate180FlipNone;
+                case 270:
+                    return RotateFlipType.Rotate270FlipNone;
+                default:
+                    return RotateFlipType.RotateNoneFlipNone;
+            }
+        }
+
+        private static void ApplyRotationOffset(DrawingImage image, int offset)
+        {
+            var rotateFlip = GetRotateFlipForOffset(offset);
+            if (rotateFlip != RotateFlipType.RotateNoneFlipNone)
+            {
+                image.RotateFlip(rotateFlip);
+            }
+        }
+
         private RectangleF ConvertToPdfCoordinates(RectangleF screenRect, int pageNumber, int rotation)
         {
             // Read page via PDFiumSharp
@@ -1667,8 +1787,8 @@ namespace AnonPDF
 
                 case 270:
                     // Page rotated 90° CCW (same as 270° CW) – mirrored relative to 90° CW case
-                    x = pageH - oldY - oldH;
-                    y = pageW - oldX - oldW;
+                    x = pageW - oldY - oldH;
+                    y = pageH - oldX - oldW;
                     w = oldH;
                     h = oldW;
                     break;
@@ -1689,10 +1809,34 @@ namespace AnonPDF
             return new RectangleF(x, y, w, h);
         }
 
+        private PointF ConvertPointToPdfCoordinates(PointF screenPoint, int pageNumber, int rotation)
+        {
+            RectangleF rect = new RectangleF(screenPoint.X, screenPoint.Y, 0f, 0f);
+            RectangleF pdfRect = ConvertToPdfCoordinates(rect, pageNumber, rotation);
+            return new PointF(pdfRect.X, pdfRect.Y);
+        }
+
+        private void ApplyRotationOffsetsToDocument(iText.Kernel.Pdf.PdfDocument pdfDoc)
+        {
+            if (pdf == null)
+                return;
+
+            int pageCount = pdfDoc.GetNumberOfPages();
+            for (int pageNum = 1; pageNum <= pageCount; pageNum++)
+            {
+                int rotation = GetEffectiveRotationDegrees(pageNum);
+                if (rotation != pdfDoc.GetPage(pageNum).GetRotation())
+                {
+                    pdfDoc.GetPage(pageNum).SetRotation(rotation);
+                }
+            }
+        }
+
         private DrawingImage RenderOriginalPage(int pageNumber)
         {
 
             var page = pdf.Pages[pageNumber - 1]; // 'pdf' is PDFiumSharp.PdfDocument loaded original
+            int offset = GetRotationOffset(pageNumber);
 
             using (var bmp = new PDFiumBitmap(
                 (int)(page.Width * scaleFactor),
@@ -1711,7 +1855,9 @@ namespace AnonPDF
                 {
                     bmp.Save(ms);
                     ms.Position = 0;
-                    return DrawingImage.FromStream(ms);
+                    var image = DrawingImage.FromStream(ms);
+                    ApplyRotationOffset(image, offset);
+                    return image;
                 }
             }
         }
@@ -1874,8 +2020,7 @@ namespace AnonPDF
                             new iText.Kernel.Pdf.PdfWriter(outputMemoryStream)))
                         {
                             PdfCleanUpTool cleanUpTool = new PdfCleanUpTool(pdfDoc);
-                            var pageWithSelections = pdfDoc.GetPage(1);
-                            var rotation = pageWithSelections.GetRotation();
+                            var rotation = GetEffectiveRotationDegrees(currentPage);
 
                             foreach (var block in blocksForThisPage)
                             {
@@ -1913,6 +2058,8 @@ namespace AnonPDF
                             }
                         }
 
+                        ApplyRotationOffset(overlayBmp, GetRotationOffset(currentPage));
+
                         // Render original page
                         Bitmap originalBmp = new Bitmap(RenderOriginalPage(currentPage));
                         // Combine bitmaps – CombineBitmaps function performs blending
@@ -1927,8 +2074,6 @@ namespace AnonPDF
 
         private void CalculateMinScaleFactor(int pageNumber)
         {
-            var page = pdf.Pages[pageNumber - 1];
-
             ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
             if (!(panel is ZoomPanel)) return;
 
@@ -1936,8 +2081,9 @@ namespace AnonPDF
             int panelWidth = panel.ClientSize.Width;
             int panelHeight = panel.ClientSize.Height;
 
-            float pageW = (float)page.Width;
-            float pageH = (float)page.Height;
+            var pageSize = GetPageSizeWithOffset(pageNumber);
+            float pageW = pageSize.Width;
+            float pageH = pageSize.Height;
 
             float scaleByWidth = panelWidth / pageW;
             float scaleByHeight = panelHeight / pageH;
@@ -2263,6 +2409,7 @@ namespace AnonPDF
             using (PdfWriter writer = new PdfWriter(outputFile, writerProps))
             using (iText.Kernel.Pdf.PdfDocument pdfDoc = new iText.Kernel.Pdf.PdfDocument(reader, writer))
             {
+                ApplyRotationOffsetsToDocument(pdfDoc);
 
                 if (signatures.Count > 0 && !signaturesOriginalRadioButton.Checked)
                 {
@@ -2381,7 +2528,7 @@ namespace AnonPDF
 
                                     var canvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page.NewContentStreamAfter(), page.GetResources(), pdfDoc);
 
-                                    int rotation = page.GetRotation();
+                                    int rotation = GetEffectiveRotationDegrees(pdfDoc.GetPageNumber(page));
                                     float dpiX, dpiY;
                                     using (Graphics g = pdfViewer.CreateGraphics())
                                     {
@@ -2456,7 +2603,7 @@ namespace AnonPDF
                 {
                     int pageNum = pageGroup.Key;
                     var pageWithSelections = pdfDoc.GetPage(pageNum);
-                    var rotation = pageWithSelections.GetRotation();
+                    var rotation = GetEffectiveRotationDegrees(pageNum);
                     foreach (var block in pageGroup)
                     {
                         var pdfCoordinates = ConvertToPdfCoordinates(block.Bounds, pageNum, rotation);
@@ -2500,45 +2647,48 @@ namespace AnonPDF
                         continue;
 
                     iText.Kernel.Pdf.PdfPage page = pdfDoc.GetPage(annotation.PageNumber);
-                    // Add a new text layer - create PdfCanvas, then Canvas from iText Layout
+                    // Add a new text layer
                     var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
-
-                    iText.Layout.Canvas layoutCanvas = new iText.Layout.Canvas(pdfCanvas, page.GetPageSize());
 
                     string fontPath = GetFontFilePathFromRegistry(annotation.AnnotationFont.FontFamily.Name, annotation.AnnotationFont.Style);
 
                     PdfFont pdfFont = PdfFontFactory.CreateFont(fontPath, PdfEncodings.CP1250, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
 
-                    // Map alignment from HorizontalAlignment to iText TextAlignment
-                    iText.Layout.Properties.TextAlignment textAlign = iText.Layout.Properties.TextAlignment.LEFT;
-                    switch (annotation.AnnotationAlignment)
-                    {
-                        case System.Windows.Forms.HorizontalAlignment.Center:
-                            textAlign = iText.Layout.Properties.TextAlignment.CENTER;
-                            break;
-                        case System.Windows.Forms.HorizontalAlignment.Right:
-                            textAlign = iText.Layout.Properties.TextAlignment.RIGHT;
-                            break;
-                        default:
-                            textAlign = iText.Layout.Properties.TextAlignment.LEFT;
-                            break;
-                    }
-
-                    // Create paragraph with annotation text
-                    var para = new iText.Layout.Element.Paragraph(annotation.AnnotationText)
-                        .SetFont(pdfFont)
-                        .SetFontSize((float)annotation.AnnotationFont.Size)
-                        .SetFontColor(new DeviceRgb(annotation.AnnotationColor.R, annotation.AnnotationColor.G, annotation.AnnotationColor.B));
+                    string textValue = annotation.AnnotationText ?? string.Empty;
+                    float fontSize = (float)annotation.AnnotationFont.Size;
                         
-                    int rotation = page.GetRotation();
+                    int rotation = GetEffectiveRotationDegrees(annotation.PageNumber);
 
                     // Coordinate conversion - assume ConvertToPdfCoordinates works similarly to redaction blocks
                     // Get DPI from pdfViewer
                     float dpiX, dpiY;
+                    float lineHeightPt = 0f;
+                    float gdiAscentPt = 0f;
+                    List<float> gdiLineWidthsPt = new List<float>();
+                    string normalizedText = textValue.Replace("\r\n", "\n").Replace("\r", "\n");
+                    string[] lines = normalizedText.Split(new[] { '\n' }, StringSplitOptions.None);
                     using (Graphics g = pdfViewer.CreateGraphics())
                     {
                         dpiX = g.DpiX;
                         dpiY = g.DpiY;
+                        lineHeightPt = annotation.AnnotationFont.GetHeight(g) * (72f / dpiY);
+                        FontFamily family = annotation.AnnotationFont.FontFamily;
+                        int ascentDesignUnits = family.GetCellAscent(annotation.AnnotationFont.Style);
+                        int emHeight = family.GetEmHeight(annotation.AnnotationFont.Style);
+                        if (emHeight > 0)
+                        {
+                            gdiAscentPt = annotation.AnnotationFont.Size * ascentDesignUnits / emHeight;
+                        }
+                        using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
+                        {
+                            format.FormatFlags |= StringFormatFlags.NoWrap | StringFormatFlags.MeasureTrailingSpaces;
+                            format.Trimming = StringTrimming.None;
+                            foreach (string line in lines)
+                            {
+                                SizeF textSize = g.MeasureString(line, annotation.AnnotationFont, int.MaxValue, format);
+                                gdiLineWidthsPt.Add(textSize.Width * (72f / dpiX));
+                            }
+                        }
                     }
 
 
@@ -2551,30 +2701,70 @@ namespace AnonPDF
                        annotation.AnnotationBounds.Width * scaleX,
                        annotation.AnnotationBounds.Height * scaleY
                     );
-                    var pdfCoordinates = ConvertToPdfCoordinates(scaledAnnotationBounds, annotation.PageNumber, rotation);
-
-                    // Adjust X coordinate based on alignment
-                    float adjustedX = pdfCoordinates.X;
-                    if (textAlign == iText.Layout.Properties.TextAlignment.RIGHT)
+                    float rectWidth = scaledAnnotationBounds.Width;
+                    float maxGdiWidthPt = 0f;
+                    float maxPdfWidth = 0f;
+                    for (int i = 0; i < lines.Length; i++)
                     {
-                        adjustedX = pdfCoordinates.X + pdfCoordinates.Width; // Right edge of rectangle
+                        float lineGdiWidth = gdiLineWidthsPt[i];
+                        float linePdfWidth = pdfFont.GetWidth(lines[i], fontSize);
+                        if (lineGdiWidth > maxGdiWidthPt)
+                        {
+                            maxGdiWidthPt = lineGdiWidth;
+                            maxPdfWidth = linePdfWidth;
+                        }
                     }
-                    else if (textAlign == iText.Layout.Properties.TextAlignment.CENTER)
+                    float horizontalScaling = 1f;
+                    if (maxPdfWidth > 0f && maxGdiWidthPt > 0f)
                     {
-                        adjustedX = pdfCoordinates.X + (pdfCoordinates.Width / 2); // Center of rectangle
+                        horizontalScaling = maxGdiWidthPt / maxPdfWidth;
                     }
 
-                    layoutCanvas.ShowTextAligned(
-                        para,
-                        adjustedX,
-                        pdfCoordinates.Y + pdfCoordinates.Height,
-                        annotation.PageNumber,
-                        textAlign,
-                        iText.Layout.Properties.VerticalAlignment.TOP,
-                        rotation
-                    );
+                    if (string.IsNullOrEmpty(textValue))
+                        continue;
 
-                    layoutCanvas.Close();
+                    float textRotation = (float)(rotation * Math.PI / 180.0);
+
+                    float cos = (float)Math.Cos(textRotation);
+                    float sin = (float)Math.Sin(textRotation);
+
+                    pdfCanvas.SaveState();
+                    pdfCanvas.BeginText();
+                    pdfCanvas.SetFontAndSize(pdfFont, fontSize);
+                    pdfCanvas.SetFillColor(new DeviceRgb(annotation.AnnotationColor.R, annotation.AnnotationColor.G, annotation.AnnotationColor.B));
+                    if (Math.Abs(horizontalScaling - 1f) > 0.0001f)
+                    {
+                        pdfCanvas.SetHorizontalScaling(horizontalScaling * 100f);
+                    }
+
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string lineText = lines[i];
+                        float lineWidthPt = gdiLineWidthsPt[i];
+
+                        float anchorX = scaledAnnotationBounds.X;
+                        switch (annotation.AnnotationAlignment)
+                        {
+                            case HorizontalAlignment.Center:
+                                anchorX = scaledAnnotationBounds.X + (rectWidth - lineWidthPt) / 2f;
+                                break;
+                            case HorizontalAlignment.Right:
+                                anchorX = scaledAnnotationBounds.X + (rectWidth - lineWidthPt);
+                                break;
+                        }
+
+                        float baselineY = scaledAnnotationBounds.Y + i * lineHeightPt + gdiAscentPt;
+                        PointF baselineView = new PointF(anchorX, baselineY);
+                        PointF baselinePdf = ConvertPointToPdfCoordinates(baselineView, annotation.PageNumber, rotation);
+
+                        pdfCanvas.SetTextMatrix(cos, sin, -sin, cos, baselinePdf.X, baselinePdf.Y);
+                        if (!string.IsNullOrEmpty(lineText))
+                        {
+                            pdfCanvas.ShowText(lineText);
+                        }
+                    }
+                    pdfCanvas.EndText();
+                    pdfCanvas.RestoreState();
 
                 }
                 // --- End of caption rendering section ---
@@ -2787,6 +2977,8 @@ namespace AnonPDF
             minScaleButton = true;
             maxScaleButton = false;
 
+            pageRotationOffsets.Clear();
+
             CalculateMinScaleFactor(currentPage);
             CalculateMaxScaleFactor();
 
@@ -2827,7 +3019,8 @@ namespace AnonPDF
                     MarkedForDeletion = false,
                     HasSearchResults = false,
                     HasSelections = false,
-                    HasTextAnnotations = false
+                    HasTextAnnotations = false,
+                    HasRotation = false
                 };
 
                 allPageStatuses.Add(newStatus);
@@ -2864,6 +3057,7 @@ namespace AnonPDF
             savePdfMenuItem.Enabled = true;
             addTextMenuItem.Enabled = true;
             deletePageMenuItem.Enabled = true;
+            rotatePageMenuItem.Enabled = true;
             copyToClipboardMenuItem.Enabled = true;
             exportGraphicsMenuItem.Enabled = true;
 
@@ -2935,6 +3129,76 @@ namespace AnonPDF
                 removePageButton.BackColor = SystemColors.ControlLight;
                 removePageButton.ForeColor = SystemColors.ControlText;
             }
+        }
+
+        private void RotateCurrentPageClockwise()
+        {
+            if (pdf == null)
+                return;
+
+            var pageSize = GetPageSizeWithOffset(currentPage);
+            if (pageSize.Width <= 0 || pageSize.Height <= 0)
+                return;
+
+            float dpiX;
+            float dpiY;
+            using (Graphics g = pdfViewer.CreateGraphics())
+            {
+                dpiX = g.DpiX;
+                dpiY = g.DpiY;
+            }
+            float pxToPtX = 72f / dpiX;
+            float pxToPtY = 72f / dpiY;
+
+            foreach (var block in redactionBlocks.Where(b => b.PageNumber == currentPage))
+            {
+                block.Bounds = RotateRectClockwise(block.Bounds, pageSize.Width, pageSize.Height);
+            }
+
+            foreach (var annotation in textAnnotations.Where(a => a.PageNumber == currentPage))
+            {
+                RectangleF boundsPt = new RectangleF(
+                    annotation.AnnotationBounds.X,
+                    annotation.AnnotationBounds.Y,
+                    annotation.AnnotationBounds.Width * pxToPtX,
+                    annotation.AnnotationBounds.Height * pxToPtY
+                );
+
+                boundsPt = RotateRectClockwise(boundsPt, pageSize.Width, pageSize.Height);
+
+                annotation.AnnotationBounds = new RectangleF(
+                    boundsPt.X,
+                    boundsPt.Y,
+                    boundsPt.Width / pxToPtX,
+                    boundsPt.Height / pxToPtY
+                );
+            }
+
+            int offset = GetRotationOffset(currentPage);
+            SetRotationOffset(currentPage, NormalizeRotation(offset + 90));
+
+            currentSelection = RectangleF.Empty;
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+
+            PageItemStatus status = allPageStatuses[currentPage - 1];
+            status.HasRotation = pageRotationOffsets.ContainsKey(currentPage);
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                pagesListView.Invalidate(currentItem.Bounds);
+            }
+            else
+            {
+                ApplyFilter((string)filterComboBox.SelectedItem);
+            }
+
+            ReloadRefreshCurrentPage();
+            pendingScaleFactor = scaleFactor;
+            pdfViewer.Invalidate();
         }
 
 
@@ -3576,7 +3840,7 @@ namespace AnonPDF
                     float y = location.Rect.GetY();
                     float w = location.Rect.GetWidth();
                     float h = location.Rect.GetHeight();
-                    int rotation = location.PageRotation; // If you use rotation
+                    int rotation = GetEffectiveRotationDegrees(location.PageNumber);
 
                     RectangleF rectF = new RectangleF(x, y, w, h);
                     var pdfCoordinates = ConvertToPdfCoordinates(rectF, currentPage, rotation);
@@ -3821,6 +4085,7 @@ namespace AnonPDF
                 status.HasSearchResults = hasSearchResultsForThisPage;
                 status.MarkedForDeletion = markedForDeletionForThisPage;
                 status.HasTextAnnotations = hasTextAnnotationsForThisPage;
+                status.HasRotation = pageRotationOffsets.ContainsKey(currentPage);
 
                 //UpdateItemTag(selectedItem, pageNumber, hasSelectionsForThisPage, hasSearchResultsForThisPage, markedForDeletionForThisPage, hasTextAnnotationsForThisPage);
 
@@ -4001,6 +4266,7 @@ namespace AnonPDF
                     List<RedactionBlock> redactionBlocksJson = projectData.RedactionBlocks ?? new List<RedactionBlock>();
                     HashSet<int> pagesToRemoveJson = projectData.PagesToRemove ?? new HashSet<int>();
                     List<TextAnnotation> textAnnotationsJson = projectData.TextAnnotations ?? new List<TextAnnotation>();
+                    Dictionary<int, int> rotationOffsetsJson = projectData.PageRotationOffsets ?? new Dictionary<int, int>();
 
                     if (redactionBlocksJson.Count > 0)
                     {
@@ -4020,6 +4286,24 @@ namespace AnonPDF
 
                     ClearTextAnnotations();
                     textAnnotations = textAnnotationsJson; 
+
+                    pageRotationOffsets = rotationOffsetsJson
+                        .Where(kvp => kvp.Key >= 1 && kvp.Key <= numPages)
+                        .Select(kvp => new KeyValuePair<int, int>(kvp.Key, NormalizeRotation(kvp.Value)))
+                        .Where(kvp => kvp.Value != 0)
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+                    foreach (var statusItem in allPageStatuses)
+                    {
+                        statusItem.HasRotation = false;
+                    }
+                    foreach (var kvp in pageRotationOffsets)
+                    {
+                        int pageNum = kvp.Key;
+                        allPageStatuses[pageNum - 1].HasRotation = true;
+                    }
+
+                    ReloadRefreshCurrentPage();
 
                     pdfViewer.Invalidate();
                     UpdateSelectionNavigationButtons();
@@ -4070,6 +4354,14 @@ namespace AnonPDF
                         //pagesListView.Invalidate();
                         status.MarkedForDeletion = true;
                         UpdateItemTag(item, pageNum, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                        pagesListView.Invalidate(item.Bounds);
+                    }
+
+                    foreach (ListViewItem item in pagesListView.Items)
+                    {
+                        int pageNum = ((PageItemStatus)item.Tag).PageNumber;
+                        PageItemStatus currentStatus = allPageStatuses[pageNum - 1];
+                        UpdateItemTag(item, pageNum, currentStatus.HasSelections, currentStatus.HasSearchResults, currentStatus.MarkedForDeletion, currentStatus.HasTextAnnotations);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -4127,6 +4419,7 @@ namespace AnonPDF
                             RedactionBlocks = redactionBlocks,
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
+                            PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath
                         };
 
@@ -4475,6 +4768,7 @@ namespace AnonPDF
                             RedactionBlocks = redactionBlocks,
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
+                            PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath
                         };
 
@@ -5452,9 +5746,10 @@ namespace AnonPDF
             }
         }
 
-        private void CenterSearchResult(iText.Kernel.Geom.Rectangle resultRect, int pageNumber, int rotation)
+        private void CenterSearchResult(iText.Kernel.Geom.Rectangle resultRect, int pageNumber)
         {
             // Convert PDF coordinates to control coordinates (e.g. image or panel)
+            int rotation = GetEffectiveRotationDegrees(pageNumber);
             RectangleF pdfCoordinates = ConvertToPdfCoordinates(new RectangleF(resultRect.GetX(), resultRect.GetY(), resultRect.GetWidth(), resultRect.GetHeight()), pageNumber, rotation);
 
             // Scale coordinates if using zoom
@@ -5521,7 +5816,7 @@ namespace AnonPDF
                 // Update button states
                 UpdateNavigationButtons(currentPage);
             }
-            CenterSearchResult(location.Rect, location.PageNumber, location.PageRotation);
+            CenterSearchResult(location.Rect, location.PageNumber);
             currentLocationIndex = index;
             // Refresh drawing to change highlighting
             pdfViewer.Invalidate();
@@ -5799,7 +6094,7 @@ namespace AnonPDF
             // Convert results - for each result calculate rectangle after width correction
             var convertedResults = currentPageSearchResults.Select(result =>
             {
-                int rotation = result.PageRotation; // assume this is the rotation value
+                int rotation = GetEffectiveRotationDegrees(result.PageNumber);
                                                     // Subtract correction from width to remove excess letter
                 var screenRect = new System.Drawing.RectangleF(
                     result.Rect.GetX() + searchWidthCorrection,
@@ -5897,6 +6192,7 @@ namespace AnonPDF
                     bmp.Save(ms);
                     ms.Position = 0;
                     var pageBitmap = new Bitmap(Image.FromStream(ms));
+                    ApplyRotationOffset(pageBitmap, GetRotationOffset(pageNumber));
 
                     // Scale the selection box to bitmap coordinates
                     Rectangle cropRect = new Rectangle(
@@ -5978,7 +6274,7 @@ namespace AnonPDF
             using (var pdfDoc = new iText.Kernel.Pdf.PdfDocument(new PdfReader(pdfPath, props).SetUnethicalReading(Properties.Settings.Default.IgnorePdfRestrictions)))
             {
                 var page = pdfDoc.GetPage(block.PageNumber);
-                var rotation = page.GetRotation();
+                var rotation = GetEffectiveRotationDegrees(block.PageNumber);
 
                 var pdfCoordinates = ConvertToPdfCoordinates(block.Bounds, block.PageNumber, rotation);
                 iText.Kernel.Geom.Rectangle rectangle = new iText.Kernel.Geom.Rectangle(
@@ -6080,6 +6376,11 @@ namespace AnonPDF
         private void DeletePageToolStripMenuItem_Click(object sender, EventArgs e)
         {
             RemovePage();
+        }
+
+        private void RotatePageMenuItem_Click(object sender, EventArgs e)
+        {
+            RotateCurrentPageClockwise();
         }
 
         private void CopyToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
@@ -6980,6 +7281,7 @@ namespace AnonPDF
         public List<RedactionBlock> RedactionBlocks { get; set; }
         public HashSet<int> PagesToRemove { get; set; }
         public List<TextAnnotation> TextAnnotations { get; set; }
+        public Dictionary<int, int> PageRotationOffsets { get; set; }
         public String FilePath { get; set; }
     }
 
@@ -6990,6 +7292,7 @@ namespace AnonPDF
         public bool HasSearchResults { get; set; }
         public bool HasSelections { get; set; }
         public bool HasTextAnnotations { get; set; }
+        public bool HasRotation { get; set; }
     }
 
     public class DeletePagesDialog : Form

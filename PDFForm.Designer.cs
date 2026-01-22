@@ -94,6 +94,7 @@
             this.splitPdfToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.mergePdfToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deletePageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.rotatePageMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.addTextMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.copyToClipboardMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exportGraphicsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -921,6 +922,7 @@
             this.splitPdfToolStripMenuItem,
             this.mergePdfToolStripMenuItem,
             this.deletePageMenuItem,
+            this.rotatePageMenuItem,
             this.addTextMenuItem,
             this.copyToClipboardMenuItem,
             this.exportGraphicsMenuItem,
@@ -955,6 +957,15 @@
             this.deletePageMenuItem.Size = new System.Drawing.Size(229, 22);
             this.deletePageMenuItem.Text = "Usuń stronę";
             this.deletePageMenuItem.Click += new System.EventHandler(this.DeletePageToolStripMenuItem_Click);
+            // 
+            // rotatePageMenuItem
+            // 
+            this.rotatePageMenuItem.Enabled = false;
+            this.rotatePageMenuItem.Name = "rotatePageMenuItem";
+            this.rotatePageMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.R)));
+            this.rotatePageMenuItem.Size = new System.Drawing.Size(229, 22);
+            this.rotatePageMenuItem.Text = "Obróć stronę";
+            this.rotatePageMenuItem.Click += new System.EventHandler(this.RotatePageMenuItem_Click);
             // 
             // addTextMenuItem
             // 
@@ -1312,6 +1323,7 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripMenuItem ignorePdfRestrictionsToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem deletePageMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem rotatePageMenuItem;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.GroupBox groupBox6;
         private System.Windows.Forms.ComboBox filterComboBox;

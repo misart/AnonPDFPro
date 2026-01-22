@@ -156,6 +156,9 @@
   <data name="Menu_DeletePage" xml:space="preserve">
     <value>Usuń stronę</value>
   </data>
+  <data name="Menu_RotatePage" xml:space="preserve">
+    <value>Obróć stronę</value>
+  </data>
   <data name="Menu_AddText" xml:space="preserve">
     <value>Dodaj napis</value>
   </data>
@@ -503,6 +506,9 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   </data>
   <data name="UI_Filter_Deletions" xml:space="preserve">
     <value>Usunięcia</value>
+  </data>
+  <data name="UI_Filter_Rotations" xml:space="preserve">
+    <value>Obrócenia</value>
   </data>
   <data name="Msg_HelpNotFound" xml:space="preserve">
     <value>Plik pomocy PDF nie został znaleziony w folderze aplikacji.</value>

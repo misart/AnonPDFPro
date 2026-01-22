@@ -472,6 +472,15 @@ namespace AnonPDF.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Obróć stronę.
+        /// </summary>
+        internal static string Menu_RotatePage {
+            get {
+                return ResourceManager.GetString("Menu_RotatePage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Koniec.
         /// </summary>
         internal static string Menu_Exit {
@@ -1787,6 +1796,15 @@ namespace AnonPDF.Properties {
         internal static string UI_Filter_Deletions {
             get {
                 return ResourceManager.GetString("UI_Filter_Deletions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Obrócenia.
+        /// </summary>
+        internal static string UI_Filter_Rotations {
+            get {
+                return ResourceManager.GetString("UI_Filter_Rotations", resourceCulture);
             }
         }
         
