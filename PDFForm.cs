@@ -642,6 +642,32 @@ namespace AnonPDF
             );
         }
 
+        private void PersistCurrentPageToProjectFile()
+        {
+            if (numPages <= 0)
+                return;
+
+            string projectPath = !string.IsNullOrWhiteSpace(lastSavedProjectName)
+                ? lastSavedProjectName
+                : inputProjectPath;
+
+            if (string.IsNullOrWhiteSpace(projectPath) || !File.Exists(projectPath))
+                return;
+
+            try
+            {
+                string json = File.ReadAllText(projectPath);
+                JObject root = JObject.Parse(json);
+                int pageToSave = Math.Max(1, Math.Min(currentPage, numPages));
+                root["CurrentPage"] = pageToSave;
+                File.WriteAllText(projectPath, root.ToString(Formatting.Indented));
+            }
+            catch
+            {
+                // Keep closing flow even if project update fails.
+            }
+        }
+
         private void AddEditAnnotation(TextAnnotation annotation = null)
         {
             using (EditTextDialog dlg = new EditTextDialog())
@@ -4458,6 +4484,11 @@ namespace AnonPDF
                         .Where(kvp => kvp.Value != 0)
                         .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
+                    if (projectData.CurrentPage > 0)
+                    {
+                        currentPage = Math.Max(1, Math.Min(projectData.CurrentPage, numPages));
+                    }
+
                     foreach (var statusItem in allPageStatuses)
                     {
                         statusItem.HasRotation = false;
@@ -4530,6 +4561,28 @@ namespace AnonPDF
                         pagesListView.Invalidate(item.Bounds);
                     }
 
+                    if (numPages > 0)
+                    {
+                        if ((string)filterComboBox.SelectedItem == allComboItem)
+                        {
+                            pagesListView.Items[currentPage - 1].Selected = true;
+                            pagesListView.Items[currentPage - 1].EnsureVisible();
+                        }
+                        else
+                        {
+                            ListViewItem currentItem = FindListViewItemByPageNumber(currentPage);
+                            if (currentItem != null)
+                            {
+                                currentItem.Selected = true;
+                                currentItem.EnsureVisible();
+                            }
+                            else
+                            {
+                                pagesListView.SelectedItems.Clear();
+                            }
+                        }
+                    }
+
                     inputProjectPath = inputProjectPathTemp;
                     //Properties.Settings.Default.LastPapPath = inputProjectPath;
                     //Properties.Settings.Default.Save();
@@ -4585,7 +4638,8 @@ namespace AnonPDF
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
-                            FilePath = inputPdfPath
+                            FilePath = inputPdfPath,
+                            CurrentPage = currentPage
                         };
 
                         // Serialize list to JSON string
@@ -4883,6 +4937,11 @@ namespace AnonPDF
                 e.Cancel = true;
             }
 
+            if (!e.Cancel)
+            {
+                PersistCurrentPageToProjectFile();
+            }
+
             if (inputPdfPath != "")
             {
                 Properties.Settings.Default.LastPdfPath = inputPdfPath;
@@ -4934,7 +4993,8 @@ namespace AnonPDF
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
-                            FilePath = inputPdfPath
+                            FilePath = inputPdfPath,
+                            CurrentPage = currentPage
                         };
 
                         // Serialize list to JSON string
@@ -7610,6 +7670,7 @@ namespace AnonPDF
         public HashSet<int> PagesToRemove { get; set; }
         public List<TextAnnotation> TextAnnotations { get; set; }
         public Dictionary<int, int> PageRotationOffsets { get; set; }
+        public int CurrentPage { get; set; }
         public String FilePath { get; set; }
     }
 
