@@ -35,6 +35,9 @@
     <Setting Name="IgnorePdfRestrictions" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="DiagnosticMode" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="PreferredUICulture" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

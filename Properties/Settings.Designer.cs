@@ -154,6 +154,18 @@ namespace AnonPDF.Properties {
                 this["IgnorePdfRestrictions"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DiagnosticMode {
+            get {
+                return ((bool)(this["DiagnosticMode"]));
+            }
+            set {
+                this["DiagnosticMode"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

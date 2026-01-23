@@ -198,6 +198,9 @@
   <data name="Menu_Help_Tutorial" xml:space="preserve">
     <value>Samouczek</value>
   </data>
+  <data name="Menu_Help_DiagnosticMode" xml:space="preserve">
+    <value>Tryb diagnostyczny</value>
+  </data>
   <data name="Menu_Help_About" xml:space="preserve">
     <value>O aplikacji</value>
   </data>

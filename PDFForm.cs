@@ -50,6 +50,9 @@ namespace AnonPDF
 {
     public partial class PDFForm : Form
     {
+        private static readonly string DebugLogPath = Path.Combine(Path.GetTempPath(), "AnonPDF-debug.log");
+        private static bool diagnosticModeEnabled = false;
+        private static bool DebugLogEnabled => diagnosticModeEnabled;
         private readonly string fileVersion;
         private string serviceEndDate = "";
         private string inputPdfPath = "";
@@ -82,6 +85,7 @@ namespace AnonPDF
         private string lastSavedProjectName = "";
         private System.Drawing.RectangleF currentSelection;
         private List<RedactionBlock> redactionBlocks = new List<RedactionBlock>();
+        private readonly HashSet<int> reencodedPages = new HashSet<int>();
         private bool projectWasChangedAfterLastSave = false;
         private readonly bool isReencodingMode;
         private readonly int reencodingDPI = 200;
@@ -347,6 +351,7 @@ namespace AnonPDF
             // Help menu
             helpMenuItem.Text = Resources.Menu_Help_Help;
             tutorialMenuItem.Text = Resources.Menu_Help_Tutorial;
+            diagnosticModeMenuItem.Text = Resources.Menu_Help_DiagnosticMode;
             aboutMenuItem.Text = Resources.Menu_Help_About;
             showLicenseToolStripMenuItem.Text = Resources.Menu_Help_ShowLicense;
             thirdPartyNoticesToolStripMenuItem.Text = Resources.Menu_Help_ThirdParty;
@@ -674,6 +679,52 @@ namespace AnonPDF
                 textSize.Width,
                 textSize.Height
             );
+        }
+
+        private static void LogDebug(string message)
+        {
+            if (!DebugLogEnabled || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            try
+            {
+                string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}";
+                File.AppendAllText(DebugLogPath, line);
+            }
+            catch
+            {
+                // Ignore logging failures.
+            }
+        }
+
+        private void OpenDiagnosticLogIfEnabled()
+        {
+            if (!DebugLogEnabled)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!File.Exists(DebugLogPath))
+                {
+                    return;
+                }
+
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "notepad.exe",
+                    Arguments = $"\"{DebugLogPath}\"",
+                    UseShellExecute = false
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"Open diagnostic log failed: {ex.Message}");
+            }
         }
 
         private void PersistCurrentPageToProjectFile()
@@ -1399,7 +1450,14 @@ namespace AnonPDF
 
             // Load setting "Ignore PDF restrictions"
             ignorePdfRestrictionsToolStripMenuItem.Checked = Properties.Settings.Default.IgnorePdfRestrictions;
+            diagnosticModeEnabled = false;
+            diagnosticModeMenuItem.Checked = false;
             UpdateRecentFilesMenu();
+
+            if (DebugLogEnabled)
+            {
+                LogDebug("=== Session start ===");
+            }
         }
 
         private void IgnorePdfRestrictionsToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
@@ -1407,6 +1465,16 @@ namespace AnonPDF
             // Zapisz ustawienie
             Properties.Settings.Default.IgnorePdfRestrictions = ignorePdfRestrictionsToolStripMenuItem.Checked;
             Properties.Settings.Default.Save();
+        }
+
+        private void DiagnosticModeMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            diagnosticModeEnabled = diagnosticModeMenuItem.Checked;
+
+            if (diagnosticModeMenuItem.Checked)
+            {
+                LogDebug("=== Diagnostic mode enabled ===");
+            }
         }
 
         private void ShowTutorial()
@@ -1918,14 +1986,24 @@ namespace AnonPDF
             }
         }
 
-        private RectangleF ConvertToPdfCoordinates(RectangleF screenRect, int pageNumber, int rotation)
+        private RectangleF ConvertToPdfCoordinates(RectangleF screenRect, int pageNumber, int rotation, bool includeBaseRotation = true)
         {
-            // Read page via PDFiumSharp
+            // Read page via PDFiumSharp (view space)
             var page = pdf.Pages[pageNumber - 1];
+            var viewSize = GetPageSizeWithOffset(pageNumber);
+            float viewW = viewSize.Width;
+            float viewH = viewSize.Height;
 
-            // Original MediaBox size (before rotation)
+            // Unrotated PDF user space size
             float pageW = (float)page.Width;
             float pageH = (float)page.Height;
+            int baseRotation = includeBaseRotation ? GetBaseRotationDegrees(pageNumber) : 0;
+            if (baseRotation == 90 || baseRotation == 270)
+            {
+                float tmp = pageW;
+                pageW = pageH;
+                pageH = tmp;
+            }
 
             // Rectangle selected by user (screen coords/upper corner)
             float oldX = screenRect.X;
@@ -1933,60 +2011,58 @@ namespace AnonPDF
             float oldW = screenRect.Width;
             float oldH = screenRect.Height;
 
+            // Convert to view coords with origin bottom-left
+            float xr = oldX;
+            float yr = viewH - oldY - oldH;
+            float wr = oldW;
+            float hr = oldH;
+
             float x, y, w, h;
 
-            // Check page orientation (rotation)
-            
-
+            rotation = NormalizeRotation(rotation);
             switch (rotation)
             {
                 case 90:
-                    x = oldY;
-                    y = oldX;
-                    w = oldH;
-                    h = oldW;
+                    x = pageW - (yr + hr);
+                    y = xr;
+                    w = hr;
+                    h = wr;
                     break;
 
                 case 180:
-                    // Page rotated 180 degrees: reflect horizontally and vertically
-                    x = pageW - oldX - oldW;
-                    y = oldY;
-                    w = oldW;
-                    h = oldH;
+                    x = pageW - (xr + wr);
+                    y = pageH - (yr + hr);
+                    w = wr;
+                    h = hr;
                     break;
 
                 case 270:
-                    // Page rotated 90° CCW (same as 270° CW) – mirrored relative to 90° CW case
-                    x = pageW - oldY - oldH;
-                    y = pageH - oldX - oldW;
-                    w = oldH;
-                    h = oldW;
+                    x = yr;
+                    y = pageH - (xr + wr);
+                    w = hr;
+                    h = wr;
                     break;
 
                 case 0:
                 default:
-                    // No rotation (Rotate = 0).
-                    // PDF coordinates start at bottom-left (0,0), WinForms at top-left,
-                    // so invert the Y axis:
-                    x = oldX;
-                    y = pageH - oldY - oldH;
-                    w = oldW;
-                    h = oldH;
+                    x = xr;
+                    y = yr;
+                    w = wr;
+                    h = hr;
                     break;
             }
 
-            // Return rectangle mapped to the PDF coordinate system
             return new RectangleF(x, y, w, h);
         }
 
-        private PointF ConvertPointToPdfCoordinates(PointF screenPoint, int pageNumber, int rotation)
+        private PointF ConvertPointToPdfCoordinates(PointF screenPoint, int pageNumber, int rotation, bool includeBaseRotation = true)
         {
             RectangleF rect = new RectangleF(screenPoint.X, screenPoint.Y, 0f, 0f);
-            RectangleF pdfRect = ConvertToPdfCoordinates(rect, pageNumber, rotation);
+            RectangleF pdfRect = ConvertToPdfCoordinates(rect, pageNumber, rotation, includeBaseRotation);
             return new PointF(pdfRect.X, pdfRect.Y);
         }
 
-        private void ApplyRotationOffsetsToDocument(iText.Kernel.Pdf.PdfDocument pdfDoc)
+        private void ApplyRotationOffsetsToDocument(iText.Kernel.Pdf.PdfDocument pdfDoc, ISet<int> pagesWithBakedRotation = null)
         {
             if (pdf == null)
                 return;
@@ -1994,7 +2070,10 @@ namespace AnonPDF
             int pageCount = pdfDoc.GetNumberOfPages();
             for (int pageNum = 1; pageNum <= pageCount; pageNum++)
             {
-                int rotation = GetEffectiveRotationDegrees(pageNum);
+                bool includeBaseRotation = pagesWithBakedRotation == null || !pagesWithBakedRotation.Contains(pageNum);
+                int rotation = includeBaseRotation
+                    ? GetEffectiveRotationDegrees(pageNum)
+                    : NormalizeRotation(GetRotationOffset(pageNum));
                 if (rotation != pdfDoc.GetPage(pageNum).GetRotation())
                 {
                     pdfDoc.GetPage(pageNum).SetRotation(rotation);
@@ -2524,7 +2603,7 @@ namespace AnonPDF
             return File.Exists(fontFile) ? fontFile : null;
         }
 
-        void RedactText(string inputFile, string outputFile)
+        void RedactText(string inputFile, string outputFile, ISet<int> pagesWithBakedRotation = null)
         {
             iText.Kernel.Colors.Color cleanUpColorBlack = new DeviceRgb(0, 0, 0);
             iText.Kernel.Colors.Color cleanUpColorWhite = new DeviceRgb(255, 255, 255);
@@ -2579,7 +2658,8 @@ namespace AnonPDF
             using (PdfWriter writer = new PdfWriter(outputFile, writerProps))
             using (iText.Kernel.Pdf.PdfDocument pdfDoc = new iText.Kernel.Pdf.PdfDocument(reader, writer))
             {
-                ApplyRotationOffsetsToDocument(pdfDoc);
+                ApplyRotationOffsetsToDocument(pdfDoc, pagesWithBakedRotation);
+                LogDebug($"RedactText input={inputFile} output={outputFile} safeMode={safeModeCheckBox.Checked} cleanupError={pdfCleanUpToolError} blocks={redactionBlocks.Count} bakedPages={(pagesWithBakedRotation == null ? 0 : pagesWithBakedRotation.Count)}");
 
                 if (signatures.Count > 0 && !signaturesOriginalRadioButton.Checked)
                 {
@@ -2785,10 +2865,21 @@ namespace AnonPDF
                 {
                     int pageNum = pageGroup.Key;
                     var pageWithSelections = pdfDoc.GetPage(pageNum);
-                    var rotation = GetEffectiveRotationDegrees(pageNum);
+                    bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNum);
+                    var rotation = baseRotationBaked ? GetRotationOffset(pageNum) : GetEffectiveRotationDegrees(pageNum);
+                    if (DebugLogEnabled && pageNum >= 1 && pageNum <= pdf.Pages.Count)
+                    {
+                        var pdfiumPage = pdf.Pages[pageNum - 1];
+                        var size = pageWithSelections.GetPageSize();
+                        LogDebug($"Redact page={pageNum} baseRot={GetBaseRotationDegrees(pageNum)} offset={GetRotationOffset(pageNum)} effectiveRot={GetEffectiveRotationDegrees(pageNum)} rotUsed={rotation} baked={baseRotationBaked} pdfium={pdfiumPage.Width}x{pdfiumPage.Height} itext={size.GetWidth()}x{size.GetHeight()}");
+                    }
                     foreach (var block in pageGroup)
                     {
-                        var pdfCoordinates = ConvertToPdfCoordinates(block.Bounds, pageNum, rotation);
+                        var pdfCoordinates = ConvertToPdfCoordinates(block.Bounds, pageNum, rotation, includeBaseRotation: !baseRotationBaked);
+                        if (DebugLogEnabled)
+                        {
+                            LogDebug($"Redact block page={pageNum} rect={block.Bounds} -> pdfRect={pdfCoordinates}");
+                        }
                         iText.Kernel.Geom.Rectangle rectangle = new iText.Kernel.Geom.Rectangle(
                             (int)Math.Round(pdfCoordinates.X),
                             (int)Math.Round(pdfCoordinates.Y),
@@ -2844,7 +2935,8 @@ namespace AnonPDF
                     string textValue = annotation.AnnotationText ?? string.Empty;
                     float fontSize = (float)annotation.AnnotationFont.Size;
                         
-                    int rotation = GetEffectiveRotationDegrees(annotation.PageNumber);
+                    bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(annotation.PageNumber);
+                    int rotation = baseRotationBaked ? GetRotationOffset(annotation.PageNumber) : GetEffectiveRotationDegrees(annotation.PageNumber);
                     int annotationRotation = NormalizeRotation(annotation.AnnotationRotation);
 
                     // Coordinate conversion - assume ConvertToPdfCoordinates works similarly to redaction blocks
@@ -3001,7 +3093,7 @@ namespace AnonPDF
                         PointF baselineView = new PointF(
                             scaledAnnotationBounds.X + rotatedX,
                             scaledAnnotationBounds.Y + rotatedY);
-                        PointF baselinePdf = ConvertPointToPdfCoordinates(baselineView, annotation.PageNumber, rotation);
+                        PointF baselinePdf = ConvertPointToPdfCoordinates(baselineView, annotation.PageNumber, rotation, includeBaseRotation: !baseRotationBaked);
 
                         pdfCanvas.SetTextMatrix(cos, sin, -sin, cos, baselinePdf.X, baselinePdf.Y);
                         if (!string.IsNullOrEmpty(lineText))
@@ -3226,6 +3318,8 @@ namespace AnonPDF
                 return;
             }
 
+            LogDebug($"LoadPdf path={inputPdfPath} password={(string.IsNullOrEmpty(userPassword) ? "no" : "yes")}");
+
             pdfCleanUpToolError = false;
             groupBox6.Visible = false;
             pagesListView.Visible = false;
@@ -3257,6 +3351,8 @@ namespace AnonPDF
             numPagesLabel.Visible = true;
             numPages = pdf.Pages.Count;
             groupBox4.Enabled = true;
+
+            LogPdfPageInfo();
 
             pagesListView.Clear();
             searchTextBox.Text = string.Empty;
@@ -3329,6 +3425,40 @@ namespace AnonPDF
             UpdateWindowTitle();
             ExtractSignatures();
             AddRecentFile(inputPdfPath);
+        }
+
+        private void LogPdfPageInfo()
+        {
+            if (!DebugLogEnabled || pdf == null || string.IsNullOrWhiteSpace(inputPdfPath))
+            {
+                return;
+            }
+
+            try
+            {
+                var props = new ReaderProperties();
+                if (!string.IsNullOrEmpty(userPassword))
+                {
+                    props.SetPassword(System.Text.Encoding.UTF8.GetBytes(userPassword));
+                }
+                using (PdfReader reader = new PdfReader(inputPdfPath, props).SetUnethicalReading(Properties.Settings.Default.IgnorePdfRestrictions))
+                using (iText.Kernel.Pdf.PdfDocument pdfDoc = new iText.Kernel.Pdf.PdfDocument(reader))
+                {
+                    int count = Math.Min(pdf.Pages.Count, pdfDoc.GetNumberOfPages());
+                    LogDebug($"LoadPdf pages={count}");
+                    for (int i = 1; i <= count; i++)
+                    {
+                        var pdfiumPage = pdf.Pages[i - 1];
+                        var itextPage = pdfDoc.GetPage(i);
+                        var size = itextPage.GetPageSize();
+                        LogDebug($"Page {i}: pdfium={pdfiumPage.Width}x{pdfiumPage.Height} orient={pdfiumPage.Orientation} itext={size.GetWidth()}x{size.GetHeight()} rotate={itextPage.GetRotation()} offset={GetRotationOffset(i)}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"LogPdfPageInfo error: {ex.Message}");
+            }
         }
 
         private bool ConfirmOpenNewPdf()
@@ -3637,7 +3767,7 @@ namespace AnonPDF
 
                         if (retReencoding)
                         {
-                            RedactText(tempFile, saveFileDialog.FileName);
+                            RedactText(tempFile, saveFileDialog.FileName, reencodedPages);
                         }
                         else
                         {
@@ -3667,6 +3797,7 @@ namespace AnonPDF
                                 MessageBox.Show(this, string.Format(Resources.Err_NoAssociatedPdfApp, wex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
+                        OpenDiagnosticLogIfEnabled();
                     }
                     catch (Exception ex)
                     {
@@ -5835,6 +5966,7 @@ namespace AnonPDF
         public bool ReencodePdfKeepOriginalCompression(string inputPdf, string outputPdf)
         {
             bool isReencoded = false;
+            reencodedPages.Clear();
 
             var props = new ReaderProperties();
             if (!string.IsNullOrEmpty(userPassword))
@@ -5903,14 +6035,25 @@ namespace AnonPDF
                         // For pages meeting conditions perform reencoding.
 
                         isReencoded = true;
+                        reencodedPages.Add(pageNumber);
                         // Load page from PDFiumSharp:
                         var pdfiumPage = pdfiumDoc.Pages[i];
                         double pageWidthPoints = pdfiumPage.Width;
                         double pageHeightPoints = pdfiumPage.Height;
+                        if (DebugLogEnabled)
+                        {
+                            var srcPage = srcDoc.GetPage(pageNumber);
+                            var size = srcPage.GetPageSize();
+                            LogDebug($"Reencode page={pageNumber} filter={pageFilters[i] ?? "none"} rotate={srcPage.GetRotation()} itext={size.GetWidth()}x{size.GetHeight()} pdfium={pageWidthPoints}x{pageHeightPoints} safeMode={safeModeCheckBox.Checked} cleanupError={pdfCleanUpToolError}");
+                        }
 
                         int dpi = reencodingDPI;
                         int bmpWidth = (int)(pageWidthPoints * dpi / 72.0);
                         int bmpHeight = (int)(pageHeightPoints * dpi / 72.0);
+                        if (DebugLogEnabled)
+                        {
+                            LogDebug($"Reencode bitmap page={pageNumber} dpi={dpi} size={bmpWidth}x{bmpHeight}");
+                        }
 
                         using (PDFiumBitmap pdfiumBmp = new PDFiumBitmap(bmpWidth, bmpHeight, true))
                         {

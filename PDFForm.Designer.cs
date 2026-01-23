@@ -111,6 +111,7 @@
             this.showLicenseToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.thirdPartyNoticesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.tutorialMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.diagnosticModeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.aboutMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem3 = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem4 = new System.Windows.Forms.ToolStripMenuItem();
@@ -1065,6 +1066,7 @@
             this.showLicenseToolStripMenuItem,
             this.thirdPartyNoticesToolStripMenuItem,
             this.tutorialMenuItem,
+            this.diagnosticModeMenuItem,
             this.aboutMenuItem});
             this.menuHelpItem.Name = "menuHelpItem";
             this.menuHelpItem.Size = new System.Drawing.Size(57, 20);
@@ -1099,6 +1101,14 @@
             this.tutorialMenuItem.Size = new System.Drawing.Size(216, 22);
             this.tutorialMenuItem.Text = "Samouczek";
             this.tutorialMenuItem.Click += new System.EventHandler(this.TutorialToolStripMenuItem_Click);
+            // 
+            // diagnosticModeMenuItem
+            // 
+            this.diagnosticModeMenuItem.CheckOnClick = true;
+            this.diagnosticModeMenuItem.Name = "diagnosticModeMenuItem";
+            this.diagnosticModeMenuItem.Size = new System.Drawing.Size(216, 22);
+            this.diagnosticModeMenuItem.Text = "Tryb diagnostyczny";
+            this.diagnosticModeMenuItem.CheckedChanged += new System.EventHandler(this.DiagnosticModeMenuItem_CheckedChanged);
             // 
             // aboutMenuItem
             // 
@@ -1330,6 +1340,7 @@
         private System.Windows.Forms.Button searchButton;
         private System.Windows.Forms.CheckBox safeModeCheckBox;
         private System.Windows.Forms.ToolStripMenuItem tutorialMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem diagnosticModeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem showLicenseToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem thirdPartyNoticesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem menuOptionsItem;

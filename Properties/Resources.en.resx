@@ -198,6 +198,9 @@
   <data name="Menu_Help_Tutorial" xml:space="preserve">
     <value>Tutorial</value>
   </data>
+  <data name="Menu_Help_DiagnosticMode" xml:space="preserve">
+    <value>Diagnostic mode</value>
+  </data>
   <data name="Menu_Help_About" xml:space="preserve">
     <value>About</value>
   </data>

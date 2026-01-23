@@ -581,6 +581,15 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("Menu_Help_Tutorial", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Tryb diagnostyczny.
+        /// </summary>
+        internal static string Menu_Help_DiagnosticMode {
+            get {
+                return ResourceManager.GetString("Menu_Help_DiagnosticMode", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Pomijaj ograniczenia PDF.
