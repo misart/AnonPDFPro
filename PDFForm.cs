@@ -115,7 +115,7 @@ namespace AnonPDF
 
         // Fields to detect clicks on icon buttons
         private bool isClickOnIcon = false;
-        private enum IconType { None, Edit, Lock, Delete }
+        private enum IconType { None, Edit, Lock, Duplicate, Delete }
         private IconType clickedIconType = IconType.None;
         private TextAnnotation annotationForIcon = null;  // annotation where the icon was clicked
 
@@ -607,25 +607,49 @@ namespace AnonPDF
 
             float height = Math.Max(lineHeight * Math.Max(lines.Length, 1), lineHeight);
             rotation = NormalizeRotation(rotation);
-            if (rotation == 90 || rotation == 270)
-                return new SizeF(height, maxWidth);
-            return new SizeF(maxWidth, height);
+            if (rotation == 0)
+                return new SizeF(maxWidth, height);
+
+            float angle = (float)(rotation * Math.PI / 180.0);
+            float cos = Math.Abs((float)Math.Cos(angle));
+            float sin = Math.Abs((float)Math.Sin(angle));
+            float rotatedWidth = (maxWidth * cos) + (height * sin);
+            float rotatedHeight = (maxWidth * sin) + (height * cos);
+
+            return new SizeF(rotatedWidth, rotatedHeight);
         }
 
         private static PointF GetRotationOffsetForBounds(int rotation, float width, float height)
         {
             rotation = NormalizeRotation(rotation);
-            switch (rotation)
+            if (rotation == 0)
+                return new PointF(0f, 0f);
+
+            float angle = (float)(rotation * Math.PI / 180.0);
+            float cos = (float)Math.Cos(angle);
+            float sin = (float)Math.Sin(angle);
+
+            PointF[] points =
             {
-                case 90:
-                    return new PointF(height, 0f);
-                case 180:
-                    return new PointF(width, height);
-                case 270:
-                    return new PointF(0f, width);
-                default:
-                    return new PointF(0f, 0f);
+                new PointF(0f, 0f),
+                new PointF(width, 0f),
+                new PointF(width, height),
+                new PointF(0f, height)
+            };
+
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            foreach (PointF pt in points)
+            {
+                float x = pt.X * cos - pt.Y * sin;
+                float y = pt.X * sin + pt.Y * cos;
+                if (x < minX)
+                    minX = x;
+                if (y < minY)
+                    minY = y;
             }
+
+            return new PointF(-minX, -minY);
         }
 
         private static void ApplyAnnotationFromDialog(TextAnnotation annotation, EditTextDialog dlg)
@@ -697,10 +721,6 @@ namespace AnonPDF
                     // Calculate text size using the selected font
                     SizeF textSize = GetAnnotationSize(dlg.AnnotationText, dlg.AnnotationFont, dlg.AnnotationRotation);
 
-                    ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
-
-
-                        // Get DPI from current graphics context
                     float boxWidth = textSize.Width;
                     float boxHeight = textSize.Height;
 
@@ -722,27 +742,7 @@ namespace AnonPDF
                             AnnotationAlignment = dlg.AnnotationAlignment,
                             AnnotationRotation = dlg.AnnotationRotation
                         };
-
-                        // 1) panel dimensions
-                        int panelW = panel.ClientSize.Width;
-                        int panelH = panel.ClientSize.Height;
-                        // 2) PDF image dimensions
-                        int imgW = pdfViewer.Width;
-                        int imgH = pdfViewer.Height;
-                        // 3) effective viewport size (min(panel, image))
-                        int viewW = Math.Min(panelW, imgW);
-                        int viewH = Math.Min(panelH, imgH);
-                        // 4) current scroll offsets
-                        int scrollX = panel.HorizontalScroll.Value;
-                        int scrollY = panel.VerticalScroll.Value;
-                        // 5) viewport center in pixels, convert to document coords
-                        float docCenterX = (scrollX + viewW / 2f) / scaleFactor;
-                        float docCenterY = (scrollY + viewH / 2f) / scaleFactor;
-                        // 6) position so annotation center matches viewport center
-                        float x = docCenterX - boxWidth / 2f;
-                        float y = docCenterY - boxHeight / 2f;
-
-                        newAnnotation.AnnotationBounds = new RectangleF(x, y, boxWidth, boxHeight);
+                        newAnnotation.AnnotationBounds = GetCenteredAnnotationBounds(boxWidth, boxHeight);
 
                         // Add the new annotation to the list
                         textAnnotations.Add(newAnnotation);
@@ -775,6 +775,75 @@ namespace AnonPDF
 
                 }
             }
+        }
+
+        private RectangleF GetCenteredAnnotationBounds(float width, float height)
+        {
+            ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
+            if (panel == null)
+            {
+                return new RectangleF(0f, 0f, width, height);
+            }
+
+            if (scaleFactor <= 0f)
+            {
+                return new RectangleF(0f, 0f, width, height);
+            }
+
+            int panelW = panel.ClientSize.Width;
+            int panelH = panel.ClientSize.Height;
+            int imgW = pdfViewer.Width;
+            int imgH = pdfViewer.Height;
+            int viewW = Math.Min(panelW, imgW);
+            int viewH = Math.Min(panelH, imgH);
+            int scrollX = panel.HorizontalScroll.Value;
+            int scrollY = panel.VerticalScroll.Value;
+            float docCenterX = (scrollX + viewW / 2f) / scaleFactor;
+            float docCenterY = (scrollY + viewH / 2f) / scaleFactor;
+            float x = docCenterX - width / 2f;
+            float y = docCenterY - height / 2f;
+
+            return new RectangleF(x, y, width, height);
+        }
+
+        private void DuplicateAnnotation(TextAnnotation source)
+        {
+            if (source == null)
+                return;
+
+            SizeF textSize = GetAnnotationSize(source.AnnotationText, source.AnnotationFont, source.AnnotationRotation);
+            TextAnnotation copy = new TextAnnotation
+            {
+                PageNumber = currentPage,
+                AnnotationText = source.AnnotationText,
+                AnnotationFont = source.AnnotationFont,
+                AnnotationColor = source.AnnotationColor,
+                AnnotationAlignment = source.AnnotationAlignment,
+                AnnotationRotation = source.AnnotationRotation,
+                AnnotationIsLocked = source.AnnotationIsLocked,
+                AnnotationBounds = GetCenteredAnnotationBounds(textSize.Width, textSize.Height)
+            };
+
+            textAnnotations.Add(copy);
+
+            PageItemStatus status = allPageStatuses[currentPage - 1];
+            status.HasTextAnnotations = true;
+
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                pagesListView.Invalidate(currentItem.Bounds);
+            }
+            else
+            {
+                ApplyFilter((string)filterComboBox.SelectedItem);
+            }
+
+            pdfViewer.Invalidate();
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
         }
 
         public bool PageHasVectorDrawing(iText.Kernel.Pdf.PdfPage page)
@@ -2800,13 +2869,6 @@ namespace AnonPDF
                        annotation.AnnotationBounds.Width * scaleX,
                        annotation.AnnotationBounds.Height * scaleY
                     );
-                    float layoutWidth = scaledAnnotationBounds.Width;
-                    float layoutHeight = scaledAnnotationBounds.Height;
-                    if (annotationRotation == 90 || annotationRotation == 270)
-                    {
-                        layoutWidth = scaledAnnotationBounds.Height;
-                        layoutHeight = scaledAnnotationBounds.Width;
-                    }
                     float maxGdiWidthPt = 0f;
                     float maxPdfWidth = 0f;
                     var lineRuns = new List<List<(string Text, PdfFont Font)>>();
@@ -2862,6 +2924,10 @@ namespace AnonPDF
                             maxPdfWidth = linePdfWidth;
                         }
                     }
+
+                    int lineCount = Math.Max(lines.Length, 1);
+                    float layoutWidth = maxGdiWidthPt;
+                    float layoutHeight = lineHeightPt * lineCount;
                     float horizontalScaling = 1f;
                     if (maxPdfWidth > 0f && maxGdiWidthPt > 0f)
                     {
@@ -3626,18 +3692,23 @@ namespace AnonPDF
                     );
                     
                     // Calculate button rectangles - placed above annotation
-                    System.Drawing.Rectangle editIconRect = new System.Drawing.Rectangle(
-                        annotationRect.Right - (annotationsIconSize * 3) - 2 * annotationsIconPadding,
+                    System.Drawing.Rectangle deleteIconRect = new System.Drawing.Rectangle(
+                        annotationRect.Right - annotationsIconSize,
                         annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                         annotationsIconSize, annotationsIconSize
                     );
-                    System.Drawing.Rectangle lockIconRect = new System.Drawing.Rectangle(
+                    System.Drawing.Rectangle duplicateIconRect = new System.Drawing.Rectangle(
                         annotationRect.Right - (annotationsIconSize * 2) - annotationsIconPadding,
                         annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                         annotationsIconSize, annotationsIconSize
                     );
-                    System.Drawing.Rectangle deleteIconRect = new System.Drawing.Rectangle(
-                        annotationRect.Right - annotationsIconSize,
+                    System.Drawing.Rectangle lockIconRect = new System.Drawing.Rectangle(
+                        annotationRect.Right - (annotationsIconSize * 3) - 2 * annotationsIconPadding,
+                        annotationRect.Top - annotationsIconSize - annotationsIconPadding,
+                        annotationsIconSize, annotationsIconSize
+                    );
+                    System.Drawing.Rectangle editIconRect = new System.Drawing.Rectangle(
+                        annotationRect.Right - (annotationsIconSize * 4) - 3 * annotationsIconPadding,
                         annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                         annotationsIconSize, annotationsIconSize
                     );
@@ -3651,6 +3722,13 @@ namespace AnonPDF
                     {
                         isClickOnIcon = true;
                         clickedIconType = IconType.Lock;
+                        annotationForIcon = annotation;
+                        break;
+                    }
+                    else if (duplicateIconRect.Contains(e.Location))
+                    {
+                        isClickOnIcon = true;
+                        clickedIconType = IconType.Duplicate;
                         annotationForIcon = annotation;
                         break;
                     }
@@ -3859,6 +3937,10 @@ namespace AnonPDF
 
                         }
 
+                    }
+                    else if (clickedIconType == IconType.Duplicate)
+                    {
+                        DuplicateAnnotation(annotationForIcon);
                     }
                     // Refresh view
                     pdfViewer.Invalidate();
@@ -4109,13 +4191,9 @@ namespace AnonPDF
                 float dpiCorrection = 72f / e.Graphics.DpiY; // DpiY to DPI w pionie dla bitmapy
 
                 int annotationRotation = NormalizeRotation(annotation.AnnotationRotation);
-                float layoutWidth = rect.Width;
-                float layoutHeight = rect.Height;
-                if (annotationRotation == 90 || annotationRotation == 270)
-                {
-                    layoutWidth = rect.Height;
-                    layoutHeight = rect.Width;
-                }
+                SizeF baseSize = GetAnnotationSize(annotation.AnnotationText, annotation.AnnotationFont, 0);
+                float layoutWidth = baseSize.Width * scaleFactor * 72f / e.Graphics.DpiX;
+                float layoutHeight = baseSize.Height * scaleFactor * 72f / e.Graphics.DpiY;
 
                 // Render text with scaled font
                 using (SolidBrush brush = new SolidBrush(annotation.AnnotationColor))
@@ -4149,19 +4227,24 @@ namespace AnonPDF
                 // --- Drawing buttons with icons above annotation box ---
 
                 // Position buttons to be above annotation
-                // DeleteButton: prawy przycisk, a EditButton: po lewej od niego.
+                // DeleteButton: rightmost; edit button at the left end.
                 Rectangle deleteIconRect = new Rectangle(
-                    rect.Right - annotationsIconSize,                   // at right edge
-                    rect.Top - annotationsIconSize - annotationsIconPadding,         // above annotation
+                    rect.Right - annotationsIconSize,
+                    rect.Top - annotationsIconSize - annotationsIconPadding,
+                    annotationsIconSize, annotationsIconSize
+                );
+                Rectangle duplicateIconRect = new Rectangle(
+                    rect.Right - (annotationsIconSize * 2) - annotationsIconPadding,
+                    rect.Top - annotationsIconSize - annotationsIconPadding,
                     annotationsIconSize, annotationsIconSize
                 );
                 Rectangle lockIconRect = new Rectangle(
-                    rect.Right - (annotationsIconSize * 2) - annotationsIconPadding, // right next to delete icon
+                    rect.Right - (annotationsIconSize * 3) - 2 * annotationsIconPadding,
                     rect.Top - annotationsIconSize - annotationsIconPadding,
                     annotationsIconSize, annotationsIconSize
                 );
                 Rectangle editIconRect = new Rectangle(
-                    rect.Right - (annotationsIconSize * 3) - 2 * annotationsIconPadding, // right next to lock icon
+                    rect.Right - (annotationsIconSize * 4) - 3 * annotationsIconPadding,
                     rect.Top - annotationsIconSize - annotationsIconPadding,
                     annotationsIconSize, annotationsIconSize
                 );
@@ -4204,7 +4287,7 @@ namespace AnonPDF
                     }
                 }
 
-                // Draw both buttons:
+                // Draw buttons:
                 DrawButtonIcon(editIconRect, "\uE70F");   // Ikonka edycji
                 if (annotation.AnnotationIsLocked)
                 {
@@ -4214,6 +4297,7 @@ namespace AnonPDF
                 {
                     DrawButtonIcon(lockIconRect, "\uE785");   // Ikonka odblokowaia
                 }
+                DrawButtonIcon(duplicateIconRect, "\uE8C8");  // Ikonka powielania
                 DrawButtonIcon(deleteIconRect, "\uE74D");  // Ikonka usuwania
             }
 
@@ -6871,10 +6955,9 @@ namespace AnonPDF
         private RadioButton rbCenter;
         private RadioButton rbRight;
         private GroupBox groupBoxRotation;
-        private RadioButton rbRotate0;
-        private RadioButton rbRotate90;
-        private RadioButton rbRotate180;
-        private RadioButton rbRotate270;
+        private Label lblRotation;
+        private NumericUpDown nudRotation;
+        private FlowLayoutPanel rotationPresetPanel;
         private GroupBox groupBoxSymbols;
         private FlowLayoutPanel symbolsPanel;
         private Button btnOK;
@@ -6896,8 +6979,7 @@ namespace AnonPDF
             if (AnnotationText == null) AnnotationText = "";
             if (AnnotationFont == null) AnnotationFont = new Font("Arial", 12);
             if (AnnotationColor == System.Drawing.Color.Empty) AnnotationColor = System.Drawing.Color.Black;
-            if (AnnotationRotation != 90 && AnnotationRotation != 180 && AnnotationRotation != 270)
-                AnnotationRotation = 0;
+            AnnotationRotation = NormalizeAngle(AnnotationRotation);
 
             InitializeComponents();
         }
@@ -6908,7 +6990,7 @@ namespace AnonPDF
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
             this.Width = 440;
-            this.Height = 470;
+            this.Height = 500;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
 
@@ -7004,54 +7086,62 @@ namespace AnonPDF
             {
                 Text = Resources.EditText_GroupRotation,
                 Location = new Point(10, 260),
-                Size = new Size(400, 50)
+                Size = new Size(400, 55)
             };
 
-            rbRotate0 = new RadioButton
+            lblRotation = new Label
             {
-                Text = "0",
-                Location = new Point(10, 20),
-                AutoSize = true,
-                Checked = true
-            };
-
-            rbRotate90 = new RadioButton
-            {
-                Text = "90",
-                Location = new Point(90, 20),
+                Text = Resources.EditText_RotationLabel,
+                Location = new Point(10, 22),
                 AutoSize = true
             };
 
-            rbRotate180 = new RadioButton
+            nudRotation = new NumericUpDown
             {
-                Text = "180",
-                Location = new Point(180, 20),
-                AutoSize = true
+                Minimum = 0,
+                Maximum = 359,
+                Increment = 1,
+                Value = NormalizeAngle(AnnotationRotation),
+                Location = new Point(90, 18),
+                Size = new Size(70, 22)
+            };
+            nudRotation.ValueChanged += RotationValueChanged;
+
+            rotationPresetPanel = new FlowLayoutPanel
+            {
+                Location = new Point(170, 18),
+                Size = new Size(220, 28),
+                AutoSize = false,
+                WrapContents = false,
+                FlowDirection = FlowDirection.LeftToRight,
+                Margin = new Padding(0)
             };
 
-            rbRotate270 = new RadioButton
+            int[] presets = { 0, 30, 45, 90, 180, 270 };
+            foreach (int preset in presets)
             {
-                Text = "270",
-                Location = new Point(280, 20),
-                AutoSize = true
-            };
+                Button presetButton = new Button
+                {
+                    Text = preset.ToString(CultureInfo.InvariantCulture),
+                    Tag = preset,
+                    Size = new Size(34, 24),
+                    Margin = new Padding(2, 0, 0, 0),
+                    TabStop = false
+                };
+                presetButton.Click += RotationPresetButton_Click;
+                rotationPresetPanel.Controls.Add(presetButton);
+            }
 
-            groupBoxRotation.Controls.Add(rbRotate0);
-            groupBoxRotation.Controls.Add(rbRotate90);
-            groupBoxRotation.Controls.Add(rbRotate180);
-            groupBoxRotation.Controls.Add(rbRotate270);
-
-            rbRotate0.CheckedChanged += RotationRadioButton_CheckedChanged;
-            rbRotate90.CheckedChanged += RotationRadioButton_CheckedChanged;
-            rbRotate180.CheckedChanged += RotationRadioButton_CheckedChanged;
-            rbRotate270.CheckedChanged += RotationRadioButton_CheckedChanged;
+            groupBoxRotation.Controls.Add(lblRotation);
+            groupBoxRotation.Controls.Add(nudRotation);
+            groupBoxRotation.Controls.Add(rotationPresetPanel);
 
             // GroupBox for symbol gallery
             groupBoxSymbols = new GroupBox
             {
                 Text = Resources.EditText_GroupSymbols,
-                Location = new Point(10, 310),
-                Size = new Size(400, 70)
+                Location = new Point(10, 330),
+                Size = new Size(400, 65)
             };
 
             symbolsPanel = new FlowLayoutPanel
@@ -7082,7 +7172,7 @@ namespace AnonPDF
             btnOK = new Button
             {
                 Text = Resources.Merge_OK,
-                Location = new Point(240, 390),
+                Location = new Point(240, 420),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.OK
             };
@@ -7091,7 +7181,7 @@ namespace AnonPDF
             btnCancel = new Button
             {
                 Text = Resources.Merge_Cancel,
-                Location = new Point(330, 390),
+                Location = new Point(330, 420),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.Cancel
             };
@@ -7136,21 +7226,7 @@ namespace AnonPDF
                     break;
             }
 
-            switch (AnnotationRotation)
-            {
-                case 90:
-                    rbRotate90.Checked = true;
-                    break;
-                case 180:
-                    rbRotate180.Checked = true;
-                    break;
-                case 270:
-                    rbRotate270.Checked = true;
-                    break;
-                default:
-                    rbRotate0.Checked = true;
-                    break;
-            }
+            nudRotation.Value = NormalizeAngle(AnnotationRotation);
             suppressAutoApply = false;
         }
 
@@ -7202,25 +7278,38 @@ namespace AnonPDF
 
         }
 
-        private void RotationRadioButton_CheckedChanged(object sender, EventArgs e)
+        private void RotationValueChanged(object sender, EventArgs e)
         {
-            if (rbRotate0.Checked)
-            {
-                AnnotationRotation = 0;
-            }
-            else if (rbRotate90.Checked)
-            {
-                AnnotationRotation = 90;
-            }
-            else if (rbRotate180.Checked)
-            {
-                AnnotationRotation = 180;
-            }
-            else if (rbRotate270.Checked)
-            {
-                AnnotationRotation = 270;
-            }
+            AnnotationRotation = NormalizeAngle((int)nudRotation.Value);
             TryApplyChanges();
+        }
+
+        private void RotationPresetButton_Click(object sender, EventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                int value = 0;
+                if (btn.Tag is int tagValue)
+                {
+                    value = tagValue;
+                }
+                else
+                {
+                    int.TryParse(btn.Text, out value);
+                }
+
+                if (value < nudRotation.Minimum)
+                {
+                    value = (int)nudRotation.Minimum;
+                }
+                else if (value > nudRotation.Maximum)
+                {
+                    value = (int)nudRotation.Maximum;
+                }
+
+                nudRotation.Value = value;
+                nudRotation.Focus();
+            }
         }
 
         private void BtnFont_Click(object sender, EventArgs e)
@@ -7236,8 +7325,6 @@ namespace AnonPDF
                 }
             }
         }
-
-
 
         private void BtnColor_Click(object sender, EventArgs e)
         {
@@ -7262,6 +7349,14 @@ namespace AnonPDF
                 return;
             }
             AnnotationText = txtText.Text.Trim();
+        }
+
+        private static int NormalizeAngle(int rotation)
+        {
+            rotation %= 360;
+            if (rotation < 0)
+                rotation += 360;
+            return rotation;
         }
 
         private void SymbolButton_Click(object sender, EventArgs e)

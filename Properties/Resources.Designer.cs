@@ -278,6 +278,15 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("EditText_GroupRotation", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Kąt (°):.
+        /// </summary>
+        internal static string EditText_RotationLabel {
+            get {
+                return ResourceManager.GetString("EditText_RotationLabel", resourceCulture);
+            }
+        }
         
         internal static string EditText_GroupSymbols {
             get {

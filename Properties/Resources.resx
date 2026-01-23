@@ -549,6 +549,9 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   <data name="EditText_GroupRotation" xml:space="preserve">
     <value>Obrót</value>
   </data>
+  <data name="EditText_RotationLabel" xml:space="preserve">
+    <value>Kąt (°):</value>
+  </data>
   <data name="EditText_GroupSymbols" xml:space="preserve">
     <value>Znaczki</value>
   </data>
