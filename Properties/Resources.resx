@@ -144,6 +144,9 @@
   <data name="Menu_SavePdf" xml:space="preserve">
     <value>Zapisz PDF</value>
   </data>
+  <data name="Menu_SelectSignaturesToRemove" xml:space="preserve">
+    <value>Wybierz podpisy do usunięcia</value>
+  </data>
   <data name="Menu_RecentFiles" xml:space="preserve">
     <value>Ostatnio otwierane pliki</value>
   </data>
@@ -566,6 +569,18 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   </data>
   <data name="EditText_EmptyError" xml:space="preserve">
     <value>Wprowadź jakiś tekst.</value>
+  </data>
+  <data name="Signatures_Select_Title" xml:space="preserve">
+    <value>Wybierz podpisy do usunięcia</value>
+  </data>
+  <data name="Signatures_Select_Column_Name" xml:space="preserve">
+    <value>Podpisujący</value>
+  </data>
+  <data name="Signatures_Select_Column_Title" xml:space="preserve">
+    <value>Stanowisko</value>
+  </data>
+  <data name="Signatures_Select_Column_Date" xml:space="preserve">
+    <value>Data</value>
   </data>
   <data name="Msg_ServiceUpdateInProgress" xml:space="preserve">
     <value>Aktualnie do {0} jest przeprowadzana aktualizacja aplikacji Anon PDF.</value>

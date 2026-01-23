@@ -144,6 +144,9 @@
   <data name="Menu_SavePdf" xml:space="preserve">
     <value>Save PDF</value>
   </data>
+  <data name="Menu_SelectSignaturesToRemove" xml:space="preserve">
+    <value>Select signatures to remove</value>
+  </data>
   <data name="Menu_RecentFiles" xml:space="preserve">
     <value>Recent files</value>
   </data>
@@ -566,6 +569,18 @@ Click again to remove marks.</value>
   </data>
   <data name="EditText_EmptyError" xml:space="preserve">
     <value>Please enter some text.</value>
+  </data>
+  <data name="Signatures_Select_Title" xml:space="preserve">
+    <value>Select signatures to remove</value>
+  </data>
+  <data name="Signatures_Select_Column_Name" xml:space="preserve">
+    <value>Signer</value>
+  </data>
+  <data name="Signatures_Select_Column_Title" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="Signatures_Select_Column_Date" xml:space="preserve">
+    <value>Date</value>
   </data>
   <data name="Msg_ServiceUpdateInProgress" xml:space="preserve">
     <value>A maintenance update for Anon PDF is in progress until {0}.</value>

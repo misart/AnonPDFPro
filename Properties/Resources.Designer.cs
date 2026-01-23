@@ -682,6 +682,15 @@ namespace AnonPDF.Properties {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Wybierz podpisy do usunięcia.
+        /// </summary>
+        internal static string Menu_SelectSignaturesToRemove {
+            get {
+                return ResourceManager.GetString("Menu_SelectSignaturesToRemove", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Ostatnio otwierane pliki.
         /// </summary>
         internal static string Menu_RecentFiles {
@@ -1193,6 +1202,42 @@ namespace AnonPDF.Properties {
         internal static string Signatures_Report_Title {
             get {
                 return ResourceManager.GetString("Signatures_Report_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Wybierz podpisy do usunięcia.
+        /// </summary>
+        internal static string Signatures_Select_Title {
+            get {
+                return ResourceManager.GetString("Signatures_Select_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Podpisujący.
+        /// </summary>
+        internal static string Signatures_Select_Column_Name {
+            get {
+                return ResourceManager.GetString("Signatures_Select_Column_Name", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Stanowisko.
+        /// </summary>
+        internal static string Signatures_Select_Column_Title {
+            get {
+                return ResourceManager.GetString("Signatures_Select_Column_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Data.
+        /// </summary>
+        internal static string Signatures_Select_Column_Date {
+            get {
+                return ResourceManager.GetString("Signatures_Select_Column_Date", resourceCulture);
             }
         }
         

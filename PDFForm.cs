@@ -63,6 +63,10 @@ namespace AnonPDF
         private string userPassword = "";
         private string userNewPassword = null;
 
+        private const string SignatureModeOriginal = "original";
+        private const string SignatureModeRemove = "remove";
+        private const string SignatureModeReport = "report";
+
         private readonly float searchWidthCorrection = 1.0f;
         private float scaleFactor = 0;
         private readonly float percentScaleFactor = 0.5f;
@@ -82,6 +86,9 @@ namespace AnonPDF
         private readonly bool isReencodingMode;
         private readonly int reencodingDPI = 200;
         private List<SignatureInfo> signatures = new List<SignatureInfo>();
+        private List<string> signaturesToRemove = new List<string>();
+        private bool hasCustomSignatureSelection = false;
+        private bool suppressSignatureModeChange;
         private List<TextAnnotation> textAnnotations = new List<TextAnnotation>();
         private int oldScrollValue = 0;
         private int wheelResistanceCurentValue = 0;
@@ -334,6 +341,7 @@ namespace AnonPDF
             addTextMenuItem.Text = Resources.Menu_AddText;
             copyToClipboardMenuItem.Text = Resources.Menu_CopyToClipboard;
             exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
+            selectSignaturesToRemoveMenuItem.Text = Resources.Menu_SelectSignaturesToRemove;
             ignorePdfRestrictionsToolStripMenuItem.Text = Resources.Menu_IgnorePdfRestrictions;
 
             // Help menu
@@ -2644,14 +2652,26 @@ namespace AnonPDF
                                 .Select(f => f.Key)
                                 .ToList();
 
+                            List<string> signatureKeysToRemove = signatureFieldKeys;
+                            if (signaturesRemoveRadioButton.Checked && hasCustomSignatureSelection)
+                            {
+                                var selected = new HashSet<string>(signaturesToRemove, StringComparer.OrdinalIgnoreCase);
+                                signatureKeysToRemove = signatureFieldKeys
+                                    .Where(key => selected.Contains(key))
+                                    .ToList();
+                            }
+
                             // Remove signature fields
-                            foreach (var key in signatureFieldKeys)
+                            foreach (var key in signatureKeysToRemove)
                             {
                                 form.RemoveField(key);
                             }
+
+                            if (signatureKeysToRemove.Count == signatureFieldKeys.Count)
+                            {
+                                pdfDoc.GetCatalog().Remove(PdfName.Perms);
+                            }
                         }
-                        // Optionally remove signature dictionary from document catalog
-                        pdfDoc.GetCatalog().Remove(PdfName.Perms);
                     }
 
                 }
@@ -3228,6 +3248,8 @@ namespace AnonPDF
             ClearPagesToRemove();
             ClearTextAnnotations();
             PdfTextSearcher.ClearCache();
+            signaturesToRemove.Clear();
+            hasCustomSignatureSelection = false;
 
             inputProjectPath = "";
             lastSavedProjectName = "";
@@ -4561,6 +4583,8 @@ namespace AnonPDF
                     HashSet<int> pagesToRemoveJson = projectData.PagesToRemove ?? new HashSet<int>();
                     List<TextAnnotation> textAnnotationsJson = projectData.TextAnnotations ?? new List<TextAnnotation>();
                     Dictionary<int, int> rotationOffsetsJson = projectData.PageRotationOffsets ?? new Dictionary<int, int>();
+                    List<string> signaturesToRemoveJson = projectData.SignaturesToRemove;
+                    string signaturesMode = projectData.SignaturesMode;
 
                     if (redactionBlocksJson.Count > 0)
                     {
@@ -4586,6 +4610,13 @@ namespace AnonPDF
                         .Select(kvp => new KeyValuePair<int, int>(kvp.Key, NormalizeRotation(kvp.Value)))
                         .Where(kvp => kvp.Value != 0)
                         .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+                    hasCustomSignatureSelection = signaturesToRemoveJson != null;
+                    signaturesToRemove = signaturesToRemoveJson ?? new List<string>();
+                    SyncSignatureSelectionWithAvailableSignatures();
+                    UpdateSignatureSelectionMenuState();
+
+                    ApplySignatureModeFromProject(signaturesMode);
 
                     if (projectData.CurrentPage > 0)
                     {
@@ -4743,7 +4774,9 @@ namespace AnonPDF
                             TextAnnotations = textAnnotations,
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
-                            CurrentPage = currentPage
+                            CurrentPage = currentPage,
+                            SignaturesMode = GetSignatureModeForProject(),
+                            SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
                         };
 
                         // Serialize list to JSON string
@@ -5098,7 +5131,9 @@ namespace AnonPDF
                             TextAnnotations = textAnnotations,
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
-                            CurrentPage = currentPage
+                            CurrentPage = currentPage,
+                            SignaturesMode = GetSignatureModeForProject(),
+                            SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
                         };
 
                         // Serialize list to JSON string
@@ -5590,18 +5625,129 @@ namespace AnonPDF
         {
             Properties.Settings.Default.LastSignaturesRemoveRadioButton = signaturesRemoveRadioButton.Checked;
             Properties.Settings.Default.Save();
+            UpdateSignatureSelectionMenuState();
+            if (!suppressSignatureModeChange && signaturesRemoveRadioButton.Checked)
+            {
+                projectWasChangedAfterLastSave = true;
+                saveProjectButton.Enabled = true;
+                saveProjectMenuItem.Enabled = true;
+            }
         }
 
         private void SignaturesOriginalRadioButton_CheckedChanged(object sender, EventArgs e)
         {
             Properties.Settings.Default.LastSignaturesOriginalRadioButton = signaturesOriginalRadioButton.Checked;
             Properties.Settings.Default.Save();
+            UpdateSignatureSelectionMenuState();
+            if (!suppressSignatureModeChange && signaturesOriginalRadioButton.Checked)
+            {
+                projectWasChangedAfterLastSave = true;
+                saveProjectButton.Enabled = true;
+                saveProjectMenuItem.Enabled = true;
+            }
         }
 
         private void SignaturesReportRadioButton_CheckedChanged(object sender, EventArgs e)
         {
             Properties.Settings.Default.LastSignaturesRaportRadioButton = signaturesReportRadioButton.Checked;
             Properties.Settings.Default.Save();
+            UpdateSignatureSelectionMenuState();
+            if (!suppressSignatureModeChange && signaturesReportRadioButton.Checked)
+            {
+                projectWasChangedAfterLastSave = true;
+                saveProjectButton.Enabled = true;
+                saveProjectMenuItem.Enabled = true;
+            }
+        }
+
+        private void UpdateSignatureSelectionMenuState()
+        {
+            if (selectSignaturesToRemoveMenuItem == null)
+            {
+                return;
+            }
+
+            selectSignaturesToRemoveMenuItem.Enabled = signaturesRemoveRadioButton.Checked && signatures.Count > 0;
+        }
+
+        private void SelectSignaturesToRemoveMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!signaturesRemoveRadioButton.Checked || signatures.Count == 0)
+            {
+                return;
+            }
+
+            IEnumerable<string> preselected = hasCustomSignatureSelection ? signaturesToRemove : null;
+            using (SelectSignaturesDialog dlg = new SelectSignaturesDialog(signatures, preselected))
+            {
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    signaturesToRemove = dlg.SelectedFieldNames;
+                    hasCustomSignatureSelection = true;
+                    projectWasChangedAfterLastSave = true;
+                    saveProjectButton.Enabled = true;
+                    saveProjectMenuItem.Enabled = true;
+                }
+            }
+        }
+
+        private void SyncSignatureSelectionWithAvailableSignatures()
+        {
+            if (!hasCustomSignatureSelection)
+            {
+                return;
+            }
+
+            var existing = new HashSet<string>(
+                signatures.Select(sig => sig.FieldName ?? string.Empty),
+                StringComparer.OrdinalIgnoreCase);
+
+            signaturesToRemove = signaturesToRemove
+                .Where(name => !string.IsNullOrWhiteSpace(name) && existing.Contains(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private string GetSignatureModeForProject()
+        {
+            if (signaturesRemoveRadioButton.Checked)
+            {
+                return SignatureModeRemove;
+            }
+            if (signaturesReportRadioButton.Checked)
+            {
+                return SignatureModeReport;
+            }
+            return SignatureModeOriginal;
+        }
+
+        private void ApplySignatureModeFromProject(string mode)
+        {
+            if (string.IsNullOrWhiteSpace(mode))
+            {
+                return;
+            }
+
+            suppressSignatureModeChange = true;
+            try
+            {
+                switch (mode.Trim().ToLowerInvariant())
+                {
+                    case SignatureModeRemove:
+                        signaturesRemoveRadioButton.Checked = true;
+                        break;
+                    case SignatureModeReport:
+                        signaturesReportRadioButton.Checked = true;
+                        break;
+                    default:
+                        signaturesOriginalRadioButton.Checked = true;
+                        break;
+                }
+            }
+            finally
+            {
+                suppressSignatureModeChange = false;
+            }
         }
 
         private void ColorCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -6015,6 +6161,7 @@ namespace AnonPDF
 
                     signatures.Add(new SignatureInfo
                     {
+                        FieldName = name,
                         SignerName = certCn,
                         SignerTitle = certT,
                         SignDate = signDate
@@ -6023,6 +6170,13 @@ namespace AnonPDF
             }
 
             groupBox2.Enabled = (signatures.Count > 0);
+            if (signatures.Count == 0)
+            {
+                signaturesToRemove.Clear();
+                hasCustomSignatureSelection = false;
+            }
+            SyncSignatureSelectionWithAvailableSignatures();
+            UpdateSignatureSelectionMenuState();
         }
 
         private void RemovePage()
@@ -7944,9 +8098,102 @@ namespace AnonPDF
 
     public class SignatureInfo
     {
+        public string FieldName { get; set; }
         public string SignerName { get; set; }
         public string SignerTitle { get; set; }
         public DateTime SignDate { get; set; }
+    }
+
+    public class SelectSignaturesDialog : Form
+    {
+        private readonly ListView listView;
+        private readonly Button btnOK;
+        private readonly Button btnCancel;
+
+        public List<string> SelectedFieldNames { get; private set; } = new List<string>();
+
+        public SelectSignaturesDialog(List<SignatureInfo> signatures, IEnumerable<string> preselectedFields)
+        {
+            this.Text = Resources.Signatures_Select_Title;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.Width = 520;
+            this.Height = 360;
+
+            listView = new ListView
+            {
+                View = View.Details,
+                CheckBoxes = true,
+                FullRowSelect = true,
+                GridLines = true,
+                Location = new Point(10, 10),
+                Size = new Size(480, 260)
+            };
+
+            listView.Columns.Add(Resources.Signatures_Select_Column_Name, 180);
+            listView.Columns.Add(Resources.Signatures_Select_Column_Title, 140);
+            listView.Columns.Add(Resources.Signatures_Select_Column_Date, 140);
+
+            HashSet<string> preselected = null;
+            if (preselectedFields != null)
+            {
+                preselected = new HashSet<string>(preselectedFields, StringComparer.OrdinalIgnoreCase);
+            }
+
+            foreach (SignatureInfo sig in signatures)
+            {
+                string signer = string.IsNullOrWhiteSpace(sig.SignerName) ? "-" : sig.SignerName;
+                string title = string.IsNullOrWhiteSpace(sig.SignerTitle) ? "-" : sig.SignerTitle;
+                string date = sig.SignDate == DateTime.MinValue ? "-" : sig.SignDate.ToString("g", CultureInfo.CurrentCulture);
+
+                ListViewItem item = new ListViewItem(signer);
+                item.SubItems.Add(title);
+                item.SubItems.Add(date);
+                item.Tag = sig.FieldName ?? string.Empty;
+                item.Checked = preselected == null || preselected.Contains(sig.FieldName ?? string.Empty);
+                listView.Items.Add(item);
+            }
+
+            btnOK = new Button
+            {
+                Text = Resources.Merge_OK,
+                Location = new Point(320, 280),
+                Size = new Size(80, 30),
+                DialogResult = DialogResult.OK
+            };
+
+            btnCancel = new Button
+            {
+                Text = Resources.Merge_Cancel,
+                Location = new Point(410, 280),
+                Size = new Size(80, 30),
+                DialogResult = DialogResult.Cancel
+            };
+
+            this.Controls.Add(listView);
+            this.Controls.Add(btnOK);
+            this.Controls.Add(btnCancel);
+
+            this.AcceptButton = btnOK;
+            this.CancelButton = btnCancel;
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (this.DialogResult == DialogResult.OK)
+            {
+                SelectedFieldNames = listView.Items
+                    .Cast<ListViewItem>()
+                    .Where(item => item.Checked && item.Tag is string)
+                    .Select(item => (string)item.Tag)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .ToList();
+            }
+
+            base.OnFormClosing(e);
+        }
     }
 
     public class ProjectData
@@ -7956,6 +8203,8 @@ namespace AnonPDF
         public List<TextAnnotation> TextAnnotations { get; set; }
         public Dictionary<int, int> PageRotationOffsets { get; set; }
         public int CurrentPage { get; set; }
+        public List<string> SignaturesToRemove { get; set; }
+        public string SignaturesMode { get; set; }
         public String FilePath { get; set; }
     }
 

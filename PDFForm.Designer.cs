@@ -99,6 +99,7 @@
             this.addTextMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.copyToClipboardMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exportGraphicsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.selectSignaturesToRemoveMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.languageToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.languageSystemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.languageEnglishToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -935,6 +936,7 @@
             this.addTextMenuItem,
             this.copyToClipboardMenuItem,
             this.exportGraphicsMenuItem,
+            this.selectSignaturesToRemoveMenuItem,
             this.languageToolStripMenuItem,
             this.toolStripSeparator1,
             this.ignorePdfRestrictionsToolStripMenuItem});
@@ -1001,6 +1003,14 @@
             this.exportGraphicsMenuItem.Size = new System.Drawing.Size(229, 22);
             this.exportGraphicsMenuItem.Text = "Eksport obiektów graficznych";
             this.exportGraphicsMenuItem.Click += new System.EventHandler(this.ExportGraphicsToolStripMenuItem_Click);
+            // 
+            // selectSignaturesToRemoveMenuItem
+            // 
+            this.selectSignaturesToRemoveMenuItem.Enabled = false;
+            this.selectSignaturesToRemoveMenuItem.Name = "selectSignaturesToRemoveMenuItem";
+            this.selectSignaturesToRemoveMenuItem.Size = new System.Drawing.Size(229, 22);
+            this.selectSignaturesToRemoveMenuItem.Text = "Wybierz podpisy do usunięcia";
+            this.selectSignaturesToRemoveMenuItem.Click += new System.EventHandler(this.SelectSignaturesToRemoveMenuItem_Click);
             // 
             // languageToolStripMenuItem
             // 
@@ -1345,6 +1355,7 @@
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem7;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem8;
         private System.Windows.Forms.ToolStripMenuItem exportGraphicsMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem selectSignaturesToRemoveMenuItem;
         private System.Windows.Forms.CheckBox setSavePassword;
     }
 }
