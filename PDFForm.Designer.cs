@@ -1240,7 +1240,7 @@
             this.Controls.Add(this.formSplitContainer);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "PDFForm";
-            this.Text = "Anon PDF";
+            this.Text = "AnonPDF Pro";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.Load += new System.EventHandler(this.PDFForm_Load);
             ((System.ComponentModel.ISupportInitialize)(this.pdfViewer)).EndInit();

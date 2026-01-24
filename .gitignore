@@ -19,3 +19,6 @@ packages/
 # Logs
 *.log
 
+# Local business docs (excluded from repo)
+private/
+

@@ -6,12 +6,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Anon PDF")]
+[assembly: AssemblyTitle("AnonPDF Pro")]
 [assembly: AssemblyDescription("Aplikacja dedykowana do anonimizacji plików PDF")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Wydział Informatyki, Urząd Miasta Szczecin, pl. Armii Krajowej 1, Polska")]
-[assembly: AssemblyProduct("AnonPDF")]
-[assembly: AssemblyCopyright("Copyright © 2025")]
+[assembly: AssemblyCompany("MISART Marta Klimek")]
+[assembly: AssemblyProduct("AnonPDF Pro")]
+[assembly: AssemblyCopyright("Copyright © 2025–2026 Urząd Miasta Szczecin; Modifications © 2026 MISART Marta Klimek")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -31,5 +31,5 @@ using System.Runtime.InteropServices;
 //      Revision
 //
 [assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.26.0123.7")]
+[assembly: AssemblyFileVersion("1.26.0123.1")]
 [assembly: NeutralResourcesLanguage("pl-PL")]

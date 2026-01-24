@@ -172,7 +172,11 @@ namespace AnonPDF
                 exitThread.IsBackground = true;
                 exitThread.Start();
                 // Polish UI text by design
-                MessageBox.Show(string.Format(Resources.Msg_ServiceUpdateInProgress, serviceEndDate), Resources.Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    string.Format(Resources.Msg_ServiceUpdateInProgress, serviceEndDate, Branding.ProductName),
+                    Resources.Title_Warning,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 Environment.Exit(0);
                 return;
             }
@@ -1393,7 +1397,12 @@ namespace AnonPDF
                 exitThread.IsBackground = true;
                 exitThread.Start();
 
-                MessageBox.Show(this, string.Format(Resources.Msg_NewVersionDetectedMaintenance, serviceEndDate), Resources.Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    this,
+                    string.Format(Resources.Msg_NewVersionDetectedMaintenance, serviceEndDate, Branding.ProductName),
+                    Resources.Title_Warning,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
             }
         }
 
@@ -4885,7 +4894,7 @@ namespace AnonPDF
                 }
 
                 saveFileDialog.Filter = Resources.Dialog_Filter_PAP;
-                saveFileDialog.Title = Resources.Dialog_Title_SavePap;
+                saveFileDialog.Title = string.Format(Resources.Dialog_Title_SavePap, Branding.ProductName);
                 saveFileDialog.FileName = $"{System.IO.Path.GetFileNameWithoutExtension(filePapName)}.pap";
 
                 if (saveFileDialog.ShowDialog() == DialogResult.OK)
@@ -4955,7 +4964,7 @@ namespace AnonPDF
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Filter = Resources.Dialog_Filter_PAP,
-                Title = Resources.Dialog_Title_OpenPap
+                Title = string.Format(Resources.Dialog_Title_OpenPap, Branding.ProductName)
             };
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
@@ -5456,17 +5465,24 @@ namespace AnonPDF
         {
             // Build "About application" message using localized resources
             var assembly = Assembly.GetExecutingAssembly();
-            var assemblyName = assembly.GetName().Name;
             var companyAttribute = assembly.GetCustomAttribute<AssemblyCompanyAttribute>();
             var companyName = companyAttribute?.Company ?? string.Empty;
             var copyrightAttribute = assembly.GetCustomAttribute<AssemblyCopyrightAttribute>();
-            var copyright = copyrightAttribute?.Copyright ?? string.Empty;
+            var copyright = Resources.ResourceManager.GetString("About_Copyright", Resources.Culture);
+            if (string.IsNullOrWhiteSpace(copyright))
+            {
+                copyright = copyrightAttribute?.Copyright ?? string.Empty;
+            }
             var descriptionAttribute = assembly.GetCustomAttribute<AssemblyDescriptionAttribute>();
-            var description = descriptionAttribute?.Description ?? string.Empty;
+            var description = Resources.ResourceManager.GetString("About_Description", Resources.Culture);
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                description = descriptionAttribute?.Description ?? string.Empty;
+            }
 
             string aboutMessage = string.Format(
                 Resources.About_Message,
-                assemblyName,
+                Branding.ProductName,
                 fileVersion,
                 companyName,
                 copyright,
@@ -6245,7 +6261,7 @@ namespace AnonPDF
         private void UpdateWindowTitle()
         {
 
-            string titleText = $"Anon PDF - v.{fileVersion}";
+            string titleText = $"{Branding.ProductName} - v.{fileVersion}";
             if (inputPdfPath != "")
             {
                 string pdfFileName = Path.GetFileName(inputPdfPath);

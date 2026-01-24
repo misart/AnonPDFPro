@@ -1,6 +1,6 @@
-# AnonPDF
+# AnonPDF Pro
 
-AnonPDF is a Windows (WinForms) application for PDF anonymization. It lets you redact document areas, remove pages, add text annotations, and search for content to mark quickly. For image-only regions with no text, it can fall back to OCR (Tesseract) for searching.
+AnonPDF Pro is a Windows (WinForms) application for PDF anonymization. It lets you redact document areas, remove pages, add text annotations, and search for content to mark quickly. For image-only regions with no text, it can fall back to OCR (Tesseract) for searching.
 
 ## Features
 - Rectangular area selection and redaction.
@@ -14,16 +14,16 @@ AnonPDF is a Windows (WinForms) application for PDF anonymization. It lets you r
 
 **First time setup:**
 1. Clone the repository
-2. Run `restore-packages.bat` (recommended) OR `nuget restore AnonPDF.sln -PackagesDirectory packages`
+2. Run `restore-packages.bat` (recommended) OR `nuget restore AnonPDFPro.sln -PackagesDirectory packages`
    - This ensures packages are restored to the local `packages/` folder
    - Required for native PDFium DLLs to be copied correctly during build
-3. Open `AnonPDF.sln` in Visual Studio
+3. Open `AnonPDFPro.sln` in Visual Studio
 4. Build and run (F5)
 
 **Alternative - Command line build:**
-- Restore: `nuget restore AnonPDF.sln -PackagesDirectory packages`
-- Build: `msbuild AnonPDF.sln /p:Configuration=Release`
-- Run: `bin\Release\AnonPDF.exe`
+- Restore: `nuget restore AnonPDFPro.sln -PackagesDirectory packages`
+- Build: `msbuild AnonPDFPro.sln /p:Configuration=Release`
+- Run: `bin\Release\AnonPDFPro.exe`
 
 **Note:** The `NuGet.Config` file ensures packages are restored locally to `packages/` folder, which is required for native DLLs (pdfium_x64.dll, Tesseract data files) to be copied to the build output.
 
@@ -31,14 +31,14 @@ The help file `UserGuide_*.pdf` is copied to the output (bin) directory during b
 
 ## Debugging in Visual Studio (iText `FontCache` NullReferenceException)
 
-When debugging AnonPDF in Visual Studio, you may see the debugger break with an exception similar to:
+When debugging AnonPDF Pro in Visual Studio, you may see the debugger break with an exception similar to:
 
 > System.NullReferenceException  
 > Source = itext.io  
 > at iText.IO.Font.FontCache..cctor()
 
 This typically happens when working with signed PDFs (e.g. when calling `SignatureUtil`) and is caused by internal initialization logic in iText.  
-The exception is **handled internally by iText** and does **not** indicate a real error in AnonPDF, but Visual Studio may still break on it by default.
+The exception is **handled internally by iText** and does **not** indicate a real error in AnonPDF Pro, but Visual Studio may still break on it by default.
 
 If this keeps interrupting your debugging session, you can safely adjust your debugger settings:
 
@@ -50,7 +50,7 @@ If this keeps interrupting your debugging session, you can safely adjust your de
 3. Optionally, open the **Exception Settings** window and uncheck  
    **Break when thrown** for **Common Language Runtime Exceptions**.
 
-After these changes, the internal iText `FontCache` exception will no longer stop the debugger, while AnonPDF will continue to run normally.
+After these changes, the internal iText `FontCache` exception will no longer stop the debugger, while AnonPDF Pro will continue to run normally.
 
 ## Usage
 - Open a PDF and navigate pages.
@@ -59,7 +59,10 @@ After these changes, the internal iText `FontCache` exception will no longer sto
 
 ## License & Components
 - License: AGPL-3.0-or-later (see `LICENSE`).
-- Third-party components: iText 7 (AGPL-3.0), PDFium/PDFiumSharp, Newtonsoft.Json (MIT), BouncyCastle (MIT), TesseractOCR (.NET) (Apache-2.0). Details in `THIRD-PARTY-NOTICES.md`.
+- Third-party components: iText 9 (AGPL-3.0), PDFium/PDFiumSharp, Newtonsoft.Json (MIT), BouncyCastle (MIT), TesseractOCR (.NET) (Apache-2.0). Details in `THIRD-PARTY-NOTICES.md`.
+
+## Copyright
+- Copyright © 2025–2026 Urząd Miasta Szczecin; Modifications © 2026 MISART Marta Klimek
 
 ## Help & Support
 - Help file: use the `Help` menu in the app (opens `UserGuide_*.pdf`).

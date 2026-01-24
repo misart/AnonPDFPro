@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo AnonPDF - Package Restore
+echo AnonPDF Pro - Package Restore
 echo ============================================
 echo.
 
@@ -26,7 +26,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo Restoring packages to local 'packages' folder...
-%NUGET_CMD% restore AnonPDF.sln -PackagesDirectory packages
+%NUGET_CMD% restore AnonPDFPro.sln -PackagesDirectory packages
 
 if %ERRORLEVEL% EQU 0 (
     echo.
@@ -35,7 +35,7 @@ if %ERRORLEVEL% EQU 0 (
     echo ============================================
     echo.
     echo You can now build the project in Visual Studio or use:
-    echo   msbuild AnonPDF.sln /p:Configuration=Release
+    echo   msbuild AnonPDFPro.sln /p:Configuration=Release
     echo.
 ) else (
     echo.
