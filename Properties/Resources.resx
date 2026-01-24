@@ -135,6 +135,9 @@
   <data name="Theme_NordCoolLight" xml:space="preserve">
     <value>Nordycki chłód</value>
   </data>
+  <data name="Theme_BalticBreeze" xml:space="preserve">
+    <value>Bałtycka bryza</value>
+  </data>
   <data name="Theme_WarmSand" xml:space="preserve">
     <value>Ciepły piasek</value>
   </data>
@@ -145,7 +148,7 @@
     <value>Grafitowa ciemność</value>
   </data>
   <data name="Theme_OledDarkTeal" xml:space="preserve">
-    <value>OLED ciemny + turkus</value>
+    <value>Ciemny turkus</value>
   </data>
   <data name="Menu_Help" xml:space="preserve">
     <value>P&amp;omoc</value>

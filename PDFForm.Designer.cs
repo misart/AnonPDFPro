@@ -106,6 +106,7 @@
             this.themeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.themeSoftLightMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.themeNordCoolLightMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.themeBalticBreezeMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.themeWarmSandMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.themeForestGreenMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.themeGraphiteDarkMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -1055,6 +1056,7 @@
             this.themeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.themeSoftLightMenuItem,
             this.themeNordCoolLightMenuItem,
+            this.themeBalticBreezeMenuItem,
             this.themeWarmSandMenuItem,
             this.themeForestGreenMenuItem,
             this.themeGraphiteDarkMenuItem,
@@ -1076,6 +1078,13 @@
             this.themeNordCoolLightMenuItem.Size = new System.Drawing.Size(180, 22);
             this.themeNordCoolLightMenuItem.Text = "Nord Cool Light";
             this.themeNordCoolLightMenuItem.Click += new System.EventHandler(this.ThemeNordCoolLightMenuItem_Click);
+            // 
+            // themeBalticBreezeMenuItem
+            // 
+            this.themeBalticBreezeMenuItem.Name = "themeBalticBreezeMenuItem";
+            this.themeBalticBreezeMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.themeBalticBreezeMenuItem.Text = "Baltic Breeze";
+            this.themeBalticBreezeMenuItem.Click += new System.EventHandler(this.ThemeBalticBreezeMenuItem_Click);
             // 
             // themeWarmSandMenuItem
             // 
@@ -1274,8 +1283,8 @@
             this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
             this.tableLayoutPanel1.RowCount = 2;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 5.408271F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 94.59173F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 49F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanel1.Size = new System.Drawing.Size(214, 908);
             this.tableLayoutPanel1.TabIndex = 48;
             // 
@@ -1432,6 +1441,7 @@
         private System.Windows.Forms.ToolStripMenuItem themeToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem themeSoftLightMenuItem;
         private System.Windows.Forms.ToolStripMenuItem themeNordCoolLightMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem themeBalticBreezeMenuItem;
         private System.Windows.Forms.ToolStripMenuItem themeWarmSandMenuItem;
         private System.Windows.Forms.ToolStripMenuItem themeForestGreenMenuItem;
         private System.Windows.Forms.ToolStripMenuItem themeGraphiteDarkMenuItem;

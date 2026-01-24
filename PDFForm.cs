@@ -142,6 +142,7 @@ namespace AnonPDF
         {
             SoftLight,
             NordCoolLight,
+            BalticBreeze,
             WarmSand,
             ForestGreen,
             GraphiteDark,
@@ -253,6 +254,27 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0xE5, 0xE9, 0xF0))
                 },
                 {
+                    UiThemeKind.BalticBreeze,
+                    new UiThemePalette(
+                        "Baltic Breeze",
+                        System.Drawing.Color.FromArgb(0xE6, 0xEF, 0xF3),
+                        System.Drawing.Color.FromArgb(0x65, 0xA0, 0xB8),
+                        System.Drawing.Color.FromArgb(0xE0, 0xE3, 0xE4),
+                        System.Drawing.Color.FromArgb(0xC9, 0xD6, 0xDF),
+                        System.Drawing.Color.FromArgb(0x1F, 0x2A, 0x33),
+                        System.Drawing.Color.FromArgb(0x55, 0x62, 0x70),
+                        System.Drawing.Color.FromArgb(0x2F, 0x6F, 0x88),
+                        System.Drawing.Color.FromArgb(0x25, 0x5A, 0x6E),
+                        System.Drawing.Color.FromArgb(0xF9, 0xFB, 0xFB),
+                        System.Drawing.Color.FromArgb(0x23, 0x40, 0x4A),
+                        System.Drawing.Color.FromArgb(0xF9, 0xFB, 0xFB),
+                        System.Drawing.Color.FromArgb(0x1F, 0x2A, 0x33),
+                        System.Drawing.Color.FromArgb(0xC7, 0xE1, 0xEC),
+                        System.Drawing.Color.FromArgb(0x12, 0x40, 0x52),
+                        System.Drawing.Color.FromArgb(0xD6, 0x45, 0x45),
+                        System.Drawing.Color.FromArgb(0xF9, 0xFB, 0xFB))
+                },
+                {
                     UiThemeKind.WarmSand,
                     new UiThemePalette(
                         "Warm Sand",
@@ -318,7 +340,7 @@ namespace AnonPDF
                 {
                     UiThemeKind.OledDarkTeal,
                     new UiThemePalette(
-                        "OLED Dark + Teal",
+                        "Dark Teal",
                         System.Drawing.Color.FromArgb(0x0B, 0x0F, 0x14),
                         System.Drawing.Color.FromArgb(0x0F, 0x17, 0x20),
                         System.Drawing.Color.FromArgb(0x12, 0x1E, 0x2A),
@@ -622,6 +644,7 @@ namespace AnonPDF
 
               themeSoftLightMenuItem.Text = GetThemeMenuText("Theme_SoftLight", UiThemes[UiThemeKind.SoftLight].Name);
               themeNordCoolLightMenuItem.Text = GetThemeMenuText("Theme_NordCoolLight", UiThemes[UiThemeKind.NordCoolLight].Name);
+              themeBalticBreezeMenuItem.Text = GetThemeMenuText("Theme_BalticBreeze", UiThemes[UiThemeKind.BalticBreeze].Name);
               themeWarmSandMenuItem.Text = GetThemeMenuText("Theme_WarmSand", UiThemes[UiThemeKind.WarmSand].Name);
               themeForestGreenMenuItem.Text = GetThemeMenuText("Theme_ForestGreen", UiThemes[UiThemeKind.ForestGreen].Name);
               themeGraphiteDarkMenuItem.Text = GetThemeMenuText("Theme_GraphiteDark", UiThemes[UiThemeKind.GraphiteDark].Name);
@@ -813,6 +836,11 @@ namespace AnonPDF
         private void ThemeNordCoolLightMenuItem_Click(object sender, EventArgs e)
         {
             SetTheme(UiThemeKind.NordCoolLight);
+        }
+
+        private void ThemeBalticBreezeMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.BalticBreeze);
         }
 
         private void ThemeWarmSandMenuItem_Click(object sender, EventArgs e)
@@ -1774,8 +1802,9 @@ namespace AnonPDF
             ApplyGroupBoxTheme(groupBoxSignatures, theme);
             ApplyGroupBoxTheme(groupBoxFilter, theme);
 
-            pagesListView.BackColor = theme.PanelBackColor;
+            pagesListView.BackColor = theme.SectionBackColor;
             pagesListView.ForeColor = theme.TextPrimaryColor;
+            tableLayoutPanel1.BackColor = theme.SectionBackColor;
 
             ApplyThemeToControls(mainAppSplitContainer.Panel1.Controls, theme);
             ApplyThemeToControls(tableLayoutPanel1.Controls, theme);
@@ -1855,22 +1884,26 @@ namespace AnonPDF
                 }
                 else if (control is TextBox textBox)
                 {
-                    textBox.BackColor = theme.PanelBackColor;
+                    textBox.BackColor = GetInputBackColor(theme);
                     textBox.ForeColor = theme.TextPrimaryColor;
                 }
                 else if (control is ComboBox comboBox)
                 {
-                    comboBox.BackColor = theme.PanelBackColor;
+                    comboBox.BackColor = GetInputBackColor(theme);
                     comboBox.ForeColor = theme.TextPrimaryColor;
                 }
                 else if (control is ListView listView)
                 {
-                    listView.BackColor = theme.PanelBackColor;
+                    listView.BackColor = listView == pagesListView
+                        ? theme.SectionBackColor
+                        : theme.PanelBackColor;
                     listView.ForeColor = theme.TextPrimaryColor;
                 }
                 else if (control is TableLayoutPanel table)
                 {
-                    table.BackColor = theme.PanelBackColor;
+                    table.BackColor = table == tableLayoutPanel1
+                        ? theme.SectionBackColor
+                        : theme.PanelBackColor;
                 }
 
                 if (control.Controls.Count > 0)
@@ -1878,6 +1911,13 @@ namespace AnonPDF
                     ApplyThemeToControls(control.Controls, theme);
                 }
             }
+        }
+
+        private System.Drawing.Color GetInputBackColor(UiThemePalette theme)
+        {
+            return currentThemeKind == UiThemeKind.BalticBreeze
+                ? System.Drawing.Color.White
+                : theme.PanelBackColor;
         }
 
         private static void ApplyIconButtonTheme(Button button, UiThemePalette theme)
@@ -1917,6 +1957,7 @@ namespace AnonPDF
 
             themeSoftLightMenuItem.Checked = currentThemeKind == UiThemeKind.SoftLight;
             themeNordCoolLightMenuItem.Checked = currentThemeKind == UiThemeKind.NordCoolLight;
+            themeBalticBreezeMenuItem.Checked = currentThemeKind == UiThemeKind.BalticBreeze;
             themeWarmSandMenuItem.Checked = currentThemeKind == UiThemeKind.WarmSand;
             themeForestGreenMenuItem.Checked = currentThemeKind == UiThemeKind.ForestGreen;
             themeGraphiteDarkMenuItem.Checked = currentThemeKind == UiThemeKind.GraphiteDark;
@@ -5327,7 +5368,7 @@ namespace AnonPDF
         {
             foreach (int pageNum in pagesToRemove)
             {
-                pagesListView.Items[pageNum - 1].BackColor = CurrentTheme.PanelBackColor;
+                pagesListView.Items[pageNum - 1].BackColor = CurrentTheme.SectionBackColor;
                 if (pagesListView.Items[pageNum - 1].ForeColor != System.Drawing.Color.Red)
                 {
                     pagesListView.Items[pageNum - 1].ForeColor = CurrentTheme.TextPrimaryColor;
