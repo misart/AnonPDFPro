@@ -104,6 +104,7 @@
             this.languageSystemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.languageEnglishToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.languagePolishToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.fullScreenToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.ignorePdfRestrictionsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuHelpItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -939,6 +940,7 @@
             this.exportGraphicsMenuItem,
             this.selectSignaturesToRemoveMenuItem,
             this.languageToolStripMenuItem,
+            this.fullScreenToolStripMenuItem,
             this.toolStripSeparator1,
             this.ignorePdfRestrictionsToolStripMenuItem});
             this.menuOptionsItem.Name = "menuOptionsItem";
@@ -1043,6 +1045,14 @@
             this.languagePolishToolStripMenuItem.Size = new System.Drawing.Size(112, 22);
             this.languagePolishToolStripMenuItem.Text = "Polski";
             this.languagePolishToolStripMenuItem.Click += new System.EventHandler(this.LanguagePolishToolStripMenuItem_Click);
+            // 
+            // fullScreenToolStripMenuItem
+            // 
+            this.fullScreenToolStripMenuItem.Name = "fullScreenToolStripMenuItem";
+            this.fullScreenToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.F11;
+            this.fullScreenToolStripMenuItem.Size = new System.Drawing.Size(229, 22);
+            this.fullScreenToolStripMenuItem.Text = "Pełny ekran";
+            this.fullScreenToolStripMenuItem.Click += new System.EventHandler(this.FullScreenToolStripMenuItem_Click);
             // 
             // toolStripSeparator1
             // 
@@ -1348,6 +1358,7 @@
         private System.Windows.Forms.ToolStripMenuItem languageSystemToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem languageEnglishToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem languagePolishToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem fullScreenToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem splitPdfToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mergePdfToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem addTextMenuItem;

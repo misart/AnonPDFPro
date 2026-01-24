@@ -134,6 +134,13 @@ namespace AnonPDF
 
         const int annotationsIconSize = 22;
         const int annotationsIconPadding = 4;
+        private const int LeftPanelBaseWidth = 169;
+        private const int LeftPanelScrollbarPadding = 6;
+        private bool isFullScreen = false;
+        private FormBorderStyle previousFormBorderStyle;
+        private FormWindowState previousWindowState;
+        private System.Drawing.Rectangle previousBounds;
+        private bool previousTopMost;
 
         private List<PageItemStatus> allPageStatuses = new List<PageItemStatus>();
         private string allComboItem = Resources.UI_Filter_AllPages;
@@ -286,7 +293,9 @@ namespace AnonPDF
             signaturesOriginalRadioButton.Checked = Properties.Settings.Default.LastSignaturesOriginalRadioButton;
             signaturesReportRadioButton.Checked = Properties.Settings.Default.LastSignaturesRaportRadioButton;
 
+            mainAppSplitContainer.Panel1.AutoScroll = true;
             mainAppSplitContainer.Panel2.AutoScroll = false;
+            mainAppSplitContainer.Panel1.SizeChanged += (_, __) => UpdateLeftPanelWidth();
 
             PdfTextSearcher.OnCacheStatusChanged += status => {
 
@@ -351,6 +360,11 @@ namespace AnonPDF
             exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
             selectSignaturesToRemoveMenuItem.Text = Resources.Menu_SelectSignaturesToRemove;
             ignorePdfRestrictionsToolStripMenuItem.Text = Resources.Menu_IgnorePdfRestrictions;
+            var fullScreenText = Resources.ResourceManager.GetString("Menu_Options_FullScreen", currentCulture);
+            if (!string.IsNullOrWhiteSpace(fullScreenText))
+            {
+                fullScreenToolStripMenuItem.Text = fullScreenText;
+            }
 
             // Help menu
             helpMenuItem.Text = Resources.Menu_Help_Help;
@@ -1416,6 +1430,20 @@ namespace AnonPDF
                 Properties.Settings.Default.TutorialShown = true;
                 Properties.Settings.Default.Save();
             }
+
+            UpdateLeftPanelWidth();
+        }
+
+        private void UpdateLeftPanelWidth()
+        {
+            int extra = mainAppSplitContainer.Panel1.VerticalScroll.Visible
+                ? SystemInformation.VerticalScrollBarWidth + LeftPanelScrollbarPadding
+                : 0;
+            int desiredWidth = LeftPanelBaseWidth + extra;
+            if (mainAppSplitContainer.SplitterDistance != desiredWidth)
+            {
+                mainAppSplitContainer.SplitterDistance = desiredWidth;
+            }
         }
 
         private void PDFForm_Load(object sender, EventArgs e)
@@ -1474,6 +1502,49 @@ namespace AnonPDF
             // Zapisz ustawienie
             Properties.Settings.Default.IgnorePdfRestrictions = ignorePdfRestrictionsToolStripMenuItem.Checked;
             Properties.Settings.Default.Save();
+        }
+
+        private void FullScreenToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            SetFullScreen(!isFullScreen);
+        }
+
+        private void SetFullScreen(bool enable)
+        {
+            if (enable == isFullScreen)
+            {
+                return;
+            }
+
+            if (enable)
+            {
+                previousFormBorderStyle = FormBorderStyle;
+                previousWindowState = WindowState;
+                previousBounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+                previousTopMost = TopMost;
+
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Normal;
+                Bounds = Screen.FromControl(this).Bounds;
+                TopMost = true;
+            }
+            else
+            {
+                FormBorderStyle = previousFormBorderStyle;
+                WindowState = FormWindowState.Normal;
+                Bounds = previousBounds;
+                TopMost = previousTopMost;
+                if (previousWindowState != FormWindowState.Normal)
+                {
+                    WindowState = previousWindowState;
+                }
+            }
+
+            isFullScreen = enable;
+            if (fullScreenToolStripMenuItem != null)
+            {
+                fullScreenToolStripMenuItem.Checked = isFullScreen;
+            }
         }
 
         private void DiagnosticModeMenuItem_CheckedChanged(object sender, EventArgs e)
@@ -5500,6 +5571,18 @@ namespace AnonPDF
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == Keys.F11)
+            {
+                SetFullScreen(!isFullScreen);
+                return true;
+            }
+
+            if (keyData == Keys.Escape && isFullScreen)
+            {
+                SetFullScreen(false);
+                return true;
+            }
+
             // Check if it's just Delete without modifiers
             if (keyData == Keys.Delete)
             {

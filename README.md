@@ -29,6 +29,10 @@ AnonPDF Pro is a Windows (WinForms) application for PDF anonymization. It lets y
 
 The help file `UserGuide_*.pdf` is copied to the output (bin) directory during build.
 
+## WinForms Designer DPI
+- When opening `PDFForm.cs` in the designer on a 150% scaled display, Visual Studio may warn about DPI and adjust layout.
+- To avoid unintended `.Designer.cs` changes, use a 100% scaled display or temporarily switch scaling to 100% while editing.
+
 ## Debugging in Visual Studio (iText `FontCache` NullReferenceException)
 
 When debugging AnonPDF Pro in Visual Studio, you may see the debugger break with an exception similar to:

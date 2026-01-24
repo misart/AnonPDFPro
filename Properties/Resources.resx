@@ -123,6 +123,9 @@
   <data name="Menu_Options" xml:space="preserve">
     <value>Op&amp;cje</value>
   </data>
+  <data name="Menu_Options_FullScreen" xml:space="preserve">
+    <value>Pełny ekran</value>
+  </data>
   <data name="Menu_Help" xml:space="preserve">
     <value>P&amp;omoc</value>
   </data>
