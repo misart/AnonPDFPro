@@ -126,6 +126,27 @@
   <data name="Menu_Options_FullScreen" xml:space="preserve">
     <value>Pełny ekran</value>
   </data>
+  <data name="Menu_Options_Theme" xml:space="preserve">
+    <value>Motyw interfejsu</value>
+  </data>
+  <data name="Theme_SoftLight" xml:space="preserve">
+    <value>Miękkie światło</value>
+  </data>
+  <data name="Theme_NordCoolLight" xml:space="preserve">
+    <value>Nordycki chłód</value>
+  </data>
+  <data name="Theme_WarmSand" xml:space="preserve">
+    <value>Ciepły piasek</value>
+  </data>
+  <data name="Theme_ForestGreen" xml:space="preserve">
+    <value>Leśna zieleń</value>
+  </data>
+  <data name="Theme_GraphiteDark" xml:space="preserve">
+    <value>Grafitowa ciemność</value>
+  </data>
+  <data name="Theme_OledDarkTeal" xml:space="preserve">
+    <value>OLED ciemny + turkus</value>
+  </data>
   <data name="Menu_Help" xml:space="preserve">
     <value>P&amp;omoc</value>
   </data>
@@ -139,10 +160,10 @@
     <value>Otwórz ostatni PDF i projekt</value>
   </data>
   <data name="Menu_SaveProjectAs" xml:space="preserve">
-    <value>Zapisz projekt zaznaczeń jako</value>
+    <value>Zapisz projekt jako</value>
   </data>
   <data name="Menu_SaveProject" xml:space="preserve">
-    <value>Zapisz projekt zaznaczeń</value>
+    <value>Zapisz projekt</value>
   </data>
   <data name="Menu_SavePdf" xml:space="preserve">
     <value>Zapisz PDF</value>
@@ -236,6 +257,15 @@
   </data>
   <data name="UI_PageLabelFormat" xml:space="preserve">
     <value>Strona {0}</value>
+  </data>
+  <data name="UI_Group_Open" xml:space="preserve">
+    <value>Otwórz</value>
+  </data>
+  <data name="UI_Group_Save" xml:space="preserve">
+    <value>Zapisz</value>
+  </data>
+  <data name="UI_Group_Options" xml:space="preserve">
+    <value>Opcje</value>
   </data>
   <data name="UI_Group_Selections" xml:space="preserve">
     <value>Zaznaczenia</value>

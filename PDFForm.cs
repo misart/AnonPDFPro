@@ -134,8 +134,240 @@ namespace AnonPDF
 
         const int annotationsIconSize = 22;
         const int annotationsIconPadding = 4;
-        private const int LeftPanelBaseWidth = 169;
+        private const int LeftPanelBaseWidth = 187;
         private const int LeftPanelScrollbarPadding = 6;
+        private static readonly System.Drawing.Color DocumentBackColor = System.Drawing.Color.White;
+
+        private enum UiThemeKind
+        {
+            SoftLight,
+            NordCoolLight,
+            WarmSand,
+            ForestGreen,
+            GraphiteDark,
+            OledDarkTeal
+        }
+
+        private sealed class UiThemePalette
+        {
+            public UiThemePalette(
+                string name,
+                System.Drawing.Color windowBackColor,
+                System.Drawing.Color panelBackColor,
+                System.Drawing.Color sectionBackColor,
+                System.Drawing.Color borderColor,
+                System.Drawing.Color textPrimaryColor,
+                System.Drawing.Color textSecondaryColor,
+                System.Drawing.Color accentColor,
+                System.Drawing.Color accentHoverColor,
+                System.Drawing.Color primaryButtonBackColor,
+                System.Drawing.Color primaryButtonForeColor,
+                System.Drawing.Color secondaryButtonBackColor,
+                System.Drawing.Color secondaryButtonForeColor,
+                System.Drawing.Color selectionBackColor,
+                System.Drawing.Color selectionForeColor,
+                System.Drawing.Color dangerBackColor,
+                System.Drawing.Color menuStripBackColor)
+            {
+                Name = name;
+                WindowBackColor = windowBackColor;
+                PanelBackColor = panelBackColor;
+                SectionBackColor = sectionBackColor;
+                BorderColor = borderColor;
+                TextPrimaryColor = textPrimaryColor;
+                TextSecondaryColor = textSecondaryColor;
+                AccentColor = accentColor;
+                AccentHoverColor = accentHoverColor;
+                PrimaryButtonBackColor = primaryButtonBackColor;
+                PrimaryButtonForeColor = primaryButtonForeColor;
+                SecondaryButtonBackColor = secondaryButtonBackColor;
+                SecondaryButtonForeColor = secondaryButtonForeColor;
+                SelectionBackColor = selectionBackColor;
+                SelectionForeColor = selectionForeColor;
+                DangerBackColor = dangerBackColor;
+                MenuStripBackColor = menuStripBackColor;
+            }
+
+            public string Name { get; }
+            public System.Drawing.Color WindowBackColor { get; }
+            public System.Drawing.Color PanelBackColor { get; }
+            public System.Drawing.Color SectionBackColor { get; }
+            public System.Drawing.Color BorderColor { get; }
+            public System.Drawing.Color TextPrimaryColor { get; }
+            public System.Drawing.Color TextSecondaryColor { get; }
+            public System.Drawing.Color AccentColor { get; }
+            public System.Drawing.Color AccentHoverColor { get; }
+            public System.Drawing.Color PrimaryButtonBackColor { get; }
+            public System.Drawing.Color PrimaryButtonForeColor { get; }
+            public System.Drawing.Color SecondaryButtonBackColor { get; }
+            public System.Drawing.Color SecondaryButtonForeColor { get; }
+            public System.Drawing.Color SelectionBackColor { get; }
+            public System.Drawing.Color SelectionForeColor { get; }
+            public System.Drawing.Color DangerBackColor { get; }
+            public System.Drawing.Color MenuStripBackColor { get; }
+        }
+
+        private static readonly Dictionary<UiThemeKind, UiThemePalette> UiThemes =
+            new Dictionary<UiThemeKind, UiThemePalette>
+            {
+                {
+                    UiThemeKind.SoftLight,
+                    new UiThemePalette(
+                        "Soft Light",
+                        System.Drawing.Color.FromArgb(0xF5, 0xF6, 0xF8),
+                        System.Drawing.Color.FromArgb(0xFF, 0xFF, 0xFF),
+                        System.Drawing.Color.FromArgb(0xF1, 0xF3, 0xF6),
+                        System.Drawing.Color.FromArgb(0xD7, 0xDC, 0xE3),
+                        System.Drawing.Color.FromArgb(0x1F, 0x29, 0x37),
+                        System.Drawing.Color.FromArgb(0x6B, 0x72, 0x80),
+                        System.Drawing.Color.FromArgb(0x3B, 0x82, 0xF6),
+                        System.Drawing.Color.FromArgb(0x25, 0x63, 0xEB),
+                        System.Drawing.Color.FromArgb(0x3B, 0x82, 0xF6),
+                        System.Drawing.Color.White,
+                        System.Drawing.Color.FromArgb(0xE9, 0xEE, 0xF7),
+                        System.Drawing.Color.FromArgb(0x1F, 0x29, 0x37),
+                        System.Drawing.Color.FromArgb(0xDC, 0xEB, 0xFF),
+                        System.Drawing.Color.FromArgb(0x0B, 0x3A, 0x87),
+                        System.Drawing.Color.FromArgb(0xEF, 0x44, 0x44),
+                        System.Drawing.Color.FromArgb(0xF1, 0xF5, 0xF9))
+                },
+                {
+                    UiThemeKind.NordCoolLight,
+                    new UiThemePalette(
+                        "Nord Cool Light",
+                        System.Drawing.Color.FromArgb(0xEC, 0xEF, 0xF4),
+                        System.Drawing.Color.FromArgb(0xFF, 0xFF, 0xFF),
+                        System.Drawing.Color.FromArgb(0xE5, 0xE9, 0xF0),
+                        System.Drawing.Color.FromArgb(0xD8, 0xDE, 0xE9),
+                        System.Drawing.Color.FromArgb(0x2E, 0x34, 0x40),
+                        System.Drawing.Color.FromArgb(0x5E, 0x67, 0x77),
+                        System.Drawing.Color.FromArgb(0x5E, 0x81, 0xAC),
+                        System.Drawing.Color.FromArgb(0x4C, 0x6A, 0x91),
+                        System.Drawing.Color.FromArgb(0x5E, 0x81, 0xAC),
+                        System.Drawing.Color.White,
+                        System.Drawing.Color.FromArgb(0xE5, 0xE9, 0xF0),
+                        System.Drawing.Color.FromArgb(0x2E, 0x34, 0x40),
+                        System.Drawing.Color.FromArgb(0xD8, 0xE7, 0xFF),
+                        System.Drawing.Color.FromArgb(0x2E, 0x34, 0x40),
+                        System.Drawing.Color.FromArgb(0xBF, 0x61, 0x6A),
+                        System.Drawing.Color.FromArgb(0xE5, 0xE9, 0xF0))
+                },
+                {
+                    UiThemeKind.WarmSand,
+                    new UiThemePalette(
+                        "Warm Sand",
+                        System.Drawing.Color.FromArgb(0xF6, 0xF1, 0xEA),
+                        System.Drawing.Color.FromArgb(0xFF, 0xFC, 0xF7),
+                        System.Drawing.Color.FromArgb(0xF1, 0xE8, 0xDD),
+                        System.Drawing.Color.FromArgb(0xE2, 0xD6, 0xC7),
+                        System.Drawing.Color.FromArgb(0x2B, 0x2A, 0x28),
+                        System.Drawing.Color.FromArgb(0x6A, 0x62, 0x5A),
+                        System.Drawing.Color.FromArgb(0xC0, 0x84, 0x57),
+                        System.Drawing.Color.FromArgb(0xA7, 0x6B, 0x41),
+                        System.Drawing.Color.FromArgb(0xC0, 0x84, 0x57),
+                        System.Drawing.Color.White,
+                        System.Drawing.Color.FromArgb(0xEF, 0xE4, 0xD8),
+                        System.Drawing.Color.FromArgb(0x2B, 0x2A, 0x28),
+                        System.Drawing.Color.FromArgb(0xF2, 0xD9, 0xC6),
+                        System.Drawing.Color.FromArgb(0x5B, 0x34, 0x1C),
+                        System.Drawing.Color.FromArgb(0xD6, 0x45, 0x45),
+                        System.Drawing.Color.FromArgb(0xF1, 0xE8, 0xDD))
+                },
+                {
+                    UiThemeKind.ForestGreen,
+                    new UiThemePalette(
+                        "Forest Green",
+                        System.Drawing.Color.FromArgb(0xF3, 0xF6, 0xF4),
+                        System.Drawing.Color.FromArgb(0xFF, 0xFF, 0xFF),
+                        System.Drawing.Color.FromArgb(0xE7, 0xEF, 0xEA),
+                        System.Drawing.Color.FromArgb(0xD3, 0xDE, 0xD7),
+                        System.Drawing.Color.FromArgb(0x1F, 0x2A, 0x24),
+                        System.Drawing.Color.FromArgb(0x5C, 0x6B, 0x63),
+                        System.Drawing.Color.FromArgb(0x2F, 0x85, 0x5A),
+                        System.Drawing.Color.FromArgb(0x27, 0x67, 0x49),
+                        System.Drawing.Color.FromArgb(0x2F, 0x85, 0x5A),
+                        System.Drawing.Color.White,
+                        System.Drawing.Color.FromArgb(0xE1, 0xEE, 0xE7),
+                        System.Drawing.Color.FromArgb(0x1F, 0x2A, 0x24),
+                        System.Drawing.Color.FromArgb(0xCF, 0xEB, 0xDD),
+                        System.Drawing.Color.FromArgb(0x14, 0x5A, 0x32),
+                        System.Drawing.Color.FromArgb(0xE5, 0x3E, 0x3E),
+                        System.Drawing.Color.FromArgb(0xE7, 0xEF, 0xEA))
+                },
+                {
+                    UiThemeKind.GraphiteDark,
+                    new UiThemePalette(
+                        "Graphite Dark",
+                        System.Drawing.Color.FromArgb(0x0F, 0x17, 0x2A),
+                        System.Drawing.Color.FromArgb(0x11, 0x18, 0x27),
+                        System.Drawing.Color.FromArgb(0x17, 0x20, 0x33),
+                        System.Drawing.Color.FromArgb(0x2B, 0x36, 0x48),
+                        System.Drawing.Color.FromArgb(0xE5, 0xE7, 0xEB),
+                        System.Drawing.Color.FromArgb(0x9C, 0xA3, 0xAF),
+                        System.Drawing.Color.FromArgb(0x60, 0xA5, 0xFA),
+                        System.Drawing.Color.FromArgb(0x3B, 0x82, 0xF6),
+                        System.Drawing.Color.FromArgb(0x25, 0x63, 0xEB),
+                        System.Drawing.Color.White,
+                        System.Drawing.Color.FromArgb(0x32, 0x4A, 0x6B),
+                        System.Drawing.Color.FromArgb(0xE5, 0xE7, 0xEB),
+                        System.Drawing.Color.FromArgb(0x1E, 0x3A, 0x8A),
+                        System.Drawing.Color.FromArgb(0xE5, 0xE7, 0xEB),
+                        System.Drawing.Color.FromArgb(0xF8, 0x71, 0x71),
+                        System.Drawing.Color.FromArgb(0x17, 0x20, 0x33))
+                },
+                {
+                    UiThemeKind.OledDarkTeal,
+                    new UiThemePalette(
+                        "OLED Dark + Teal",
+                        System.Drawing.Color.FromArgb(0x0B, 0x0F, 0x14),
+                        System.Drawing.Color.FromArgb(0x0F, 0x17, 0x20),
+                        System.Drawing.Color.FromArgb(0x12, 0x1E, 0x2A),
+                        System.Drawing.Color.FromArgb(0x22, 0x32, 0x44),
+                        System.Drawing.Color.FromArgb(0xE6, 0xED, 0xF3),
+                        System.Drawing.Color.FromArgb(0x9A, 0xA7, 0xB2),
+                        System.Drawing.Color.FromArgb(0x22, 0xC1, 0xC3),
+                        System.Drawing.Color.FromArgb(0x14, 0xA6, 0xA8),
+                        System.Drawing.Color.FromArgb(0x22, 0xC1, 0xC3),
+                        System.Drawing.Color.FromArgb(0x06, 0x20, 0x24),
+                        System.Drawing.Color.FromArgb(0x2D, 0x43, 0x58),
+                        System.Drawing.Color.FromArgb(0xE6, 0xED, 0xF3),
+                        System.Drawing.Color.FromArgb(0x0E, 0x5E, 0x63),
+                        System.Drawing.Color.FromArgb(0xE6, 0xED, 0xF3),
+                        System.Drawing.Color.FromArgb(0xFF, 0x6B, 0x6B),
+                        System.Drawing.Color.FromArgb(0x12, 0x1E, 0x2A))
+                }
+            };
+
+        private UiThemeKind currentThemeKind = UiThemeKind.SoftLight;
+        private UiThemePalette CurrentTheme => UiThemes[currentThemeKind];
+
+        private sealed class MenuColorTable : ProfessionalColorTable
+        {
+            private readonly UiThemePalette theme;
+
+            public MenuColorTable(UiThemePalette theme)
+            {
+                this.theme = theme;
+                UseSystemColors = false;
+            }
+
+            public override System.Drawing.Color MenuStripGradientBegin => theme.MenuStripBackColor;
+            public override System.Drawing.Color MenuStripGradientEnd => theme.MenuStripBackColor;
+            public override System.Drawing.Color ToolStripDropDownBackground => theme.SectionBackColor;
+            public override System.Drawing.Color ImageMarginGradientBegin => theme.SectionBackColor;
+            public override System.Drawing.Color ImageMarginGradientMiddle => theme.SectionBackColor;
+            public override System.Drawing.Color ImageMarginGradientEnd => theme.SectionBackColor;
+            public override System.Drawing.Color MenuItemSelected => theme.SelectionBackColor;
+            public override System.Drawing.Color MenuItemSelectedGradientBegin => theme.SelectionBackColor;
+            public override System.Drawing.Color MenuItemSelectedGradientEnd => theme.SelectionBackColor;
+            public override System.Drawing.Color MenuItemPressedGradientBegin => theme.SectionBackColor;
+            public override System.Drawing.Color MenuItemPressedGradientEnd => theme.SectionBackColor;
+            public override System.Drawing.Color MenuItemBorder => theme.BorderColor;
+            public override System.Drawing.Color SeparatorDark => theme.BorderColor;
+            public override System.Drawing.Color SeparatorLight => theme.BorderColor;
+            public override System.Drawing.Color ToolStripBorder => theme.BorderColor;
+            public override System.Drawing.Color MenuBorder => theme.BorderColor;
+        }
         private bool isFullScreen = false;
         private FormBorderStyle previousFormBorderStyle;
         private FormWindowState previousWindowState;
@@ -158,7 +390,11 @@ namespace AnonPDF
         [DllImport("user32.dll")]
         private static extern bool IsIconic(IntPtr hWnd);
 
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
         private const int SW_RESTORE = 9;
+        private const int DWMWA_CAPTION_COLOR = 35;
 
         public PDFForm()
         {
@@ -189,6 +425,9 @@ namespace AnonPDF
             }
 
             InitializeComponent();
+            LoadPreferredTheme();
+            ApplyTheme();
+            this.HandleCreated += (_, __) => ApplyTitleBarColor();
 
             // Apply preferred UI culture if set; otherwise use environment (OS) culture
             var prefCulture = Properties.Settings.Default.PreferredUICulture;
@@ -285,6 +524,14 @@ namespace AnonPDF
 
             removePageButton.Click += RemovePageButton_Click;
             removePageRangeButton.Click += RemovePageRangeButton_Click;
+            saveProjectButton.EnabledChanged += (_, __) => UpdateSaveGroupState();
+            saveProjectAsButton.EnabledChanged += (_, __) => UpdateSaveGroupState();
+            buttonRedactText.EnabledChanged += (_, __) => UpdateSaveGroupState();
+            savePdfMenuItem.EnabledChanged += (_, __) => UpdateSaveGroupState();
+            colorCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
+            openSavedPDFCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
+            safeModeCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
+            setSavePassword.EnabledChanged += (_, __) => UpdateOptionsGroupState();
 
             // Load last session state
             colorCheckBox.Checked = Properties.Settings.Default.LastColorCheckBoxState;
@@ -296,6 +543,8 @@ namespace AnonPDF
             mainAppSplitContainer.Panel1.AutoScroll = true;
             mainAppSplitContainer.Panel2.AutoScroll = false;
             mainAppSplitContainer.Panel1.SizeChanged += (_, __) => UpdateLeftPanelWidth();
+            UpdateSaveGroupState();
+            UpdateOptionsGroupState();
 
             PdfTextSearcher.OnCacheStatusChanged += status => {
 
@@ -351,20 +600,37 @@ namespace AnonPDF
             exitMenuItem.Text = Resources.Menu_Exit;
 
             // Options menu
-            splitPdfToolStripMenuItem.Text = Resources.Menu_SplitPdf;
-            mergePdfToolStripMenuItem.Text = Resources.Menu_MergePdf;
-            deletePageMenuItem.Text = Resources.Menu_DeletePage;
-            rotatePageMenuItem.Text = Resources.Menu_RotatePage;
-            addTextMenuItem.Text = Resources.Menu_AddText;
-            copyToClipboardMenuItem.Text = Resources.Menu_CopyToClipboard;
-            exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
-            selectSignaturesToRemoveMenuItem.Text = Resources.Menu_SelectSignaturesToRemove;
-            ignorePdfRestrictionsToolStripMenuItem.Text = Resources.Menu_IgnorePdfRestrictions;
-            var fullScreenText = Resources.ResourceManager.GetString("Menu_Options_FullScreen", currentCulture);
-            if (!string.IsNullOrWhiteSpace(fullScreenText))
-            {
-                fullScreenToolStripMenuItem.Text = fullScreenText;
-            }
+              splitPdfToolStripMenuItem.Text = Resources.Menu_SplitPdf;
+              mergePdfToolStripMenuItem.Text = Resources.Menu_MergePdf;
+              deletePageMenuItem.Text = Resources.Menu_DeletePage;
+              rotatePageMenuItem.Text = Resources.Menu_RotatePage;
+              addTextMenuItem.Text = Resources.Menu_AddText;
+              copyToClipboardMenuItem.Text = Resources.Menu_CopyToClipboard;
+              exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
+              selectSignaturesToRemoveMenuItem.Text = Resources.Menu_SelectSignaturesToRemove;
+              ignorePdfRestrictionsToolStripMenuItem.Text = Resources.Menu_IgnorePdfRestrictions;
+              var themeText = Resources.ResourceManager.GetString("Menu_Options_Theme", currentCulture);
+              if (!string.IsNullOrWhiteSpace(themeText))
+              {
+                  themeToolStripMenuItem.Text = themeText;
+              }
+              string GetThemeMenuText(string key, string fallback)
+              {
+                  var text = Resources.ResourceManager.GetString(key, currentCulture);
+                  return string.IsNullOrWhiteSpace(text) ? fallback : text;
+              }
+
+              themeSoftLightMenuItem.Text = GetThemeMenuText("Theme_SoftLight", UiThemes[UiThemeKind.SoftLight].Name);
+              themeNordCoolLightMenuItem.Text = GetThemeMenuText("Theme_NordCoolLight", UiThemes[UiThemeKind.NordCoolLight].Name);
+              themeWarmSandMenuItem.Text = GetThemeMenuText("Theme_WarmSand", UiThemes[UiThemeKind.WarmSand].Name);
+              themeForestGreenMenuItem.Text = GetThemeMenuText("Theme_ForestGreen", UiThemes[UiThemeKind.ForestGreen].Name);
+              themeGraphiteDarkMenuItem.Text = GetThemeMenuText("Theme_GraphiteDark", UiThemes[UiThemeKind.GraphiteDark].Name);
+              themeOledDarkTealMenuItem.Text = GetThemeMenuText("Theme_OledDarkTeal", UiThemes[UiThemeKind.OledDarkTeal].Name);
+              var fullScreenText = Resources.ResourceManager.GetString("Menu_Options_FullScreen", currentCulture);
+              if (!string.IsNullOrWhiteSpace(fullScreenText))
+              {
+                  fullScreenToolStripMenuItem.Text = fullScreenText;
+              }
 
             // Help menu
             helpMenuItem.Text = Resources.Menu_Help_Help;
@@ -394,12 +660,27 @@ namespace AnonPDF
             try { signaturesReportRadioButton.Text = Resources.UI_Radio_Signatures_Report; } catch { }
 
             // Group boxes
-            try { groupBox1.Text = Resources.UI_Group_Selections; } catch { }
-            try { groupBox2.Text = Resources.UI_Group_Signatures; } catch { }
-            try { groupBox3.Text = Resources.UI_Group_Search; } catch { }
-            try { groupBox4.Text = Resources.UI_Group_Pages; } catch { }
-            try { groupBox5.Text = Resources.UI_Group_PagesToRemove; } catch { }
-            try { groupBox6.Text = Resources.UI_Group_Filter; } catch { }
+            var openGroupText = Resources.ResourceManager.GetString("UI_Group_Open", currentCulture);
+            if (!string.IsNullOrWhiteSpace(openGroupText))
+            {
+                groupBoxOpen.Text = openGroupText;
+            }
+            var saveGroupText = Resources.ResourceManager.GetString("UI_Group_Save", currentCulture);
+            if (!string.IsNullOrWhiteSpace(saveGroupText))
+            {
+                groupBoxSave.Text = saveGroupText;
+            }
+            var optionsGroupText = Resources.ResourceManager.GetString("UI_Group_Options", currentCulture);
+            if (!string.IsNullOrWhiteSpace(optionsGroupText))
+            {
+                groupBoxOptions.Text = optionsGroupText;
+            }
+            try { groupBoxSelections.Text = Resources.UI_Group_Selections; } catch { }
+            try { groupBoxSignatures.Text = Resources.UI_Group_Signatures; } catch { }
+            try { groupBoxSearch.Text = Resources.UI_Group_Search; } catch { }
+            try { groupBoxPages.Text = Resources.UI_Group_Pages; } catch { }
+            try { groupBoxPagesToRemove.Text = Resources.UI_Group_PagesToRemove; } catch { }
+            try { groupBoxFilter.Text = Resources.UI_Group_Filter; } catch { }
 
             // Tooltips
             try { toolTip1.SetToolTip(loadPdfButton, Resources.Tooltip_LoadPdf); } catch { }
@@ -522,6 +803,36 @@ namespace AnonPDF
             Resources.Culture = sys;
             ApplyLocalization();
             UpdateHelpMenuAvailability();
+        }
+
+        private void ThemeSoftLightMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.SoftLight);
+        }
+
+        private void ThemeNordCoolLightMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.NordCoolLight);
+        }
+
+        private void ThemeWarmSandMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.WarmSand);
+        }
+
+        private void ThemeForestGreenMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.ForestGreen);
+        }
+
+        private void ThemeGraphiteDarkMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.GraphiteDark);
+        }
+
+        private void ThemeOledDarkTealMenuItem_Click(object sender, EventArgs e)
+        {
+            SetTheme(UiThemeKind.OledDarkTeal);
         }
 
         private void FilterComboBox_DrawItem(object sender, DrawItemEventArgs e)
@@ -1434,6 +1745,269 @@ namespace AnonPDF
             UpdateLeftPanelWidth();
         }
 
+        private void ApplyTheme()
+        {
+            var theme = CurrentTheme;
+
+            this.BackColor = theme.WindowBackColor;
+            mainAppSplitContainer.Panel1.BackColor = theme.PanelBackColor;
+            mainAppSplitContainer.Panel1.ForeColor = theme.TextPrimaryColor;
+            mainAppSplitContainer.Panel2.BackColor = DocumentBackColor;
+            pdfViewer.BackColor = DocumentBackColor;
+
+            menuStrip1.BackColor = theme.MenuStripBackColor;
+            menuStrip1.ForeColor = theme.TextPrimaryColor;
+            menuStrip1.RenderMode = ToolStripRenderMode.Professional;
+            menuStrip1.Renderer = new ToolStripProfessionalRenderer(new MenuColorTable(theme))
+            {
+                RoundedEdges = false
+            };
+            ApplyMenuItemTheme(menuStrip1.Items, theme);
+
+            ApplyGroupBoxTheme(groupBoxOpen, theme);
+            ApplyGroupBoxTheme(groupBoxSave, theme);
+            ApplyGroupBoxTheme(groupBoxOptions, theme);
+            ApplyGroupBoxTheme(groupBoxPages, theme);
+            ApplyGroupBoxTheme(groupBoxSearch, theme);
+            ApplyGroupBoxTheme(groupBoxSelections, theme);
+            ApplyGroupBoxTheme(groupBoxPagesToRemove, theme);
+            ApplyGroupBoxTheme(groupBoxSignatures, theme);
+            ApplyGroupBoxTheme(groupBoxFilter, theme);
+
+            pagesListView.BackColor = theme.PanelBackColor;
+            pagesListView.ForeColor = theme.TextPrimaryColor;
+
+            ApplyThemeToControls(mainAppSplitContainer.Panel1.Controls, theme);
+            ApplyThemeToControls(tableLayoutPanel1.Controls, theme);
+            ApplyIconButtonTheme(removePageButton, theme);
+            ApplyIconButtonTheme(removePageRangeButton, theme);
+            ApplyDangerButtonTheme(clearSelectionButton, theme);
+            ApplyTitleBarColor();
+            UpdateSaveGroupState();
+            UpdateOptionsGroupState();
+            UpdateRecentFilesMenu();
+            UpdateThemeMenuChecks();
+        }
+
+        private void LoadPreferredTheme()
+        {
+            var preferredTheme = Properties.Settings.Default.PreferredUiTheme;
+            if (string.IsNullOrWhiteSpace(preferredTheme))
+            {
+                return;
+            }
+
+            if (Enum.TryParse(preferredTheme, out UiThemeKind parsedTheme) && UiThemes.ContainsKey(parsedTheme))
+            {
+                currentThemeKind = parsedTheme;
+            }
+        }
+
+        private void SetTheme(UiThemeKind kind)
+        {
+            if (currentThemeKind == kind)
+            {
+                UpdateThemeMenuChecks();
+                return;
+            }
+
+            currentThemeKind = kind;
+            Properties.Settings.Default.PreferredUiTheme = kind.ToString();
+            Properties.Settings.Default.Save();
+            ApplyTheme();
+        }
+
+        private void ApplyThemeToControls(Control.ControlCollection controls, UiThemePalette theme)
+        {
+            foreach (Control control in controls)
+            {
+                if (control is ThemedCheckBox themedCheckBox)
+                {
+                    var backColor = control.Parent?.BackColor ?? theme.SectionBackColor;
+                    themedCheckBox.BackColor = backColor;
+                    themedCheckBox.UseVisualStyleBackColor = false;
+                    themedCheckBox.ForeColor = theme.TextPrimaryColor;
+                    themedCheckBox.DisabledForeColor = theme.TextSecondaryColor;
+                }
+                else if (control is ThemedRadioButton themedRadioButton)
+                {
+                    var backColor = control.Parent?.BackColor ?? theme.SectionBackColor;
+                    themedRadioButton.BackColor = backColor;
+                    themedRadioButton.UseVisualStyleBackColor = false;
+                    themedRadioButton.ForeColor = theme.TextPrimaryColor;
+                    themedRadioButton.DisabledForeColor = theme.TextSecondaryColor;
+                }
+                else if (control is Button button)
+                {
+                    ApplySecondaryButtonTheme(button, theme);
+                }
+                else if (control is CheckBox checkBox)
+                {
+                    checkBox.ForeColor = theme.TextPrimaryColor;
+                }
+                else if (control is RadioButton radioButton)
+                {
+                    radioButton.ForeColor = theme.TextPrimaryColor;
+                }
+                else if (control is Label label)
+                {
+                    label.ForeColor = theme.TextSecondaryColor;
+                }
+                else if (control is TextBox textBox)
+                {
+                    textBox.BackColor = theme.PanelBackColor;
+                    textBox.ForeColor = theme.TextPrimaryColor;
+                }
+                else if (control is ComboBox comboBox)
+                {
+                    comboBox.BackColor = theme.PanelBackColor;
+                    comboBox.ForeColor = theme.TextPrimaryColor;
+                }
+                else if (control is ListView listView)
+                {
+                    listView.BackColor = theme.PanelBackColor;
+                    listView.ForeColor = theme.TextPrimaryColor;
+                }
+                else if (control is TableLayoutPanel table)
+                {
+                    table.BackColor = theme.PanelBackColor;
+                }
+
+                if (control.Controls.Count > 0)
+                {
+                    ApplyThemeToControls(control.Controls, theme);
+                }
+            }
+        }
+
+        private static void ApplyIconButtonTheme(Button button, UiThemePalette theme)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.BackColor = theme.SecondaryButtonBackColor;
+            button.ForeColor = button.Enabled ? theme.TextPrimaryColor : theme.TextSecondaryColor;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderColor = theme.BorderColor;
+            button.UseVisualStyleBackColor = false;
+        }
+
+        private void ApplySecondaryButtonTheme(Button button, UiThemePalette theme)
+        {
+            if (button == null || button == clearSelectionButton || button == removePageButton || button == removePageRangeButton)
+            {
+                return;
+            }
+
+            button.BackColor = theme.SecondaryButtonBackColor;
+            button.ForeColor = button.Enabled ? theme.SecondaryButtonForeColor : theme.TextSecondaryColor;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderColor = theme.BorderColor;
+            button.UseVisualStyleBackColor = false;
+        }
+
+        private void UpdateThemeMenuChecks()
+        {
+            if (themeSoftLightMenuItem == null)
+            {
+                return;
+            }
+
+            themeSoftLightMenuItem.Checked = currentThemeKind == UiThemeKind.SoftLight;
+            themeNordCoolLightMenuItem.Checked = currentThemeKind == UiThemeKind.NordCoolLight;
+            themeWarmSandMenuItem.Checked = currentThemeKind == UiThemeKind.WarmSand;
+            themeForestGreenMenuItem.Checked = currentThemeKind == UiThemeKind.ForestGreen;
+            themeGraphiteDarkMenuItem.Checked = currentThemeKind == UiThemeKind.GraphiteDark;
+            themeOledDarkTealMenuItem.Checked = currentThemeKind == UiThemeKind.OledDarkTeal;
+        }
+
+        private static void ApplyMenuItemTheme(ToolStripItemCollection items, UiThemePalette theme)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                item.ForeColor = theme.TextPrimaryColor;
+                if (item is ToolStripDropDownItem dropDownItem && dropDownItem.DropDownItems.Count > 0)
+                {
+                    ApplyMenuItemTheme(dropDownItem.DropDownItems, theme);
+                }
+            }
+        }
+
+        private static void ApplyGroupBoxTheme(GroupBox groupBox, UiThemePalette theme)
+        {
+            if (groupBox == null)
+            {
+                return;
+            }
+
+            groupBox.BackColor = theme.SectionBackColor;
+            if (groupBox is ThemedGroupBox themedGroupBox)
+            {
+                themedGroupBox.ForeColor = theme.TextPrimaryColor;
+                themedGroupBox.DisabledForeColor = theme.TextSecondaryColor;
+                themedGroupBox.Invalidate();
+            }
+            else
+            {
+                groupBox.ForeColor = groupBox.Enabled ? theme.TextPrimaryColor : theme.TextSecondaryColor;
+            }
+        }
+
+        private void UpdateRemovePageButtonVisual(bool isMarked)
+        {
+            if (removePageButton == null)
+            {
+                return;
+            }
+
+            if (isMarked)
+            {
+                removePageButton.BackColor = System.Drawing.Color.Black;
+                removePageButton.ForeColor = System.Drawing.Color.White;
+            }
+            else
+            {
+                removePageButton.BackColor = CurrentTheme.SecondaryButtonBackColor;
+                removePageButton.ForeColor = CurrentTheme.SecondaryButtonForeColor;
+            }
+        }
+
+        private static void ApplyDangerButtonTheme(Button button, UiThemePalette theme)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.BackColor = theme.DangerBackColor;
+            button.ForeColor = System.Drawing.Color.White;
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderColor = theme.BorderColor;
+            button.UseVisualStyleBackColor = false;
+        }
+
+        private void ApplyTitleBarColor()
+        {
+            if (DesignMode || !IsHandleCreated)
+            {
+                return;
+            }
+
+            try
+            {
+                int colorRef = System.Drawing.ColorTranslator.ToWin32(CurrentTheme.WindowBackColor);
+                DwmSetWindowAttribute(this.Handle, DWMWA_CAPTION_COLOR, ref colorRef, sizeof(int));
+            }
+            catch (DllNotFoundException)
+            {
+            }
+            catch (EntryPointNotFoundException)
+            {
+            }
+        }
+
         private void UpdateLeftPanelWidth()
         {
             int extra = mainAppSplitContainer.Panel1.VerticalScroll.Visible
@@ -1444,6 +2018,32 @@ namespace AnonPDF
             {
                 mainAppSplitContainer.SplitterDistance = desiredWidth;
             }
+        }
+
+        private void UpdateSaveGroupState()
+        {
+            if (groupBoxSave == null)
+            {
+                return;
+            }
+
+            groupBoxSave.Enabled = saveProjectButton.Enabled
+                || buttonRedactText.Enabled
+                || savePdfMenuItem.Enabled
+                || (saveProjectAsButton.Visible && saveProjectAsButton.Enabled);
+            groupBoxSave.ForeColor = groupBoxSave.Enabled ? CurrentTheme.TextPrimaryColor : CurrentTheme.TextSecondaryColor;
+        }
+
+        private void UpdateOptionsGroupState()
+        {
+            if (groupBoxOptions == null)
+            {
+                return;
+            }
+
+            bool optionsAvailable = pdf != null;
+            groupBoxOptions.Enabled = true;
+            groupBoxOptions.ForeColor = optionsAvailable ? CurrentTheme.TextPrimaryColor : CurrentTheme.TextSecondaryColor;
         }
 
         private void PDFForm_Load(object sender, EventArgs e)
@@ -3401,7 +4001,7 @@ namespace AnonPDF
             LogDebug($"LoadPdf path={inputPdfPath} password={(string.IsNullOrEmpty(userPassword) ? "no" : "yes")}");
 
             pdfCleanUpToolError = false;
-            groupBox6.Visible = false;
+            groupBoxFilter.Visible = false;
             pagesListView.Visible = false;
             currentPage = 1;
             scaleFactor = 0;
@@ -3430,7 +4030,7 @@ namespace AnonPDF
             pageNumberTextBox.Visible = true;
             numPagesLabel.Visible = true;
             numPages = pdf.Pages.Count;
-            groupBox4.Enabled = true;
+            groupBoxPages.Enabled = true;
 
             LogPdfPageInfo();
 
@@ -3465,21 +4065,21 @@ namespace AnonPDF
                 pagesListView.Items.Add(item);
             }
             
-            groupBox6.Visible = true;
-            groupBox6.Refresh();
+            groupBoxFilter.Visible = true;
+            groupBoxFilter.Refresh();
             pagesListView.Visible = true;
             pagesListView.Items[currentPage - 1].Selected = true;
             pagesListView.Items[currentPage - 1].EnsureVisible();
 
-            groupBox1.Enabled = true;
-            groupBox5.Enabled = true;
+            groupBoxSelections.Enabled = true;
+            groupBoxPagesToRemove.Enabled = true;
             if (PdfDocumentContainsText())
             {
-                groupBox3.Enabled = true;
+                groupBoxSearch.Enabled = true;
             }
             else
             {
-                groupBox3.Enabled = false;
+                groupBoxSearch.Enabled = false;
             }
             
             saveProjectAsButton.Enabled = true;
@@ -3500,6 +4100,8 @@ namespace AnonPDF
             removePageButton.Enabled = true;
             removePageRangeButton.Enabled = true;
             
+            UpdateSaveGroupState();
+            UpdateOptionsGroupState();
 
             UpdateNavigationButtons(currentPage);
             UpdateWindowTitle();
@@ -3605,16 +4207,7 @@ namespace AnonPDF
             buttonLast.Enabled = numPage < numPages;
 
             bool isMarked = pagesToRemove.Contains(numPage);
-            if (isMarked)
-            {
-                removePageButton.BackColor = System.Drawing.Color.Black;
-                removePageButton.ForeColor = System.Drawing.Color.White;
-            }
-            else
-            {
-                removePageButton.BackColor = SystemColors.ControlLight;
-                removePageButton.ForeColor = SystemColors.ControlText;
-            }
+            UpdateRemovePageButtonVisual(isMarked);
         }
 
         private void RotateCurrentPageClockwise()
@@ -4734,15 +5327,14 @@ namespace AnonPDF
         {
             foreach (int pageNum in pagesToRemove)
             {
-                pagesListView.Items[pageNum - 1].BackColor = SystemColors.Window;
+                pagesListView.Items[pageNum - 1].BackColor = CurrentTheme.PanelBackColor;
                 if (pagesListView.Items[pageNum - 1].ForeColor != System.Drawing.Color.Red)
                 {
-                    pagesListView.Items[pageNum - 1].ForeColor = System.Drawing.Color.Black;
+                    pagesListView.Items[pageNum - 1].ForeColor = CurrentTheme.TextPrimaryColor;
                 }
             }
             pagesToRemove.Clear();
-            removePageButton.BackColor = SystemColors.ControlLight;
-            removePageButton.ForeColor = SystemColors.ControlText;
+            UpdateRemovePageButtonVisual(false);
         }
 
         private void LoadRedactionBlocks(string inputProjectPathTemp)
@@ -4883,8 +5475,7 @@ namespace AnonPDF
                         status = allPageStatuses[pageNum - 1];
                         if (pageNum == 1)
                         {
-                            removePageButton.BackColor = System.Drawing.Color.Black;
-                            removePageButton.ForeColor = System.Drawing.Color.White;
+                            UpdateRemovePageButtonVisual(true);
                         }
                         var item = pagesListView.Items[pageNum - 1];
 
@@ -5070,6 +5661,8 @@ namespace AnonPDF
                 selectionPrevButton.Enabled = false;
                 selectionNextButton.Enabled = false;
                 selectionLastButton.Enabled = false;
+                clearSelectionButton.Enabled = false;
+                clearPageButton.Enabled = false;
                 return;
             }
 
@@ -5091,6 +5684,7 @@ namespace AnonPDF
 
             // Enable/disable button depending on whether there are selections
             clearPageButton.Enabled = hasSelectionsForThisPage;
+            clearSelectionButton.Enabled = true;
         }
 
         private void UpdateSearchNavigationButtons()
@@ -5756,6 +6350,7 @@ namespace AnonPDF
                 return;
             }
 
+            var theme = CurrentTheme;
             recentFilesMenuItem.DropDownItems.Clear();
 
             var files = LoadRecentFiles();
@@ -5785,6 +6380,7 @@ namespace AnonPDF
             {
                 var emptyItem = new ToolStripMenuItem(Resources.Menu_RecentFiles_Empty);
                 emptyItem.Enabled = false;
+                emptyItem.ForeColor = theme.TextSecondaryColor;
                 recentFilesMenuItem.DropDownItems.Add(emptyItem);
                 recentFilesMenuItem.Enabled = false;
                 return;
@@ -5803,7 +6399,11 @@ namespace AnonPDF
                 item.AutoToolTip = true;
                 if (!File.Exists(path))
                 {
-                    item.ForeColor = System.Drawing.Color.Gray;
+                    item.ForeColor = theme.TextSecondaryColor;
+                }
+                else
+                {
+                    item.ForeColor = theme.TextPrimaryColor;
                 }
                 item.Click += RecentFileMenuItem_Click;
                 recentFilesMenuItem.DropDownItems.Add(item);
@@ -6411,7 +7011,7 @@ namespace AnonPDF
                 }
             }
 
-            groupBox2.Enabled = (signatures.Count > 0);
+            groupBoxSignatures.Enabled = (signatures.Count > 0);
             if (signatures.Count == 0)
             {
                 signaturesToRemove.Clear();
@@ -6435,14 +7035,12 @@ namespace AnonPDF
             if (isMarked)
             {
                 pagesToRemove.Remove(currentPage);
-                removePageButton.BackColor = SystemColors.ControlLight;
-                removePageButton.ForeColor = SystemColors.ControlText;
+                UpdateRemovePageButtonVisual(false);
                 status.MarkedForDeletion = false;
             }
             else
             {
-                removePageButton.BackColor = System.Drawing.Color.Black;
-                removePageButton.ForeColor = System.Drawing.Color.White;
+                UpdateRemovePageButtonVisual(true);
                 pagesToRemove.Add(currentPage);
                 status.MarkedForDeletion = true;
             }
@@ -6573,8 +7171,7 @@ namespace AnonPDF
                                 step += dlg.Step;
                                 if (i == currentPage)
                                 {
-                                    removePageButton.BackColor = System.Drawing.Color.Black;
-                                    removePageButton.ForeColor = System.Drawing.Color.White;
+                                    UpdateRemovePageButtonVisual(true);
                                 }
 
                                 //ListViewItem item = pagesListView.Items[i - 1];
@@ -6607,8 +7204,7 @@ namespace AnonPDF
                         {
                             if (i == currentPage)
                             {
-                                removePageButton.BackColor = SystemColors.ControlLight;
-                                removePageButton.ForeColor = SystemColors.ControlText;
+                                UpdateRemovePageButtonVisual(false);
                             }
 
                             status = allPageStatuses[i - 1];
@@ -6726,9 +7322,9 @@ namespace AnonPDF
             {
                 ClearSearchResult();
                 //this.Cursor = Cursors.WaitCursor;
-                groupBox3.Enabled = false;
+                groupBoxSearch.Enabled = false;
                 searchLocations = await Task.Run(() => PdfTextSearcher.FindTextLocations(inputPdfPath, search, false, userPassword));
-                groupBox3.Enabled = true;
+                groupBoxSearch.Enabled = true;
                 searchTextBox.SelectAll();
                 searchTextBox.Focus();
                 searchResultLabel.Text = $"znaleziono: {searchLocations.Count}";                
@@ -6879,9 +7475,9 @@ namespace AnonPDF
             personalDataButton.Enabled = false;
             ClearSearchResult();
             
-            groupBox3.Enabled = false;
+            groupBoxSearch.Enabled = false;
             searchLocations = await Task.Run(() => PdfTextSearcher.FindTextLocations(inputPdfPath, "", true, userPassword));
-            groupBox3.Enabled = true;
+            groupBoxSearch.Enabled = true;
             searchResultLabel.Text = $"znaleziono: {searchLocations.Count}";
             
 

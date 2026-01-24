@@ -41,5 +41,8 @@
     <Setting Name="PreferredUICulture" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="PreferredUiTheme" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SoftLight</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

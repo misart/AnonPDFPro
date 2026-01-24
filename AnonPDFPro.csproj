@@ -204,6 +204,7 @@
     <Compile Include="PDFForm.Designer.cs">
       <DependentUpon>PDFForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="ThemedControls.cs" />
     <Compile Include="Branding.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

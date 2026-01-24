@@ -126,6 +126,27 @@
   <data name="Menu_Options_FullScreen" xml:space="preserve">
     <value>Full screen</value>
   </data>
+  <data name="Menu_Options_Theme" xml:space="preserve">
+    <value>Interface theme</value>
+  </data>
+  <data name="Theme_SoftLight" xml:space="preserve">
+    <value>Soft Light</value>
+  </data>
+  <data name="Theme_NordCoolLight" xml:space="preserve">
+    <value>Nord Cool Light</value>
+  </data>
+  <data name="Theme_WarmSand" xml:space="preserve">
+    <value>Warm Sand</value>
+  </data>
+  <data name="Theme_ForestGreen" xml:space="preserve">
+    <value>Forest Green</value>
+  </data>
+  <data name="Theme_GraphiteDark" xml:space="preserve">
+    <value>Graphite Dark</value>
+  </data>
+  <data name="Theme_OledDarkTeal" xml:space="preserve">
+    <value>OLED Dark + Teal</value>
+  </data>
   <data name="Menu_Help" xml:space="preserve">
     <value>&amp;Help</value>
   </data>
@@ -139,10 +160,10 @@
     <value>Open last PDF and project</value>
   </data>
   <data name="Menu_SaveProjectAs" xml:space="preserve">
-    <value>Save selection project as</value>
+    <value>Save project as</value>
   </data>
   <data name="Menu_SaveProject" xml:space="preserve">
-    <value>Save selection project</value>
+    <value>Save project</value>
   </data>
   <data name="Menu_SavePdf" xml:space="preserve">
     <value>Save PDF</value>
@@ -236,6 +257,15 @@
   </data>
   <data name="UI_PageLabelFormat" xml:space="preserve">
     <value>Page {0}</value>
+  </data>
+  <data name="UI_Group_Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="UI_Group_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="UI_Group_Options" xml:space="preserve">
+    <value>Options</value>
   </data>
   <data name="UI_Group_Selections" xml:space="preserve">
     <value>Selections</value>

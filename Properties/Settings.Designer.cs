@@ -178,5 +178,17 @@ namespace AnonPDF.Properties {
                 this["PreferredUICulture"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("SoftLight")]
+        public string PreferredUiTheme {
+            get {
+                return ((string)(this["PreferredUiTheme"]));
+            }
+            set {
+                this["PreferredUiTheme"] = value;
+            }
+        }
     }
 }
