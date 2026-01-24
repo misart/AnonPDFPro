@@ -441,6 +441,7 @@ namespace AnonPDF
                 exitThread.Start();
                 // Polish UI text by design
                 MessageBox.Show(
+                    this,
                     string.Format(Resources.Msg_ServiceUpdateInProgress, serviceEndDate, Branding.ProductName),
                     Resources.Title_Warning,
                     MessageBoxButtons.OK,
@@ -1135,7 +1136,7 @@ namespace AnonPDF
                     };
                 }
 
-                if (dlg.ShowDialog() == DialogResult.OK)
+                if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     // Calculate text size using the selected font
                     SizeF textSize = GetAnnotationSize(dlg.AnnotationText, dlg.AnnotationFont, dlg.AnnotationRotation);
@@ -1505,7 +1506,7 @@ namespace AnonPDF
                     
                 }
             }
-            System.Windows.Forms.MessageBox.Show(string.Format(Resources.Msg_ExportGraphics_Done, outputDir), Resources.Title_Success, System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+            System.Windows.Forms.MessageBox.Show(this, string.Format(Resources.Msg_ExportGraphics_Done, outputDir), Resources.Title_Success, System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
         }
 
 
@@ -1515,7 +1516,7 @@ namespace AnonPDF
 
             using (SplitDocumentDialog dlg = new SplitDocumentDialog(numPages, inputPdfPath))
             {
-                if (dlg.ShowDialog() == DialogResult.OK)
+                if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     Console.WriteLine("OK");
                     if (dlg.SelectedFile != "" && (dlg.PageNumbers.Count > 0 || dlg.Step > 0))
@@ -3973,7 +3974,7 @@ namespace AnonPDF
                 prompt.Controls.Add(confirmation);
                 prompt.AcceptButton = confirmation;
 
-                return prompt.ShowDialog() == DialogResult.OK ? inputBox.Text : "";
+                return prompt.ShowDialog(this) == DialogResult.OK ? inputBox.Text : "";
             }
         }
 
@@ -4245,7 +4246,7 @@ namespace AnonPDF
                 Title = Resources.Dialog_Title_OpenPdf
             };
 
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            if (openFileDialog.ShowDialog(this) == DialogResult.OK)
             {
                 OpenPdfFromPath(openFileDialog.FileName);
             }
@@ -4485,7 +4486,7 @@ namespace AnonPDF
                 saveFileDialog.Title = Resources.Dialog_Title_SavePdfAs;
                 saveFileDialog.FileName = $"{System.IO.Path.GetFileNameWithoutExtension(inputPdfPath)}_anon.pdf";
 
-                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
                 {
                     try
                     {
@@ -5615,7 +5616,7 @@ namespace AnonPDF
                 saveFileDialog.Title = string.Format(Resources.Dialog_Title_SavePap, Branding.ProductName);
                 saveFileDialog.FileName = $"{System.IO.Path.GetFileNameWithoutExtension(filePapName)}.pap";
 
-                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
                 {
                     try
                     {
@@ -5685,7 +5686,7 @@ namespace AnonPDF
                 Title = string.Format(Resources.Dialog_Title_OpenPap, Branding.ProductName)
             };
 
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            if (openFileDialog.ShowDialog(this) == DialogResult.OK)
             {
                 // inputProjectPath = openFileDialog.FileName;
 
@@ -7208,7 +7209,7 @@ namespace AnonPDF
             // Display dialog with page range, where maximum range is based on numPages variable.
             using (DeletePagesDialog dlg = new DeletePagesDialog(numPages))
             {
-                if (dlg.ShowDialog() == DialogResult.OK)
+                if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     PageItemStatus status;
                     int step = dlg.StartPage;
@@ -7379,7 +7380,7 @@ namespace AnonPDF
                 ClearSearchResult();
                 //this.Cursor = Cursors.WaitCursor;
                 groupBoxSearch.Enabled = false;
-                searchLocations = await Task.Run(() => PdfTextSearcher.FindTextLocations(inputPdfPath, search, false, userPassword));
+                searchLocations = await Task.Run(() => PdfTextSearcher.FindTextLocations(inputPdfPath, search, false, userPassword, this));
                 groupBoxSearch.Enabled = true;
                 searchTextBox.SelectAll();
                 searchTextBox.Focus();
@@ -7532,7 +7533,7 @@ namespace AnonPDF
             ClearSearchResult();
             
             groupBoxSearch.Enabled = false;
-            searchLocations = await Task.Run(() => PdfTextSearcher.FindTextLocations(inputPdfPath, "", true, userPassword));
+            searchLocations = await Task.Run(() => PdfTextSearcher.FindTextLocations(inputPdfPath, "", true, userPassword, this));
             groupBoxSearch.Enabled = true;
             searchResultLabel.Text = $"znaleziono: {searchLocations.Count}";
             
@@ -7757,7 +7758,7 @@ namespace AnonPDF
 
                     if (cropRect.Width <= 0 || cropRect.Height <= 0)
                     {
-                        MessageBox.Show(string.Format(Resources.Err_Crop_OutsideBitmap, cropRect), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(this, string.Format(Resources.Err_Crop_OutsideBitmap, cropRect), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return null;
                     }
 
@@ -7803,7 +7804,7 @@ namespace AnonPDF
             catch (Exception ex)
             {
                 // Error handling
-                MessageBox.Show(string.Format(Resources.Err_OCR, ex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, string.Format(Resources.Err_OCR, ex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             return result.Trim();
         }
@@ -8365,7 +8366,7 @@ namespace AnonPDF
             using (FontDialog fontDialog = new FontDialog())
             {
                 fontDialog.Font = AnnotationFont;
-                if (fontDialog.ShowDialog() == DialogResult.OK)
+                if (fontDialog.ShowDialog(this) == DialogResult.OK)
                 {
                     AnnotationFont = fontDialog.Font;
                     UpdateFontDisplay();
@@ -8379,7 +8380,7 @@ namespace AnonPDF
             using (ColorDialog colorDialog = new ColorDialog())
             {
                 colorDialog.Color = AnnotationColor;
-                if (colorDialog.ShowDialog() == DialogResult.OK)
+                if (colorDialog.ShowDialog(this) == DialogResult.OK)
                 {
                     AnnotationColor = colorDialog.Color;
                     txtText.ForeColor = AnnotationColor;
@@ -8569,7 +8570,7 @@ namespace AnonPDF
                 openFileDialog.Filter = Resources.Dialog_Filter_PDF;
                 openFileDialog.Title = Resources.Split_Dlg_Title;
 
-                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                if (openFileDialog.ShowDialog(this) == DialogResult.OK)
                 {
                     txtFilePath.Text = openFileDialog.FileName;
                     SelectedFile = openFileDialog.FileName;
@@ -8731,7 +8732,7 @@ namespace AnonPDF
                 Filter = Resources.Dialog_Filter_PDF,
                 Multiselect = true
             };
-            if (ofd.ShowDialog() == DialogResult.OK)
+            if (ofd.ShowDialog(this) == DialogResult.OK)
             {
                 foreach (var file in ofd.FileNames)
                 {
@@ -8745,7 +8746,7 @@ namespace AnonPDF
         {
             using (var dlg = new FolderBrowserDialog())
             {
-                if (dlg.ShowDialog() == DialogResult.OK)
+                if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     var files = Directory.GetFiles(dlg.SelectedPath, "*.pdf");
                     foreach (var file in files)
@@ -8884,7 +8885,7 @@ namespace AnonPDF
 
             // if all files are OK, only then ask for destination
             SaveFileDialog sfd = new SaveFileDialog { Filter = Resources.Dialog_Filter_PDF };
-            if (sfd.ShowDialog() == DialogResult.OK)
+            if (sfd.ShowDialog(this) == DialogResult.OK)
             {
                 try
                 {
@@ -9270,7 +9271,7 @@ namespace AnonPDF
 
         public static event Action<string> OnCacheStatusChanged;
 
-        public static List<TextLocation> FindTextLocations(string pdfPath, string searchText, bool searchPersonalData, string userPassword)
+        public static List<TextLocation> FindTextLocations(string pdfPath, string searchText, bool searchPersonalData, string userPassword, IWin32Window owner = null)
         {
             // Check whether lines for this file are already cached
             if (!_lineCache.ContainsKey(pdfPath))
@@ -9279,7 +9280,7 @@ namespace AnonPDF
             }
 
             // Perform search based on cache
-            return SearchInCachedLines(pdfPath, searchText, searchPersonalData);
+            return SearchInCachedLines(pdfPath, searchText, searchPersonalData, owner);
         }
 
         private static void CacheLines(string pdfPath, string userPassword)
@@ -9314,7 +9315,7 @@ namespace AnonPDF
         }
 
         // Funkcja do odczytu text na podstawie line_number
-        private static List<TextLocation> SearchInCachedLines(string pdfPath, string searchText, bool searchPersonalData)
+        private static List<TextLocation> SearchInCachedLines(string pdfPath, string searchText, bool searchPersonalData, IWin32Window owner)
         {
 
             var locations = new List<TextLocation> { };
@@ -9351,13 +9352,13 @@ namespace AnonPDF
 
             if (searchPersonalData && PDDServerUrl!="")
             {
-                DialogResult result = MessageBox.Show(
+                DialogResult result = ShowMessageBox(
+                    owner,
                     Resources.Msg_Confirm_NameSearchSlow,
                     Resources.Title_Warning,
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Exclamation,
-                    MessageBoxDefaultButton.Button2
-                );
+                    MessageBoxDefaultButton.Button2);
 
                 if (result == DialogResult.No)
                 {
@@ -9399,7 +9400,7 @@ namespace AnonPDF
                         }
                         catch {
 
-                            MessageBox.Show(Resources.Msg_NameSearchServiceUnavailable, Resources.Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            ShowMessageBox(owner, Resources.Msg_NameSearchServiceUnavailable, Resources.Title_Warning, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             return locations;
                         }
 
@@ -9450,6 +9451,25 @@ namespace AnonPDF
             OnCacheStatusChanged?.Invoke("");
 
             return locations;
+        }
+
+        private static DialogResult ShowMessageBox(
+            IWin32Window owner,
+            string text,
+            string caption,
+            MessageBoxButtons buttons,
+            MessageBoxIcon icon,
+            MessageBoxDefaultButton defaultButton = MessageBoxDefaultButton.Button1)
+        {
+            if (owner is Control control && control.InvokeRequired)
+            {
+                return (DialogResult)control.Invoke(new Func<DialogResult>(() =>
+                    MessageBox.Show(owner, text, caption, buttons, icon, defaultButton)));
+            }
+
+            return owner == null
+                ? MessageBox.Show(text, caption, buttons, icon, defaultButton)
+                : MessageBox.Show(owner, text, caption, buttons, icon, defaultButton);
         }
 
 
