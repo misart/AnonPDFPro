@@ -32,7 +32,20 @@ namespace AnonPDF
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new PDFForm());
+            var splash = new SplashForm();
+            var mainForm = new PDFForm(splash);
+            splash.Owner = mainForm;
+            splash.Show();
+            Application.DoEvents();
+            mainForm.FormClosed += (_, __) =>
+            {
+                if (!splash.IsDisposed)
+                {
+                    splash.Close();
+                }
+            };
+
+            Application.Run(mainForm);
         }
 
         // Log unhandled exceptions to AppData

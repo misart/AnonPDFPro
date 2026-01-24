@@ -137,6 +137,8 @@ namespace AnonPDF
         private const int LeftPanelBaseWidth = 187;
         private const int LeftPanelScrollbarPadding = 6;
         private static readonly System.Drawing.Color DocumentBackColor = System.Drawing.Color.White;
+        private readonly SplashForm splashForm;
+        private bool splashClosed;
 
         private enum UiThemeKind
         {
@@ -418,8 +420,9 @@ namespace AnonPDF
         private const int SW_RESTORE = 9;
         private const int DWMWA_CAPTION_COLOR = 35;
 
-        public PDFForm()
+        public PDFForm(SplashForm splash = null)
         {
+            splashForm = splash;
             // Read version info
             var assembly = Assembly.GetExecutingAssembly();
             var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
@@ -4148,6 +4151,18 @@ namespace AnonPDF
             UpdateWindowTitle();
             ExtractSignatures();
             AddRecentFile(inputPdfPath);
+            CloseSplashIfVisible();
+        }
+
+        private void CloseSplashIfVisible()
+        {
+            if (splashClosed || splashForm == null || splashForm.IsDisposed)
+            {
+                return;
+            }
+
+            splashClosed = true;
+            splashForm.Close();
         }
 
         private void LogPdfPageInfo()
