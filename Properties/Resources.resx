@@ -637,6 +637,15 @@ Proszę zapisać wyniki swojej pracy i wyłączyć program.
 
 Automatyczne wyłączenie nastąpi za 5 minut.</value>
   </data>
+  <data name="Msg_NewVersionAvailable" xml:space="preserve">
+    <value>Dostępna jest nowsza wersja {0} (data aktualizacji: {1}).</value>
+  </data>
+  <data name="Msg_NewVersionChangesHeader" xml:space="preserve">
+    <value>Zmiany:</value>
+  </data>
+  <data name="Msg_NewVersionNoChanges" xml:space="preserve">
+    <value>Brak listy zmian.</value>
+  </data>
   <data name="Err_InvalidPdfFile" xml:space="preserve">
     <value>Ten plik PDF jest nieprawidłowy.
 

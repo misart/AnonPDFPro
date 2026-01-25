@@ -637,6 +637,15 @@ Please save your work and close the application.
 
 The application will close automatically in 5 minutes.</value>
   </data>
+  <data name="Msg_NewVersionAvailable" xml:space="preserve">
+    <value>A newer version {0} is available (updated: {1}).</value>
+  </data>
+  <data name="Msg_NewVersionChangesHeader" xml:space="preserve">
+    <value>Changes:</value>
+  </data>
+  <data name="Msg_NewVersionNoChanges" xml:space="preserve">
+    <value>No change list provided.</value>
+  </data>
   <data name="Err_InvalidPdfFile" xml:space="preserve">
     <value>This PDF file is invalid.
 

@@ -56,7 +56,6 @@ namespace AnonPDF
         private static bool diagnosticModeEnabled = false;
         private static bool DebugLogEnabled => diagnosticModeEnabled;
         private readonly string fileVersion;
-        private string serviceEndDate = "";
         private string inputPdfPath = "";
         private string inputProjectPath = "";
         private int currentPage = 1;
@@ -107,8 +106,11 @@ namespace AnonPDF
         private readonly Timer pagingTimer;
         private readonly Timer renderTimer;
         private static System.Timers.Timer versionCheckTimer;
-
-        static bool exitScheduled = false;
+        private static readonly HttpClient VersionHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+        private string lastNotifiedVersion = "";
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -429,28 +431,6 @@ namespace AnonPDF
             var assembly = Assembly.GetExecutingAssembly();
             var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
             fileVersion = fileVersionInfo.FileVersion;
-
-            // Version check on application startup
-            if (!IsVersionMatching())
-            {
-                System.Threading.Thread exitThread = new System.Threading.Thread(() =>
-                {
-                    // Wait 10 seconds
-                    System.Threading.Thread.Sleep(10 * 1000);
-                    Environment.Exit(0);
-                });
-                exitThread.IsBackground = true;
-                exitThread.Start();
-                // Polish UI text by design
-                MessageBox.Show(
-                    this,
-                    string.Format(Resources.Msg_ServiceUpdateInProgress, serviceEndDate, Branding.ProductName),
-                    Resources.Title_Warning,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                Environment.Exit(0);
-                return;
-            }
 
             InitializeComponent();
             LoadPreferredTheme();
@@ -1753,55 +1733,132 @@ namespace AnonPDF
             SetForegroundWindow(this.Handle);
         }
 
-        // Method to check if the application version matches the version from the file
-        bool IsVersionMatching()
+        private sealed class RemoteVersionInfo
+        {
+            public RemoteVersionInfo(string version, string updated, string changesText)
+            {
+                Version = version;
+                Updated = updated;
+                ChangesText = changesText;
+            }
+
+            public string Version { get; }
+            public string Updated { get; }
+            public string ChangesText { get; }
+        }
+
+        private RemoteVersionInfo FetchRemoteVersionInfo()
         {
             try
             {
-                string versionFilePath = Path.Combine(Application.StartupPath, "service.json");
-                if (!File.Exists(versionFilePath))
+                string baseUrl = LicenseManager.Config?.ServerBaseUrl ?? "https://misart.pl/anonpdfpro";
+                string url = baseUrl.TrimEnd('/') + "/version.json";
+                var response = VersionHttpClient.GetAsync(url).GetAwaiter().GetResult();
+                if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine("Version file not found: " + versionFilePath);
-                    return true; // Decision: if the file is missing, continue working
+                    return null;
                 }
-                string json = File.ReadAllText(versionFilePath);
-                // Use Newtonsoft.Json to parse version.json file
-                JObject obj = JObject.Parse(json);
-                string networkVersion = (string)obj["version"];
-                serviceEndDate = (string)obj["enddate"];
-                return networkVersion == fileVersion;
+
+                string json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                var obj = JObject.Parse(json);
+                string version = (string)obj["version"];
+                string updated = (string)obj["updated"] ?? (string)obj["date"] ?? (string)obj["updatedAt"];
+
+                string changesText = null;
+                if (obj["changes"] is JArray changesArray)
+                {
+                    var lines = changesArray
+                        .Select(item => item?.ToString())
+                        .Where(item => !string.IsNullOrWhiteSpace(item))
+                        .Select(item => "- " + item)
+                        .ToList();
+                    if (lines.Count > 0)
+                    {
+                        changesText = string.Join(Environment.NewLine, lines);
+                    }
+                }
+                else if (obj["changes"] != null)
+                {
+                    changesText = obj["changes"].ToString();
+                }
+
+                return new RemoteVersionInfo(version, updated, changesText);
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Error while checking version: " + ex.Message);
-                // In case of error you can decide whether to continue or terminate application.
-                return true;
+                return null;
             }
+        }
+
+        private static bool IsRemoteVersionNewer(string remoteVersion, string localVersion)
+        {
+            if (string.IsNullOrWhiteSpace(remoteVersion))
+            {
+                return false;
+            }
+
+            if (Version.TryParse(remoteVersion, out var remote) && Version.TryParse(localVersion, out var local))
+            {
+                return remote > local;
+            }
+
+            return !string.Equals(remoteVersion, localVersion, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string BuildNewVersionMessage(RemoteVersionInfo info)
+        {
+            string dateText = string.IsNullOrWhiteSpace(info.Updated) ? "-" : info.Updated;
+            string message = string.Format(Resources.Msg_NewVersionAvailable, info.Version, dateText);
+
+            if (!string.IsNullOrWhiteSpace(info.ChangesText))
+            {
+                message += Environment.NewLine + Environment.NewLine
+                    + Resources.Msg_NewVersionChangesHeader + Environment.NewLine
+                    + info.ChangesText;
+            }
+            else
+            {
+                message += Environment.NewLine + Environment.NewLine + Resources.Msg_NewVersionNoChanges;
+            }
+
+            return message;
+        }
+
+        private void CheckForNewVersion()
+        {
+            var info = FetchRemoteVersionInfo();
+            if (info == null || !IsRemoteVersionNewer(info.Version, fileVersion))
+            {
+                return;
+            }
+
+            if (string.Equals(lastNotifiedVersion, info.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            lastNotifiedVersion = info.Version;
+            var message = BuildNewVersionMessage(info);
+
+            ShowInfoMessage(message);
         }
 
         // Method called by timer for periodic version checking
         void OnVersionCheck(object sender, EventArgs e)
         {
-            if (!IsVersionMatching() && !exitScheduled)
-            {
-                exitScheduled = true;
-                BringAppToFront();
-                // Launch separate thread counting down 5 minutes before shutdown
-                System.Threading.Thread exitThread = new System.Threading.Thread(() =>
-                {
-                    System.Threading.Thread.Sleep(5 * 60 * 1000);
-                    Environment.Exit(0);
-                });
-                exitThread.IsBackground = true;
-                exitThread.Start();
+            CheckForNewVersion();
+        }
 
-                MessageBox.Show(
-                    this,
-                    string.Format(Resources.Msg_NewVersionDetectedMaintenance, serviceEndDate, Branding.ProductName),
-                    Resources.Title_Warning,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+        private void ShowInfoMessage(string message)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => ShowInfoMessage(message)));
+                return;
             }
+
+            MessageBox.Show(this, message, Resources.Title_Info, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void PDFForm_Shown(object sender, EventArgs e)
@@ -1816,6 +1873,7 @@ namespace AnonPDF
             }
 
             UpdateLeftPanelWidth();
+            Task.Run(() => CheckForNewVersion());
         }
 
         private void ApplyTheme()

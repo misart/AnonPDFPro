@@ -1023,6 +1023,33 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("Msg_NewVersionDetectedMaintenance", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Dostępna jest nowsza wersja {0} (data aktualizacji: {1})..
+        /// </summary>
+        internal static string Msg_NewVersionAvailable {
+            get {
+                return ResourceManager.GetString("Msg_NewVersionAvailable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Zmiany:.
+        /// </summary>
+        internal static string Msg_NewVersionChangesHeader {
+            get {
+                return ResourceManager.GetString("Msg_NewVersionChangesHeader", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Brak listy zmian..
+        /// </summary>
+        internal static string Msg_NewVersionNoChanges {
+            get {
+                return ResourceManager.GetString("Msg_NewVersionNoChanges", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to W dokumencie nie znaleziono poprawnych numerów PESEL, KW i innych identyfikatorów..
