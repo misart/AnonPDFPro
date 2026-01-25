@@ -340,6 +340,8 @@ namespace AnonPDF
         internal static bool IsUpdateOutOfRangeForCurrentVersion { get; private set; }
         internal static DateTime? CurrentBuildDate { get; private set; }
         internal static DateTime? ServerUpdatesUntil { get; private set; }
+        internal static bool IsRevoked { get; private set; }
+        internal static string ServerMessage { get; private set; }
 
         private static readonly HttpClient LicenseHttpClient = new HttpClient
         {
@@ -347,10 +349,10 @@ namespace AnonPDF
         };
 
         internal static bool RequiresDemoWatermark
-            => Current != null && (!Current.IsSignatureValid || Current.IsDemoExpired || IsUpdateOutOfRangeForCurrentVersion);
+            => Current != null && (!Current.IsSignatureValid || Current.IsDemoExpired || IsUpdateOutOfRangeForCurrentVersion || IsRevoked);
 
         internal static bool IsDemoModeForCurrentVersion
-            => Current != null && (Current.IsDemo || IsUpdateOutOfRangeForCurrentVersion);
+            => Current != null && (Current.IsDemo || IsUpdateOutOfRangeForCurrentVersion || IsRevoked);
 
         internal static DateTime? GetEffectiveUpdatesUntil()
         {
@@ -406,7 +408,14 @@ namespace AnonPDF
                 string json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var obj = JObject.Parse(json);
                 var updatesUntil = ParseDate((string)obj["updatesUntil"]);
-                return UpdateServerUpdatesUntil(updatesUntil);
+                bool? revoked = null;
+                var revokedToken = obj["revoked"];
+                if (revokedToken != null && bool.TryParse(revokedToken.ToString(), out bool revokedValue))
+                {
+                    revoked = revokedValue;
+                }
+                string message = (string)obj["message"];
+                return UpdateServerStatus(updatesUntil, revoked, message);
             }
             catch
             {
@@ -414,16 +423,29 @@ namespace AnonPDF
             }
         }
 
-        private static bool UpdateServerUpdatesUntil(DateTime? updatesUntil)
+        private static bool UpdateServerStatus(DateTime? updatesUntil, bool? revoked, string message)
         {
-            if (Nullable.Equals(ServerUpdatesUntil, updatesUntil))
+            bool changed = false;
+            if (!Nullable.Equals(ServerUpdatesUntil, updatesUntil))
             {
-                return false;
+                ServerUpdatesUntil = updatesUntil;
+                changed = true;
             }
 
-            ServerUpdatesUntil = updatesUntil;
+            if (revoked.HasValue && revoked.Value != IsRevoked)
+            {
+                IsRevoked = revoked.Value;
+                changed = true;
+            }
+
+            if (message != null && !string.Equals(ServerMessage, message, StringComparison.Ordinal))
+            {
+                ServerMessage = message;
+                changed = true;
+            }
+
             RefreshUpdateRange();
-            return true;
+            return changed;
         }
 
         private static void RefreshUpdateRange()

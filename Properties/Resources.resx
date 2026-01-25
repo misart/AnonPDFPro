@@ -570,6 +570,9 @@ Aplikacja zostanie zamknięta.</value>
   <data name="License_Invalid" xml:space="preserve">
     <value>Nieprawidłowa licencja: {0}</value>
   </data>
+  <data name="License_RevokedDefault" xml:space="preserve">
+    <value>Licencja została cofnięta. Aplikacja przechodzi w tryb DEMO.</value>
+  </data>
   <data name="UI_Filter_AllPages" xml:space="preserve">
     <value>Wszystkie strony</value>
   </data>

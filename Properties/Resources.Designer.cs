@@ -1887,6 +1887,15 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("License_Invalid", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Licencja została cofnięta. Aplikacja przechodzi w tryb DEMO..
+        /// </summary>
+        internal static string License_RevokedDefault {
+            get {
+                return ResourceManager.GetString("License_RevokedDefault", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Otwórz PDF.

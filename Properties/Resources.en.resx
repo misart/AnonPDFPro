@@ -570,6 +570,9 @@ The application will close.</value>
   <data name="License_Invalid" xml:space="preserve">
     <value>Invalid license: {0}</value>
   </data>
+  <data name="License_RevokedDefault" xml:space="preserve">
+    <value>The license has been revoked. The application switches to DEMO mode.</value>
+  </data>
   <data name="UI_Filter_AllPages" xml:space="preserve">
     <value>All pages</value>
   </data>
