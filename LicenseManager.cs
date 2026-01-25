@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json.Linq;
@@ -16,18 +17,21 @@ namespace AnonPDF
             string licenseFile,
             string publicKeyFile,
             string serverBaseUrl,
-            string defaultTheme)
+            string defaultTheme,
+            string licenseId)
         {
             LicenseFile = licenseFile;
             PublicKeyFile = publicKeyFile;
             ServerBaseUrl = serverBaseUrl;
             DefaultTheme = defaultTheme;
+            LicenseId = licenseId;
         }
 
         internal string LicenseFile { get; }
         internal string PublicKeyFile { get; }
         internal string ServerBaseUrl { get; }
         internal string DefaultTheme { get; }
+        internal string LicenseId { get; }
 
         internal static AppConfig Load(string baseDir)
         {
@@ -36,7 +40,8 @@ namespace AnonPDF
                 licenseFile: "license.json",
                 publicKeyFile: "license_public.xml",
                 serverBaseUrl: "https://misart.pl/anonpdfpro",
-                defaultTheme: string.Empty);
+                defaultTheme: string.Empty,
+                licenseId: string.Empty);
 
             if (!File.Exists(configPath))
             {
@@ -51,7 +56,8 @@ namespace AnonPDF
                     licenseFile: (string)root["licenseFile"] ?? defaults.LicenseFile,
                     publicKeyFile: (string)root["publicKeyFile"] ?? defaults.PublicKeyFile,
                     serverBaseUrl: (string)root["serverBaseUrl"] ?? defaults.ServerBaseUrl,
-                    defaultTheme: (string)root["defaultTheme"] ?? defaults.DefaultTheme);
+                    defaultTheme: (string)root["defaultTheme"] ?? defaults.DefaultTheme,
+                    licenseId: (string)root["licenseId"] ?? defaults.LicenseId);
             }
             catch
             {
@@ -331,14 +337,195 @@ namespace AnonPDF
     {
         internal static AppConfig Config { get; private set; }
         internal static LicenseInfo Current { get; private set; }
+        internal static bool IsUpdateOutOfRangeForCurrentVersion { get; private set; }
+        internal static DateTime? CurrentBuildDate { get; private set; }
+        internal static DateTime? ServerUpdatesUntil { get; private set; }
+
+        private static readonly HttpClient LicenseHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
 
         internal static bool RequiresDemoWatermark
-            => Current != null && (!Current.IsSignatureValid || Current.IsDemoExpired);
+            => Current != null && (!Current.IsSignatureValid || Current.IsDemoExpired || IsUpdateOutOfRangeForCurrentVersion);
+
+        internal static bool IsDemoModeForCurrentVersion
+            => Current != null && (Current.IsDemo || IsUpdateOutOfRangeForCurrentVersion);
+
+        internal static DateTime? GetEffectiveUpdatesUntil()
+        {
+            if (ServerUpdatesUntil.HasValue)
+            {
+                return ServerUpdatesUntil;
+            }
+
+            var info = Current;
+            if (info == null || !info.IsSignatureValid || info.Payload == null)
+            {
+                return null;
+            }
+
+            return ParseDate(info.Payload.UpdatesUntil);
+        }
 
         internal static void Initialize(string baseDir)
         {
             Config = AppConfig.Load(baseDir);
             Current = LicenseInfo.Load(Config, baseDir);
+            CurrentBuildDate = GetBuildDateFromFileVersion();
+            RefreshUpdateRange();
+        }
+
+        internal static bool RefreshServerStatus()
+        {
+            if (Config == null)
+            {
+                return false;
+            }
+
+            string licenseId = Config.LicenseId;
+            if (string.IsNullOrWhiteSpace(licenseId) && Current?.Payload != null)
+            {
+                licenseId = Current.Payload.LicenseId;
+            }
+
+            if (string.IsNullOrWhiteSpace(Config.ServerBaseUrl) || string.IsNullOrWhiteSpace(licenseId))
+            {
+                return false;
+            }
+
+            try
+            {
+                string url = Config.ServerBaseUrl.TrimEnd('/') + "/clients/" + licenseId + ".json";
+                var response = LicenseHttpClient.GetAsync(url).GetAwaiter().GetResult();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                string json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                var obj = JObject.Parse(json);
+                var updatesUntil = ParseDate((string)obj["updatesUntil"]);
+                return UpdateServerUpdatesUntil(updatesUntil);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool UpdateServerUpdatesUntil(DateTime? updatesUntil)
+        {
+            if (Nullable.Equals(ServerUpdatesUntil, updatesUntil))
+            {
+                return false;
+            }
+
+            ServerUpdatesUntil = updatesUntil;
+            RefreshUpdateRange();
+            return true;
+        }
+
+        private static void RefreshUpdateRange()
+        {
+            IsUpdateOutOfRangeForCurrentVersion = CheckUpdatesOutOfRange(Current, CurrentBuildDate, ServerUpdatesUntil);
+        }
+
+        private static bool CheckUpdatesOutOfRange(LicenseInfo info, DateTime? buildDate, DateTime? updatesUntilOverride)
+        {
+            if (info == null || !info.IsSignatureValid || info.Payload == null)
+            {
+                return false;
+            }
+
+            if (info.IsDemo)
+            {
+                return false;
+            }
+
+            var updatesUntil = updatesUntilOverride ?? ParseDate(info.Payload.UpdatesUntil);
+            if (!updatesUntil.HasValue || !buildDate.HasValue)
+            {
+                return false;
+            }
+
+            return buildDate.Value.Date > updatesUntil.Value.Date;
+        }
+
+        private static DateTime? GetBuildDateFromFileVersion()
+        {
+            try
+            {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                var version = System.Diagnostics.FileVersionInfo.GetVersionInfo(assembly.Location).FileVersion;
+                return ParseBuildDate(version);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static DateTime? ParseBuildDate(string version)
+        {
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                return null;
+            }
+
+            var parts = version.Split('.');
+            if (parts.Length < 3)
+            {
+                return null;
+            }
+
+            if (!int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int yearTwoDigit))
+            {
+                return null;
+            }
+
+            string buildPart = parts[2].PadLeft(4, '0');
+            if (buildPart.Length < 4)
+            {
+                return null;
+            }
+
+            if (!int.TryParse(buildPart.Substring(0, 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out int month))
+            {
+                return null;
+            }
+            if (!int.TryParse(buildPart.Substring(2, 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out int day))
+            {
+                return null;
+            }
+
+            int year = 2000 + yearTwoDigit;
+            if (month < 1 || month > 12 || day < 1 || day > 31)
+            {
+                return null;
+            }
+
+            return new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc);
+        }
+
+        private static DateTime? ParseDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime exact))
+            {
+                return DateTime.SpecifyKind(exact, DateTimeKind.Utc);
+            }
+
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            }
+
+            return null;
         }
     }
 }

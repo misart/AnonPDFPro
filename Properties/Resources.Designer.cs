@@ -1052,6 +1052,26 @@ namespace AnonPDF.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Link do pobrania: {0}.
+        /// </summary>
+        internal static string Msg_NewVersionDownload {
+            get {
+                return ResourceManager.GetString("Msg_NewVersionDownload", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Zainstalowana wersja przekracza zakres wykupionych aktualizacji. Licencja na nowsze wersje nie została wykupiona.
+        ///
+        ///Aplikacja przechodzi w tryb DEMO..
+        /// </summary>
+        internal static string Msg_UpdateLicenseOutOfRange {
+            get {
+                return ResourceManager.GetString("Msg_UpdateLicenseOutOfRange", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to W dokumencie nie znaleziono poprawnych numerów PESEL, KW i innych identyfikatorów..
         /// </summary>
         internal static string Msg_NoIdentifiersFound {

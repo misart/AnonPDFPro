@@ -111,6 +111,7 @@ namespace AnonPDF
             Timeout = TimeSpan.FromSeconds(5)
         };
         private string lastNotifiedVersion = "";
+        private static bool updatesOutOfRangeNotified;
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -1735,16 +1736,18 @@ namespace AnonPDF
 
         private sealed class RemoteVersionInfo
         {
-            public RemoteVersionInfo(string version, string updated, string changesText)
+            public RemoteVersionInfo(string version, string updated, string changesText, string downloadUrl)
             {
                 Version = version;
                 Updated = updated;
                 ChangesText = changesText;
+                DownloadUrl = downloadUrl;
             }
 
             public string Version { get; }
             public string Updated { get; }
             public string ChangesText { get; }
+            public string DownloadUrl { get; }
         }
 
         private RemoteVersionInfo FetchRemoteVersionInfo()
@@ -1782,7 +1785,8 @@ namespace AnonPDF
                     changesText = obj["changes"].ToString();
                 }
 
-                return new RemoteVersionInfo(version, updated, changesText);
+                string downloadUrl = (string)obj["downloadUrl"];
+                return new RemoteVersionInfo(version, updated, changesText, downloadUrl);
             }
             catch (Exception ex)
             {
@@ -1822,6 +1826,12 @@ namespace AnonPDF
                 message += Environment.NewLine + Environment.NewLine + Resources.Msg_NewVersionNoChanges;
             }
 
+            if (!string.IsNullOrWhiteSpace(info.DownloadUrl))
+            {
+                message += Environment.NewLine + Environment.NewLine
+                    + string.Format(Resources.Msg_NewVersionDownload, info.DownloadUrl);
+            }
+
             return message;
         }
 
@@ -1842,6 +1852,37 @@ namespace AnonPDF
             var message = BuildNewVersionMessage(info);
 
             ShowInfoMessage(message);
+        }
+
+        private void RefreshLicenseStatusFromServer()
+        {
+            LicenseManager.RefreshServerStatus();
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(ApplyLicenseStatusUi));
+                return;
+            }
+
+            ApplyLicenseStatusUi();
+        }
+
+        private void ApplyLicenseStatusUi()
+        {
+            UpdateWindowTitle();
+            UpdateSplashLicenseStatus();
+            NotifyUpdatesOutOfRangeIfNeeded();
+        }
+
+        private void UpdateSplashLicenseStatus()
+        {
+            if (splashForm == null || splashForm.IsDisposed || splashClosed)
+            {
+                return;
+            }
+
+            splashForm.UpdateLicenseStatus(GetLicenseStatusLine());
+            splashForm.UpdateUpdateStatus(GetUpdatesStatusLine());
         }
 
         // Method called by timer for periodic version checking
@@ -1874,6 +1915,35 @@ namespace AnonPDF
 
             UpdateLeftPanelWidth();
             Task.Run(() => CheckForNewVersion());
+            Task.Run(() => RefreshLicenseStatusFromServer());
+        }
+
+        private void NotifyUpdatesOutOfRangeIfNeeded()
+        {
+            if (updatesOutOfRangeNotified)
+            {
+                return;
+            }
+
+            if (!LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
+            {
+                return;
+            }
+
+            updatesOutOfRangeNotified = true;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(NotifyUpdatesOutOfRangeIfNeeded));
+                return;
+            }
+
+            MessageBox.Show(
+                this,
+                Resources.Msg_UpdateLicenseOutOfRange,
+                Resources.Title_Warning,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
         }
 
         private void ApplyTheme()
@@ -7230,9 +7300,17 @@ namespace AnonPDF
                 return string.Empty;
             }
 
-            if (!string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase)
+                && !LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
             {
                 return string.Empty;
+            }
+
+            if (LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
+            {
+                return IsPolishCulture()
+                    ? " [WERSJA DEMO: brak licencji na nowsze wersje]"
+                    : " [DEMO: updates not licensed]";
             }
 
             var demoUntil = ParseLicenseDate(info.Payload.DemoUntil);
@@ -7272,6 +7350,13 @@ namespace AnonPDF
                 return IsPolishCulture() ? "Status licencji: brak danych" : "License status: no data";
             }
 
+            if (LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
+            {
+                return IsPolishCulture()
+                    ? "Status licencji: DEMO (brak licencji na nowsze wersje)"
+                    : "License status: DEMO (updates not licensed)";
+            }
+
             if (string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase))
             {
                 var demoUntil = ParseLicenseDate(info.Payload.DemoUntil);
@@ -7304,7 +7389,7 @@ namespace AnonPDF
                 return IsPolishCulture() ? "Aktualizacje: brak danych" : "Updates: no data";
             }
 
-            var updatesUntil = ParseLicenseDate(info.Payload.UpdatesUntil);
+            var updatesUntil = LicenseManager.GetEffectiveUpdatesUntil();
             if (!updatesUntil.HasValue)
             {
                 return IsPolishCulture() ? "Aktualizacje: brak" : "Updates: none";

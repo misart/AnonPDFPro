@@ -243,6 +243,13 @@ namespace AnonPDF
                 return IsPolishCulture() ? "Status licencji: brak danych" : "License status: no data";
             }
 
+            if (LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
+            {
+                return IsPolishCulture()
+                    ? "Status licencji: DEMO (brak licencji na nowsze wersje)"
+                    : "License status: DEMO (updates not licensed)";
+            }
+
             if (string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase))
             {
                 var demoUntil = ParseDate(info.Payload.DemoUntil);
@@ -275,7 +282,7 @@ namespace AnonPDF
                 return IsPolishCulture() ? "Aktualizacje: brak danych" : "Updates: no data";
             }
 
-            var updatesUntil = ParseDate(info.Payload.UpdatesUntil);
+            var updatesUntil = LicenseManager.GetEffectiveUpdatesUntil();
             if (!updatesUntil.HasValue)
             {
                 return IsPolishCulture() ? "Aktualizacje: brak" : "Updates: none";

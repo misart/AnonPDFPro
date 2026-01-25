@@ -646,6 +646,14 @@ The application will close automatically in 5 minutes.</value>
   <data name="Msg_NewVersionNoChanges" xml:space="preserve">
     <value>No change list provided.</value>
   </data>
+  <data name="Msg_NewVersionDownload" xml:space="preserve">
+    <value>Download link: {0}</value>
+  </data>
+  <data name="Msg_UpdateLicenseOutOfRange" xml:space="preserve">
+    <value>This version is newer than your update entitlement. A license for newer versions was not purchased.
+
+The application switches to DEMO mode.</value>
+  </data>
   <data name="Err_InvalidPdfFile" xml:space="preserve">
     <value>This PDF file is invalid.
 

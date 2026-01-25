@@ -646,6 +646,14 @@ Automatyczne wyłączenie nastąpi za 5 minut.</value>
   <data name="Msg_NewVersionNoChanges" xml:space="preserve">
     <value>Brak listy zmian.</value>
   </data>
+  <data name="Msg_NewVersionDownload" xml:space="preserve">
+    <value>Link do pobrania: {0}</value>
+  </data>
+  <data name="Msg_UpdateLicenseOutOfRange" xml:space="preserve">
+    <value>Zainstalowana wersja przekracza zakres wykupionych aktualizacji. Licencja na nowsze wersje nie została wykupiona.
+
+Aplikacja przechodzi w tryb DEMO.</value>
+  </data>
   <data name="Err_InvalidPdfFile" xml:space="preserve">
     <value>Ten plik PDF jest nieprawidłowy.
 
