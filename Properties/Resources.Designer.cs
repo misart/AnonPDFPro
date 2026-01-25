@@ -1830,6 +1830,63 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("Tutorial_Column_Description", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Nieprawidłowe lub brakujące pliki licencji:
+        ///{0}
+        ///
+        ///Aplikacja zostanie zamknięta..
+        /// </summary>
+        internal static string License_StartupError {
+            get {
+                return ResourceManager.GetString("License_StartupError", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Brak pliku config.json: {0}.
+        /// </summary>
+        internal static string License_ConfigMissing {
+            get {
+                return ResourceManager.GetString("License_ConfigMissing", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Nieprawidłowy plik config.json: {0}.
+        /// </summary>
+        internal static string License_ConfigInvalid {
+            get {
+                return ResourceManager.GetString("License_ConfigInvalid", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Brak pliku licencji: {0}.
+        /// </summary>
+        internal static string License_FileMissing {
+            get {
+                return ResourceManager.GetString("License_FileMissing", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Brak pliku klucza publicznego: {0}.
+        /// </summary>
+        internal static string License_PublicKeyMissing {
+            get {
+                return ResourceManager.GetString("License_PublicKeyMissing", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Nieprawidłowa licencja: {0}.
+        /// </summary>
+        internal static string License_Invalid {
+            get {
+                return ResourceManager.GetString("License_Invalid", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Otwórz PDF.

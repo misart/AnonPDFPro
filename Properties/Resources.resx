@@ -549,6 +549,27 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   <data name="Tutorial_Column_Description" xml:space="preserve">
     <value>Opis</value>
   </data>
+  <data name="License_StartupError" xml:space="preserve">
+    <value>Nieprawidłowe lub brakujące pliki licencji:
+{0}
+
+Aplikacja zostanie zamknięta.</value>
+  </data>
+  <data name="License_ConfigMissing" xml:space="preserve">
+    <value>Brak pliku config.json: {0}</value>
+  </data>
+  <data name="License_ConfigInvalid" xml:space="preserve">
+    <value>Nieprawidłowy plik config.json: {0}</value>
+  </data>
+  <data name="License_FileMissing" xml:space="preserve">
+    <value>Brak pliku licencji: {0}</value>
+  </data>
+  <data name="License_PublicKeyMissing" xml:space="preserve">
+    <value>Brak pliku klucza publicznego: {0}</value>
+  </data>
+  <data name="License_Invalid" xml:space="preserve">
+    <value>Nieprawidłowa licencja: {0}</value>
+  </data>
   <data name="UI_Filter_AllPages" xml:space="preserve">
     <value>Wszystkie strony</value>
   </data>

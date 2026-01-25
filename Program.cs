@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Windows.Forms;
 using System.IO;
+using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 // Suppress spell-check warning for project name 'AnonPDF'
 #pragma warning disable SPELL
@@ -33,6 +35,15 @@ namespace AnonPDF
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             LicenseManager.Initialize(AppDomain.CurrentDomain.BaseDirectory);
+            if (!ValidateRequiredLicenseFiles(out string licenseError))
+            {
+                MessageBox.Show(
+                    licenseError,
+                    Properties.Resources.Title_Error,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
             var splash = new SplashForm();
             var mainForm = new PDFForm(splash);
             splash.Owner = mainForm;
@@ -47,6 +58,64 @@ namespace AnonPDF
             };
 
             Application.Run(mainForm);
+        }
+
+        private static bool ValidateRequiredLicenseFiles(out string errorMessage)
+        {
+            var issues = new List<string>();
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            string configPath = Path.Combine(baseDir, "config.json");
+            if (!File.Exists(configPath))
+            {
+                issues.Add(string.Format(Properties.Resources.License_ConfigMissing, configPath));
+            }
+            else
+            {
+                try
+                {
+                    JObject.Parse(File.ReadAllText(configPath));
+                }
+                catch (Exception ex)
+                {
+                    issues.Add(string.Format(Properties.Resources.License_ConfigInvalid, ex.Message));
+                }
+            }
+
+            var config = LicenseManager.Config;
+            string licensePath = config?.ResolveLicensePath(baseDir) ?? Path.Combine(baseDir, "license.json");
+            if (!File.Exists(licensePath))
+            {
+                issues.Add(string.Format(Properties.Resources.License_FileMissing, licensePath));
+            }
+
+            string publicKeyPath = config?.ResolvePublicKeyPath(baseDir) ?? Path.Combine(baseDir, "license_public.xml");
+            if (!File.Exists(publicKeyPath))
+            {
+                issues.Add(string.Format(Properties.Resources.License_PublicKeyMissing, publicKeyPath));
+            }
+
+            var info = LicenseManager.Current;
+            if (info == null || !info.IsSignatureValid || info.Payload == null)
+            {
+                string detail = info?.Error;
+                if (string.IsNullOrWhiteSpace(detail))
+                {
+                    detail = "-";
+                }
+                issues.Add(string.Format(Properties.Resources.License_Invalid, detail));
+            }
+
+            if (issues.Count > 0)
+            {
+                errorMessage = string.Format(
+                    Properties.Resources.License_StartupError,
+                    string.Join(Environment.NewLine, issues));
+                return false;
+            }
+
+            errorMessage = string.Empty;
+            return true;
         }
 
         // Log unhandled exceptions to AppData
