@@ -235,12 +235,19 @@ namespace AnonPDF
 
             if (!info.IsSignatureValid)
             {
-                return IsPolishCulture() ? "Status licencji: nieprawidlowa" : "License status: invalid";
+                return IsPolishCulture() ? "Status licencji: nieprawidłowa" : "License status: invalid";
             }
 
             if (info.Payload == null)
             {
                 return IsPolishCulture() ? "Status licencji: brak danych" : "License status: no data";
+            }
+
+            if (LicenseManager.IsRevoked)
+            {
+                return IsPolishCulture()
+                    ? "Status licencji: DEMO (licencja cofnięta)"
+                    : "License status: DEMO (license revoked)";
             }
 
             if (LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
@@ -267,7 +274,7 @@ namespace AnonPDF
                 }
 
                 return IsPolishCulture()
-                    ? $"Status licencji: DEMO (wygasla {demoUntil:yyyy-MM-dd})"
+                    ? $"Status licencji: DEMO (wygasła {demoUntil:yyyy-MM-dd})"
                     : $"License status: DEMO (expired {demoUntil:yyyy-MM-dd})";
             }
 
@@ -296,7 +303,7 @@ namespace AnonPDF
             }
 
             return IsPolishCulture()
-                ? $"Aktualizacje: wygasly ({updatesUntil:yyyy-MM-dd})"
+                ? $"Aktualizacje: wygasły ({updatesUntil:yyyy-MM-dd})"
                 : $"Updates: expired ({updatesUntil:yyyy-MM-dd})";
         }
 

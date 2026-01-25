@@ -110,6 +110,7 @@ namespace AnonPDF
         };
         private string lastNotifiedVersion = "";
         private static bool updatesOutOfRangeNotified;
+        private static bool revokedNotified;
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -1870,6 +1871,7 @@ namespace AnonPDF
             UpdateWindowTitle();
             UpdateSplashLicenseStatus();
             NotifyUpdatesOutOfRangeIfNeeded();
+            NotifyLicenseRevokedIfNeeded();
         }
 
         private void UpdateSplashLicenseStatus()
@@ -1940,6 +1942,39 @@ namespace AnonPDF
             MessageBox.Show(
                 this,
                 Resources.Msg_UpdateLicenseOutOfRange,
+                Resources.Title_Warning,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+
+        private void NotifyLicenseRevokedIfNeeded()
+        {
+            if (revokedNotified)
+            {
+                return;
+            }
+
+            if (!LicenseManager.IsRevoked)
+            {
+                return;
+            }
+
+            revokedNotified = true;
+            string message = LicenseManager.ServerMessage;
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                message = Resources.License_RevokedDefault;
+            }
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(NotifyLicenseRevokedIfNeeded));
+                return;
+            }
+
+            MessageBox.Show(
+                this,
+                message,
                 Resources.Title_Warning,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
@@ -7315,9 +7350,17 @@ namespace AnonPDF
             }
 
             if (!string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase)
-                && !LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
+                && !LicenseManager.IsUpdateOutOfRangeForCurrentVersion
+                && !LicenseManager.IsRevoked)
             {
                 return string.Empty;
+            }
+
+            if (LicenseManager.IsRevoked)
+            {
+                return IsPolishCulture()
+                    ? " [WERSJA DEMO: licencja cofnięta]"
+                    : " [DEMO: license revoked]";
             }
 
             if (LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
@@ -7342,7 +7385,7 @@ namespace AnonPDF
             }
 
             return IsPolishCulture()
-                ? $" [WERSJA DEMO: wygasla {demoUntil:yyyy-MM-dd}]"
+                ? $" [WERSJA DEMO: wygasła {demoUntil:yyyy-MM-dd}]"
                 : $" [DEMO: expired on {demoUntil:yyyy-MM-dd}]";
         }
 
@@ -7356,12 +7399,19 @@ namespace AnonPDF
 
             if (!info.IsSignatureValid)
             {
-                return IsPolishCulture() ? "Status licencji: nieprawidlowa" : "License status: invalid";
+                return IsPolishCulture() ? "Status licencji: nieprawidłowa" : "License status: invalid";
             }
 
             if (info.Payload == null)
             {
                 return IsPolishCulture() ? "Status licencji: brak danych" : "License status: no data";
+            }
+
+            if (LicenseManager.IsRevoked)
+            {
+                return IsPolishCulture()
+                    ? "Status licencji: DEMO (licencja cofnięta)"
+                    : "License status: DEMO (license revoked)";
             }
 
             if (LicenseManager.IsUpdateOutOfRangeForCurrentVersion)
@@ -7388,7 +7438,7 @@ namespace AnonPDF
                 }
 
                 return IsPolishCulture()
-                    ? $"Status licencji: DEMO (wygasla {demoUntil:yyyy-MM-dd})"
+                    ? $"Status licencji: DEMO (wygasła {demoUntil:yyyy-MM-dd})"
                     : $"License status: DEMO (expired {demoUntil:yyyy-MM-dd})";
             }
 
@@ -7417,7 +7467,7 @@ namespace AnonPDF
             }
 
             return IsPolishCulture()
-                ? $"Aktualizacje: wygasly ({updatesUntil:yyyy-MM-dd})"
+                ? $"Aktualizacje: wygasły ({updatesUntil:yyyy-MM-dd})"
                 : $"Updates: expired ({updatesUntil:yyyy-MM-dd})";
         }
 
