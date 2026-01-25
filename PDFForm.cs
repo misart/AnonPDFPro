@@ -6510,9 +6510,14 @@ namespace AnonPDF
 
             var licenseLine = GetLicenseStatusLine();
             var updatesLine = GetUpdatesStatusLine();
+            var licensedToLine = GetLicensedToLine();
             if (!string.IsNullOrWhiteSpace(licenseLine))
             {
                 aboutMessage += Environment.NewLine + Environment.NewLine + licenseLine;
+            }
+            if (!string.IsNullOrWhiteSpace(licensedToLine))
+            {
+                aboutMessage += Environment.NewLine + licensedToLine;
             }
             if (!string.IsNullOrWhiteSpace(updatesLine))
             {
@@ -7450,25 +7455,39 @@ namespace AnonPDF
             var info = LicenseManager.Current;
             if (info == null || !info.IsSignatureValid || info.Payload == null)
             {
-                return IsPolishCulture() ? "Aktualizacje: brak danych" : "Updates: no data";
+                return IsPolishCulture() ? "Wsparcie: brak danych" : "Support: no data";
             }
 
-            var updatesUntil = LicenseManager.GetEffectiveUpdatesUntil();
-            if (!updatesUntil.HasValue)
+            var supportUntil = LicenseManager.GetEffectiveSupportUntil();
+            if (!supportUntil.HasValue)
             {
-                return IsPolishCulture() ? "Aktualizacje: brak" : "Updates: none";
+                return IsPolishCulture() ? "Wsparcie: brak" : "Support: none";
             }
 
-            if (updatesUntil.Value.Date >= DateTime.UtcNow.Date)
+            if (supportUntil.Value.Date >= DateTime.UtcNow.Date)
             {
                 return IsPolishCulture()
-                    ? $"Aktualizacje: do {updatesUntil:yyyy-MM-dd}"
-                    : $"Updates: until {updatesUntil:yyyy-MM-dd}";
+                    ? $"Wsparcie do: {supportUntil:yyyy-MM-dd}"
+                    : $"Support until: {supportUntil:yyyy-MM-dd}";
             }
 
             return IsPolishCulture()
-                ? $"Aktualizacje: wygasły ({updatesUntil:yyyy-MM-dd})"
-                : $"Updates: expired ({updatesUntil:yyyy-MM-dd})";
+                ? $"Wsparcie wygasło ({supportUntil:yyyy-MM-dd})"
+                : $"Support expired ({supportUntil:yyyy-MM-dd})";
+        }
+
+        private static string GetLicensedToLine()
+        {
+            var info = LicenseManager.Current;
+            string customer = info?.Payload?.CustomerName;
+            if (string.IsNullOrWhiteSpace(customer))
+            {
+                customer = "-";
+            }
+
+            return IsPolishCulture()
+                ? $"Licencja dla: {customer}"
+                : $"Licensed to: {customer}";
         }
 
         private static DateTime? ParseLicenseDate(string value)

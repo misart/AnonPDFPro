@@ -11,6 +11,7 @@ namespace AnonPDF
     {
         private const int BorderThickness = 2;
         private const int ShadowSize = 4;
+        private readonly Label licensedToLabel;
         private readonly Label licenseStatusLabel;
         private readonly Label updateStatusLabel;
 
@@ -31,7 +32,7 @@ namespace AnonPDF
             var layout = new TableLayoutPanel
             {
                 ColumnCount = 1,
-                RowCount = 9,
+                RowCount = 10,
                 Dock = DockStyle.Fill,
                 Padding = new Padding(20),
             };
@@ -42,7 +43,9 @@ namespace AnonPDF
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 8F));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -84,6 +87,16 @@ namespace AnonPDF
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
+            licensedToLabel = new Label
+            {
+                Text = GetLicensedToText(),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(0x55, 0x62, 0x70),
+                Anchor = AnchorStyles.None,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+
             licenseStatusLabel = new Label
             {
                 Text = GetLicenseStatusText(),
@@ -110,8 +123,10 @@ namespace AnonPDF
             layout.Controls.Add(descriptionLabel, 0, 3);
             layout.Controls.Add(new Panel { Height = 8, Dock = DockStyle.Fill }, 0, 4);
             layout.Controls.Add(versionLabel, 0, 5);
-            layout.Controls.Add(licenseStatusLabel, 0, 7);
-            layout.Controls.Add(updateStatusLabel, 0, 8);
+            layout.Controls.Add(new Panel { Height = 8, Dock = DockStyle.Fill }, 0, 6);
+            layout.Controls.Add(licensedToLabel, 0, 7);
+            layout.Controls.Add(licenseStatusLabel, 0, 8);
+            layout.Controls.Add(updateStatusLabel, 0, 9);
 
             Controls.Add(layout);
         }
@@ -146,6 +161,10 @@ namespace AnonPDF
             }
 
             licenseStatusLabel.Text = text;
+            if (licensedToLabel != null)
+            {
+                licensedToLabel.Text = GetLicensedToText();
+            }
         }
 
         public void UpdateUpdateStatus(string text)
@@ -208,6 +227,19 @@ namespace AnonPDF
         private static string GetVersionLabelText()
         {
             return IsPolishCulture() ? "Wersja" : "Version";
+        }
+
+        private static string GetLicensedToText()
+        {
+            var info = LicenseManager.Current;
+            string customer = info?.Payload?.CustomerName;
+            if (string.IsNullOrWhiteSpace(customer))
+            {
+                customer = "-";
+            }
+
+            string label = IsPolishCulture() ? "Licencja dla" : "Licensed to";
+            return $"{label}: {customer}";
         }
 
         private static string GetDescriptionText()
@@ -286,25 +318,25 @@ namespace AnonPDF
             var info = LicenseManager.Current;
             if (info == null || !info.IsSignatureValid || info.Payload == null)
             {
-                return IsPolishCulture() ? "Aktualizacje: brak danych" : "Updates: no data";
+                return IsPolishCulture() ? "Wsparcie: brak danych" : "Support: no data";
             }
 
-            var updatesUntil = LicenseManager.GetEffectiveUpdatesUntil();
-            if (!updatesUntil.HasValue)
+            var supportUntil = LicenseManager.GetEffectiveSupportUntil();
+            if (!supportUntil.HasValue)
             {
-                return IsPolishCulture() ? "Aktualizacje: brak" : "Updates: none";
+                return IsPolishCulture() ? "Wsparcie: brak" : "Support: none";
             }
 
-            if (updatesUntil.Value.Date >= DateTime.UtcNow.Date)
+            if (supportUntil.Value.Date >= DateTime.UtcNow.Date)
             {
                 return IsPolishCulture()
-                    ? $"Aktualizacje: do {updatesUntil:yyyy-MM-dd}"
-                    : $"Updates: until {updatesUntil:yyyy-MM-dd}";
+                    ? $"Wsparcie do: {supportUntil:yyyy-MM-dd}"
+                    : $"Support until: {supportUntil:yyyy-MM-dd}";
             }
 
             return IsPolishCulture()
-                ? $"Aktualizacje: wygasły ({updatesUntil:yyyy-MM-dd})"
-                : $"Updates: expired ({updatesUntil:yyyy-MM-dd})";
+                ? $"Wsparcie wygasło ({supportUntil:yyyy-MM-dd})"
+                : $"Support expired ({supportUntil:yyyy-MM-dd})";
         }
 
         private static bool IsPolishCulture()

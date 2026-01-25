@@ -686,7 +686,7 @@ The application will close automatically in 5 minutes.</value>
     <value>Download link: {0}</value>
   </data>
   <data name="Msg_UpdateLicenseOutOfRange" xml:space="preserve">
-    <value>This version is newer than your update entitlement. A license for newer versions was not purchased.
+    <value>This version is newer than your support entitlement. A license for newer versions was not purchased.
 
 The application switches to DEMO mode.</value>
   </data>

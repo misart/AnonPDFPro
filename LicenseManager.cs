@@ -249,7 +249,8 @@ namespace AnonPDF
             string updatesUntil,
             string demoUntil,
             IList<string> features,
-            string maxVersion)
+            string maxVersion,
+            bool hasUpdatesUntil)
         {
             LicenseId = licenseId;
             Product = product;
@@ -264,6 +265,7 @@ namespace AnonPDF
             DemoUntil = demoUntil;
             Features = features ?? new List<string>();
             MaxVersion = maxVersion;
+            HasUpdatesUntil = hasUpdatesUntil;
         }
 
         internal string LicenseId { get; }
@@ -279,6 +281,7 @@ namespace AnonPDF
         internal string DemoUntil { get; }
         internal IList<string> Features { get; }
         internal string MaxVersion { get; }
+        internal bool HasUpdatesUntil { get; }
 
         internal static LicensePayload FromJObject(JObject payload)
         {
@@ -294,6 +297,8 @@ namespace AnonPDF
                 }
             }
 
+            bool hasUpdatesUntil = payload.Property("updatesUntil") != null;
+
             return new LicensePayload(
                 licenseId: (string)payload["licenseId"],
                 product: (string)payload["product"],
@@ -307,7 +312,8 @@ namespace AnonPDF
                 updatesUntil: (string)payload["updatesUntil"],
                 demoUntil: (string)payload["demoUntil"],
                 features: features,
-                maxVersion: (string)payload["maxVersion"]);
+                maxVersion: (string)payload["maxVersion"],
+                hasUpdatesUntil: hasUpdatesUntil);
         }
 
         internal static string SerializeForSigning(LicensePayload payload)
@@ -323,11 +329,15 @@ namespace AnonPDF
                 ["issueDate"] = payload.IssueDate,
                 ["perpetualUse"] = payload.PerpetualUse,
                 ["supportUntil"] = payload.SupportUntil,
-                ["updatesUntil"] = payload.UpdatesUntil,
                 ["demoUntil"] = payload.DemoUntil,
                 ["features"] = new JArray(payload.Features ?? new List<string>()),
                 ["maxVersion"] = payload.MaxVersion
             };
+
+            if (payload.HasUpdatesUntil)
+            {
+                obj["updatesUntil"] = payload.UpdatesUntil;
+            }
 
             return obj.ToString(Newtonsoft.Json.Formatting.None);
         }
@@ -339,7 +349,7 @@ namespace AnonPDF
         internal static LicenseInfo Current { get; private set; }
         internal static bool IsUpdateOutOfRangeForCurrentVersion { get; private set; }
         internal static DateTime? CurrentBuildDate { get; private set; }
-        internal static DateTime? ServerUpdatesUntil { get; private set; }
+        internal static DateTime? ServerSupportUntil { get; private set; }
         internal static bool IsRevoked { get; private set; }
         internal static string ServerMessage { get; private set; }
 
@@ -354,17 +364,23 @@ namespace AnonPDF
         internal static bool IsDemoModeForCurrentVersion
             => Current != null && (Current.IsDemo || IsUpdateOutOfRangeForCurrentVersion || IsRevoked);
 
-        internal static DateTime? GetEffectiveUpdatesUntil()
+        internal static DateTime? GetEffectiveSupportUntil()
         {
-            if (ServerUpdatesUntil.HasValue)
+            if (ServerSupportUntil.HasValue)
             {
-                return ServerUpdatesUntil;
+                return ServerSupportUntil;
             }
 
             var info = Current;
             if (info == null || !info.IsSignatureValid || info.Payload == null)
             {
                 return null;
+            }
+
+            var supportUntil = ParseDate(info.Payload.SupportUntil);
+            if (supportUntil.HasValue)
+            {
+                return supportUntil;
             }
 
             return ParseDate(info.Payload.UpdatesUntil);
@@ -407,7 +423,7 @@ namespace AnonPDF
 
                 string json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var obj = JObject.Parse(json);
-                var updatesUntil = ParseDate((string)obj["updatesUntil"]);
+                var updatesUntil = ParseDate((string)obj["supportUntil"] ?? (string)obj["updatesUntil"]);
                 bool? revoked = null;
                 var revokedToken = obj["revoked"];
                 if (revokedToken != null && bool.TryParse(revokedToken.ToString(), out bool revokedValue))
@@ -423,12 +439,12 @@ namespace AnonPDF
             }
         }
 
-        private static bool UpdateServerStatus(DateTime? updatesUntil, bool? revoked, string message)
+        private static bool UpdateServerStatus(DateTime? supportUntil, bool? revoked, string message)
         {
             bool changed = false;
-            if (!Nullable.Equals(ServerUpdatesUntil, updatesUntil))
+            if (!Nullable.Equals(ServerSupportUntil, supportUntil))
             {
-                ServerUpdatesUntil = updatesUntil;
+                ServerSupportUntil = supportUntil;
                 changed = true;
             }
 
@@ -450,10 +466,10 @@ namespace AnonPDF
 
         private static void RefreshUpdateRange()
         {
-            IsUpdateOutOfRangeForCurrentVersion = CheckUpdatesOutOfRange(Current, CurrentBuildDate, ServerUpdatesUntil);
+            IsUpdateOutOfRangeForCurrentVersion = CheckUpdatesOutOfRange(Current, CurrentBuildDate, ServerSupportUntil);
         }
 
-        private static bool CheckUpdatesOutOfRange(LicenseInfo info, DateTime? buildDate, DateTime? updatesUntilOverride)
+        private static bool CheckUpdatesOutOfRange(LicenseInfo info, DateTime? buildDate, DateTime? supportUntilOverride)
         {
             if (info == null || !info.IsSignatureValid || info.Payload == null)
             {
@@ -465,13 +481,18 @@ namespace AnonPDF
                 return false;
             }
 
-            var updatesUntil = updatesUntilOverride ?? ParseDate(info.Payload.UpdatesUntil);
-            if (!updatesUntil.HasValue || !buildDate.HasValue)
+            var supportUntil = supportUntilOverride ?? ParseDate(info.Payload.SupportUntil);
+            if (!supportUntil.HasValue)
+            {
+                supportUntil = ParseDate(info.Payload.UpdatesUntil);
+            }
+
+            if (!supportUntil.HasValue || !buildDate.HasValue)
             {
                 return false;
             }
 
-            return buildDate.Value.Date > updatesUntil.Value.Date;
+            return buildDate.Value.Date > supportUntil.Value.Date;
         }
 
         private static DateTime? GetBuildDateFromFileVersion()

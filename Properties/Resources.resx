@@ -686,7 +686,7 @@ Automatyczne wyłączenie nastąpi za 5 minut.</value>
     <value>Link do pobrania: {0}</value>
   </data>
   <data name="Msg_UpdateLicenseOutOfRange" xml:space="preserve">
-    <value>Zainstalowana wersja przekracza zakres wykupionych aktualizacji. Licencja na nowsze wersje nie została wykupiona.
+    <value>Zainstalowana wersja przekracza zakres wykupionego wsparcia. Licencja na nowsze wersje nie została wykupiona.
 
 Aplikacja przechodzi w tryb DEMO.</value>
   </data>
