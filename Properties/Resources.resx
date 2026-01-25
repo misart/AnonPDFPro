@@ -537,6 +537,18 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
     <value>Nie można uruchomić samouczka:
 {0}</value>
   </data>
+  <data name="Tutorial_InvalidFormat" xml:space="preserve">
+    <value>Nieprawidłowy format pliku tutorial.json.</value>
+  </data>
+  <data name="Tutorial_NoItems" xml:space="preserve">
+    <value>Samouczek nie zawiera tematów.</value>
+  </data>
+  <data name="Tutorial_Column_Title" xml:space="preserve">
+    <value>Temat</value>
+  </data>
+  <data name="Tutorial_Column_Description" xml:space="preserve">
+    <value>Opis</value>
+  </data>
   <data name="UI_Filter_AllPages" xml:space="preserve">
     <value>Wszystkie strony</value>
   </data>

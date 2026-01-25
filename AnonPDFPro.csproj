@@ -207,6 +207,7 @@
     <Compile Include="LicenseManager.cs" />
     <Compile Include="SplashForm.cs" />
     <Compile Include="ThemedControls.cs" />
+    <Compile Include="TutorialBrowserForm.cs" />
     <Compile Include="Branding.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

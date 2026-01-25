@@ -1794,6 +1794,42 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("Tutorial_OpenError", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Nieprawidłowy format pliku tutorial.json..
+        /// </summary>
+        internal static string Tutorial_InvalidFormat {
+            get {
+                return ResourceManager.GetString("Tutorial_InvalidFormat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Samouczek nie zawiera tematów..
+        /// </summary>
+        internal static string Tutorial_NoItems {
+            get {
+                return ResourceManager.GetString("Tutorial_NoItems", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Temat.
+        /// </summary>
+        internal static string Tutorial_Column_Title {
+            get {
+                return ResourceManager.GetString("Tutorial_Column_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Opis.
+        /// </summary>
+        internal static string Tutorial_Column_Description {
+            get {
+                return ResourceManager.GetString("Tutorial_Column_Description", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Otwórz PDF.

@@ -62,8 +62,6 @@ namespace AnonPDF
         private int numPages = 0;
         private const int RecentFilesLimit = 10;
 
-        private readonly string tutorialProcessName = "AnonPDFTutorial";
-
         private string userPassword = "";
         private string userNewPassword = null;
 
@@ -415,9 +413,6 @@ namespace AnonPDF
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("user32.dll")]
-        private static extern bool IsIconic(IntPtr hWnd);
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -807,6 +802,9 @@ namespace AnonPDF
             string instructionPath = Path.Combine(Application.StartupPath, $"UserGuide_{culture}.pdf");
             if (!File.Exists(instructionPath)) instructionPath = Path.Combine(Application.StartupPath, "UserGuide.pdf");
             helpMenuItem.Enabled = File.Exists(instructionPath);
+
+            string tutorialDir = GetTutorialDirectory();
+            tutorialMenuItem.Enabled = Directory.Exists(tutorialDir);
         }
 
         private void SetLanguage(string cultureName)
@@ -1906,11 +1904,12 @@ namespace AnonPDF
         {
             if (!Properties.Settings.Default.TutorialShown)
             {
-                ShowTutorial();
-
-                // Set flag to true so it doesn't show again
-                Properties.Settings.Default.TutorialShown = true;
-                Properties.Settings.Default.Save();
+                if (ShowTutorial())
+                {
+                    // Set flag to true so it doesn't show again
+                    Properties.Settings.Default.TutorialShown = true;
+                    Properties.Settings.Default.Save();
+                }
             }
 
             UpdateLeftPanelWidth();
@@ -2283,21 +2282,7 @@ namespace AnonPDF
             mainAppSplitContainer.Panel2.Controls.Add(zoomPanel);
             zoomPanel.Visible = true;
 
-            // If the tutorial binary is missing, disable the menu entry
-            string tutorialPath = Path.Combine(Application.StartupPath, $"{tutorialProcessName}.exe");
-            if (!File.Exists(tutorialPath))
-            {
-                tutorialMenuItem.Enabled = false;
-            }
-
-            // If the help PDF is missing for current culture and fallback, disable the menu entry
-            string culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName?.ToLowerInvariant() ?? "";
-            string instructionPath = Path.Combine(Application.StartupPath, $"UserGuide_{culture}.pdf");
-            if (!File.Exists(instructionPath)) instructionPath = Path.Combine(Application.StartupPath, "UserGuide.pdf");
-            if (!File.Exists(instructionPath))
-            {
-                helpMenuItem.Enabled = false;
-            }
+            UpdateHelpMenuAvailability();
 
             // Load setting "Ignore PDF restrictions"
             ignorePdfRestrictionsToolStripMenuItem.Checked = Properties.Settings.Default.IgnorePdfRestrictions;
@@ -2371,57 +2356,76 @@ namespace AnonPDF
             }
         }
 
-        private void ShowTutorial()
+        private bool ShowTutorial()
         {
-            string tutorialPath = Path.Combine(Application.StartupPath, $"{tutorialProcessName}.exe");
-            if (!File.Exists(tutorialPath))
+            if (isFullScreen)
             {
-                MessageBox.Show(this, string.Format(Resources.Tutorial_NotFound, tutorialPath),
+                SetFullScreen(false);
+            }
+
+            string tutorialDir = GetTutorialDirectory();
+            if (!Directory.Exists(tutorialDir))
+            {
+                return false;
+            }
+
+            string tutorialJsonPath = GetTutorialJsonPath(tutorialDir);
+            if (!File.Exists(tutorialJsonPath))
+            {
+                MessageBox.Show(this, string.Format(Resources.Tutorial_NotFound, tutorialJsonPath),
                                 Resources.Title_Error,
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Error);
-                return;
+                return false;
             }
-            try
+
+            if (!TutorialCatalog.TryLoad(tutorialJsonPath, out var catalog, out string errorMessage))
             {
-                Process[] processes = Process.GetProcessesByName(tutorialProcessName);
-                Process tutorialProcess;
-                if (processes.Any())
-                {
-                    // If process is already running, restore window
-                    tutorialProcess = processes.First();
-                    IntPtr hWnd = tutorialProcess.MainWindowHandle;
-                    if (hWnd != IntPtr.Zero)
-                    {
-                        if (IsIconic(hWnd))
-                        {
-                            ShowWindow(hWnd, SW_RESTORE);
-                        }
-                        SetForegroundWindow(hWnd);
-                    }
-                }
-                else
-                {
-                    tutorialProcess = new Process();
-                    tutorialProcess.StartInfo.FileName = tutorialPath;
-                    tutorialProcess.StartInfo.WorkingDirectory = Path.GetDirectoryName(tutorialPath);
-                    tutorialProcess.Start();
-
-                    // Launch tutorial in modal mode (blocks main application window)
-                    if (!Properties.Settings.Default.TutorialShown)
-                    {
-                        tutorialProcess.WaitForExit();
-                    }
-                }
-
-
-
+                string message = string.IsNullOrWhiteSpace(errorMessage)
+                    ? Resources.Tutorial_InvalidFormat
+                    : string.Format(Resources.Tutorial_OpenError, errorMessage);
+                MessageBox.Show(this, message,
+                                Resources.Title_Error,
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                return false;
             }
-            catch (Exception ex)
+
+            if (catalog.Items.Count == 0)
             {
-                MessageBox.Show(this, string.Format(Resources.Tutorial_OpenError, ex.Message), Resources.Title_Error,
-                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(this, Resources.Tutorial_NoItems,
+                                Resources.Title_Info,
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                return false;
             }
+
+            using (var dialog = new TutorialBrowserForm(catalog, tutorialDir))
+            {
+                dialog.ShowDialog(this);
+            }
+
+            return true;
+        }
+
+        private static string GetTutorialDirectory()
+        {
+            return Path.Combine(Application.StartupPath, "tutorial");
+        }
+
+        private static string GetTutorialJsonPath(string tutorialDir)
+        {
+            string culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName?.ToLowerInvariant() ?? "";
+            if (culture == "en")
+            {
+                string localizedPath = Path.Combine(tutorialDir, "tutorial-en.json");
+                if (File.Exists(localizedPath))
+                {
+                    return localizedPath;
+                }
+            }
+
+            return Path.Combine(tutorialDir, "tutorial.json");
         }
 
         private void UpdateItemTag(ListViewItem item, int pageNumber, bool hasSelections, bool hasSearchResults, bool markedForDeletion, bool hasTextAnnotations = false)
@@ -4034,6 +4038,16 @@ namespace AnonPDF
                 ApplyDemoWatermarkIfNeeded(pdfDoc);
                 MessageBox.Show(this, Resources.Msg_PreviewSavedPdf, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+        }
+
+        internal void SuspendTopMostForExternalLaunch()
+        {
+            if (!isFullScreen || !TopMost)
+            {
+                return;
+            }
+
+            TopMost = false;
         }
 
         internal static void ApplyDemoWatermarkIfNeeded(iText.Kernel.Pdf.PdfDocument pdfDoc)
