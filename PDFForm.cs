@@ -805,7 +805,10 @@ namespace AnonPDF
             helpMenuItem.Enabled = File.Exists(instructionPath);
 
             string tutorialDir = GetTutorialDirectory();
-            tutorialMenuItem.Enabled = Directory.Exists(tutorialDir);
+            bool hasTutorialJson = Directory.Exists(tutorialDir)
+                && (File.Exists(Path.Combine(tutorialDir, "tutorial.json"))
+                    || File.Exists(Path.Combine(tutorialDir, "tutorial-en.json")));
+            tutorialMenuItem.Enabled = hasTutorialJson;
         }
 
         private void SetLanguage(string cultureName)
