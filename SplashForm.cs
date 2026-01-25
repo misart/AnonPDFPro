@@ -227,17 +227,97 @@ namespace AnonPDF
 
         private static string GetLicenseStatusText()
         {
-            return IsPolishCulture() ? "Status licencji: —" : "License status: —";
+            var info = LicenseManager.Current;
+            if (info == null)
+            {
+                return IsPolishCulture() ? "Status licencji: brak" : "License status: missing";
+            }
+
+            if (!info.IsSignatureValid)
+            {
+                return IsPolishCulture() ? "Status licencji: nieprawidlowa" : "License status: invalid";
+            }
+
+            if (info.Payload == null)
+            {
+                return IsPolishCulture() ? "Status licencji: brak danych" : "License status: no data";
+            }
+
+            if (string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase))
+            {
+                var demoUntil = ParseDate(info.Payload.DemoUntil);
+                if (!demoUntil.HasValue)
+                {
+                    return IsPolishCulture() ? "Status licencji: DEMO" : "License status: DEMO";
+                }
+
+                var daysLeft = (int)Math.Ceiling((demoUntil.Value.Date - DateTime.UtcNow.Date).TotalDays);
+                if (daysLeft >= 0)
+                {
+                    return IsPolishCulture()
+                        ? $"Status licencji: DEMO ({daysLeft} dni)"
+                        : $"License status: DEMO ({daysLeft} days)";
+                }
+
+                return IsPolishCulture()
+                    ? $"Status licencji: DEMO (wygasla {demoUntil:yyyy-MM-dd})"
+                    : $"License status: DEMO (expired {demoUntil:yyyy-MM-dd})";
+            }
+
+            return IsPolishCulture() ? "Status licencji: PRO" : "License status: PRO";
         }
 
         private static string GetUpdateStatusText()
         {
-            return IsPolishCulture() ? "Aktualizacje: —" : "Updates: —";
+            var info = LicenseManager.Current;
+            if (info == null || !info.IsSignatureValid || info.Payload == null)
+            {
+                return IsPolishCulture() ? "Aktualizacje: brak danych" : "Updates: no data";
+            }
+
+            var updatesUntil = ParseDate(info.Payload.UpdatesUntil);
+            if (!updatesUntil.HasValue)
+            {
+                return IsPolishCulture() ? "Aktualizacje: brak" : "Updates: none";
+            }
+
+            if (updatesUntil.Value.Date >= DateTime.UtcNow.Date)
+            {
+                return IsPolishCulture()
+                    ? $"Aktualizacje: do {updatesUntil:yyyy-MM-dd}"
+                    : $"Updates: until {updatesUntil:yyyy-MM-dd}";
+            }
+
+            return IsPolishCulture()
+                ? $"Aktualizacje: wygasly ({updatesUntil:yyyy-MM-dd})"
+                : $"Updates: expired ({updatesUntil:yyyy-MM-dd})";
         }
 
         private static bool IsPolishCulture()
         {
             return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "pl";
         }
-    }
+
+        private static DateTime? ParseDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (DateTime.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal, out DateTime exact))
+            {
+                return DateTime.SpecifyKind(exact, DateTimeKind.Utc);
+            }
+
+            if (DateTime.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal, out DateTime parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            }
+
+            return null;
+        }    }
 }
+

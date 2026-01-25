@@ -32,6 +32,7 @@ namespace AnonPDF
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            LicenseManager.Initialize(AppDomain.CurrentDomain.BaseDirectory);
             var splash = new SplashForm();
             var mainForm = new PDFForm(splash);
             splash.Owner = mainForm;

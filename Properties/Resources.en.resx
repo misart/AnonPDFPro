@@ -831,6 +831,9 @@ Repository: https://github.com/misart/AnonPDFPro</value>
   <data name="About_Copyright" xml:space="preserve">
     <value>Copyright © 2025–2026 Urząd Miasta Szczecin; Modifications © 2026 MISART Marta Klimek</value>
   </data>
+  <data name="Demo_Watermark_Text" xml:space="preserve">
+    <value>WERSJA DEMONSTRACYJNA ANONPDF PRO</value>
+  </data>
   <data name="Signatures_Report_Title" xml:space="preserve">
     <value>List of qualified signatures in the original document (before anonymization):</value>
   </data>

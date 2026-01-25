@@ -20,6 +20,7 @@ using iText.Forms;
 using iText.Signatures;
 using iText.Kernel.Colors;
 using iText.Kernel.Pdf.Xobject;
+using iText.Kernel.Pdf.Extgstate;
 using iText.Commons.Bouncycastle.Cert;
 using PDFiumSharp;
 using Newtonsoft.Json;
@@ -40,6 +41,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using iText.IO.Font;
 using iText.Kernel.Font;
+using iText.Layout;
 using TesseractOCR;
 using System.Data.SqlClient;
 
@@ -1625,6 +1627,7 @@ namespace AnonPDF
                     {
                         // Copy pages from startPage to splitPage (inclusive)
                         pdfDoc.CopyPagesTo(startPage, splitPage, outputDoc);
+                        ApplyDemoWatermarkIfNeeded(outputDoc);
                     }
                     // The next segment starts after splitPage
                     startPage = splitPage + 1;
@@ -3802,10 +3805,10 @@ namespace AnonPDF
                         float localX = 0f;
                         switch (annotation.AnnotationAlignment)
                         {
-                            case HorizontalAlignment.Center:
+                            case System.Windows.Forms.HorizontalAlignment.Center:
                                 localX = (layoutWidth - lineWidthPt) / 2f;
                                 break;
-                            case HorizontalAlignment.Right:
+                            case System.Windows.Forms.HorizontalAlignment.Right:
                                 localX = layoutWidth - lineWidthPt;
                                 break;
                         }
@@ -3862,8 +3865,87 @@ namespace AnonPDF
                 info.SetMoreInfo("iTextCopyright", "This document was processed using iText Core / Community under the AGPLv3 license. Copyright (c) iText Group NV.");
                 info.SetMoreInfo("iTextLicense", "For more information see https://www.gnu.org/licenses/agpl-3.0.html and https://itextpdf.com/.");
 
+                ApplyDemoWatermarkIfNeeded(pdfDoc);
                 MessageBox.Show(this, Resources.Msg_PreviewSavedPdf, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+        }
+
+        internal static void ApplyDemoWatermarkIfNeeded(iText.Kernel.Pdf.PdfDocument pdfDoc)
+        {
+            if (pdfDoc == null || !LicenseManager.RequiresDemoWatermark)
+            {
+                return;
+            }
+
+            try
+            {
+                ApplyDemoWatermark(pdfDoc);
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Failed to apply demo watermark: " + ex.Message);
+            }
+        }
+
+        private static void ApplyDemoWatermark(iText.Kernel.Pdf.PdfDocument pdfDoc)
+        {
+            string watermarkText = GetDemoWatermarkText();
+            if (string.IsNullOrWhiteSpace(watermarkText))
+            {
+                return;
+            }
+
+            var font = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
+            var watermarkColor = new DeviceRgb(220, 0, 0);
+            var opacityState = new PdfExtGState().SetFillOpacity(0.15f);
+            float angle = (float)(Math.PI * 55.0 / 180.0);
+
+            for (int pageNumber = 1; pageNumber <= pdfDoc.GetNumberOfPages(); pageNumber++)
+            {
+                var page = pdfDoc.GetPage(pageNumber);
+                var pageSize = page.GetPageSize();
+                float fontSize = GetWatermarkFontSize(pageSize);
+
+                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page.NewContentStreamAfter(), page.GetResources(), pdfDoc);
+                pdfCanvas.SaveState();
+                pdfCanvas.SetExtGState(opacityState);
+
+                var canvas = new Canvas(pdfCanvas, pageSize);
+                try
+                {
+                    var paragraph = new iText.Layout.Element.Paragraph(watermarkText)
+                        .SetFont(font)
+                        .SetFontSize(fontSize)
+                        .SetFontColor(watermarkColor);
+
+                    canvas.ShowTextAligned(
+                        paragraph,
+                        pageSize.GetWidth() / 2f,
+                        pageSize.GetHeight() / 2f,
+                        pageNumber,
+                        iText.Layout.Properties.TextAlignment.CENTER,
+                        iText.Layout.Properties.VerticalAlignment.MIDDLE,
+                        angle);
+                }
+                finally
+                {
+                    canvas.Close();
+                }
+
+                pdfCanvas.RestoreState();
+            }
+        }
+
+        private static float GetWatermarkFontSize(iText.Kernel.Geom.Rectangle pageSize)
+        {
+            float baseSize = Math.Min(pageSize.GetWidth(), pageSize.GetHeight()) * 0.06f;
+            return Math.Max(30f, Math.Min(84f, baseSize));
+        }
+
+        private static string GetDemoWatermarkText()
+        {
+            var text = Resources.ResourceManager.GetString("Demo_Watermark_Text", CultureInfo.CurrentUICulture);
+            return string.IsNullOrWhiteSpace(text) ? "WERSJA DEMONSTRACYJNA ANONPDF PRO" : text;
         }
 
         private void ClearRedactionBlocks()
@@ -5047,13 +5129,13 @@ namespace AnonPDF
                 StringAlignment align;
                 switch (annotation.AnnotationAlignment)
                 {
-                    case HorizontalAlignment.Left:
+                    case System.Windows.Forms.HorizontalAlignment.Left:
                         align = StringAlignment.Near;
                         break;
-                    case HorizontalAlignment.Center:
+                    case System.Windows.Forms.HorizontalAlignment.Center:
                         align = StringAlignment.Center;
                         break;
-                    case HorizontalAlignment.Right:
+                    case System.Windows.Forms.HorizontalAlignment.Right:
                         align = StringAlignment.Far;
                         break;
                     default:
@@ -6211,6 +6293,17 @@ namespace AnonPDF
                 description
             );
 
+            var licenseLine = GetLicenseStatusLine();
+            var updatesLine = GetUpdatesStatusLine();
+            if (!string.IsNullOrWhiteSpace(licenseLine))
+            {
+                aboutMessage += Environment.NewLine + Environment.NewLine + licenseLine;
+            }
+            if (!string.IsNullOrWhiteSpace(updatesLine))
+            {
+                aboutMessage += Environment.NewLine + updatesLine;
+            }
+
             // Display information in dialog box
             MessageBox.Show(this,
                 aboutMessage,
@@ -7002,6 +7095,11 @@ namespace AnonPDF
         {
 
             string titleText = $"{Branding.ProductName} - v.{fileVersion}";
+            string demoSuffix = GetDemoTitleSuffix();
+            if (!string.IsNullOrWhiteSpace(demoSuffix))
+            {
+                titleText += demoSuffix;
+            }
             if (inputPdfPath != "")
             {
                 string pdfFileName = Path.GetFileName(inputPdfPath);
@@ -7026,6 +7124,132 @@ namespace AnonPDF
             }
 
             this.Text = titleText;
+        }
+
+        private static string GetDemoTitleSuffix()
+        {
+            var info = LicenseManager.Current;
+            if (info == null || !info.IsSignatureValid || info.Payload == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            var demoUntil = ParseLicenseDate(info.Payload.DemoUntil);
+            if (!demoUntil.HasValue)
+            {
+                return IsPolishCulture() ? " [WERSJA DEMO]" : " [DEMO]";
+            }
+
+            var daysLeft = (int)Math.Ceiling((demoUntil.Value.Date - DateTime.UtcNow.Date).TotalDays);
+            if (daysLeft >= 0)
+            {
+                return IsPolishCulture()
+                    ? $" [WERSJA DEMO: {daysLeft} dni]"
+                    : $" [DEMO: {daysLeft} days]";
+            }
+
+            return IsPolishCulture()
+                ? $" [WERSJA DEMO: wygasla {demoUntil:yyyy-MM-dd}]"
+                : $" [DEMO: expired {demoUntil:yyyy-MM-dd}]";
+        }
+
+        private static string GetLicenseStatusLine()
+        {
+            var info = LicenseManager.Current;
+            if (info == null)
+            {
+                return IsPolishCulture() ? "Status licencji: brak" : "License status: missing";
+            }
+
+            if (!info.IsSignatureValid)
+            {
+                return IsPolishCulture() ? "Status licencji: nieprawidlowa" : "License status: invalid";
+            }
+
+            if (info.Payload == null)
+            {
+                return IsPolishCulture() ? "Status licencji: brak danych" : "License status: no data";
+            }
+
+            if (string.Equals(info.Payload.Edition, "demo", StringComparison.OrdinalIgnoreCase))
+            {
+                var demoUntil = ParseLicenseDate(info.Payload.DemoUntil);
+                if (!demoUntil.HasValue)
+                {
+                    return IsPolishCulture() ? "Status licencji: DEMO" : "License status: DEMO";
+                }
+
+                var daysLeft = (int)Math.Ceiling((demoUntil.Value.Date - DateTime.UtcNow.Date).TotalDays);
+                if (daysLeft >= 0)
+                {
+                    return IsPolishCulture()
+                        ? $"Status licencji: DEMO ({daysLeft} dni)"
+                        : $"License status: DEMO ({daysLeft} days)";
+                }
+
+                return IsPolishCulture()
+                    ? $"Status licencji: DEMO (wygasla {demoUntil:yyyy-MM-dd})"
+                    : $"License status: DEMO (expired {demoUntil:yyyy-MM-dd})";
+            }
+
+            return IsPolishCulture() ? "Status licencji: PRO" : "License status: PRO";
+        }
+
+        private static string GetUpdatesStatusLine()
+        {
+            var info = LicenseManager.Current;
+            if (info == null || !info.IsSignatureValid || info.Payload == null)
+            {
+                return IsPolishCulture() ? "Aktualizacje: brak danych" : "Updates: no data";
+            }
+
+            var updatesUntil = ParseLicenseDate(info.Payload.UpdatesUntil);
+            if (!updatesUntil.HasValue)
+            {
+                return IsPolishCulture() ? "Aktualizacje: brak" : "Updates: none";
+            }
+
+            if (updatesUntil.Value.Date >= DateTime.UtcNow.Date)
+            {
+                return IsPolishCulture()
+                    ? $"Aktualizacje: do {updatesUntil:yyyy-MM-dd}"
+                    : $"Updates: until {updatesUntil:yyyy-MM-dd}";
+            }
+
+            return IsPolishCulture()
+                ? $"Aktualizacje: wygasly ({updatesUntil:yyyy-MM-dd})"
+                : $"Updates: expired ({updatesUntil:yyyy-MM-dd})";
+        }
+
+        private static DateTime? ParseLicenseDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal, out DateTime exact))
+            {
+                return DateTime.SpecifyKind(exact, DateTimeKind.Utc);
+            }
+
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime parsed))
+            {
+                return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            }
+
+            return null;
+        }
+
+        private static bool IsPolishCulture()
+        {
+            return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "pl";
         }
 
 
@@ -7739,7 +7963,7 @@ namespace AnonPDF
                 {
                     bmp.Save(ms);
                     ms.Position = 0;
-                    var pageBitmap = new Bitmap(Image.FromStream(ms));
+                    var pageBitmap = new Bitmap(DrawingImage.FromStream(ms));
                     ApplyRotationOffset(pageBitmap, GetRotationOffset(pageNumber));
 
                     // Scale the selection box to bitmap coordinates
@@ -7952,7 +8176,7 @@ namespace AnonPDF
 
         public System.Drawing.Color AnnotationColor { get; set; }
 
-        public HorizontalAlignment AnnotationAlignment { get; set; }
+        public System.Windows.Forms.HorizontalAlignment AnnotationAlignment { get; set; }
 
         public int AnnotationRotation { get; set; }
 
@@ -7966,14 +8190,14 @@ namespace AnonPDF
             AnnotationText = "";
             AnnotationFont = new Font("Arial", 12);
             AnnotationColor = System.Drawing.Color.Black;
-            AnnotationAlignment = HorizontalAlignment.Left; // Default left alignment
+            AnnotationAlignment = System.Windows.Forms.HorizontalAlignment.Left; // Default left alignment
             AnnotationRotation = 0;
             AnnotationBounds = new RectangleF(0, 0, 100, 30); // Example rectangular area
             AnnotationIsLocked = false;
         }
 
 
-        public TextAnnotation(int pageNumber, string text, Font font, System.Drawing.Color color, HorizontalAlignment alignment, RectangleF bounds, bool isLocked = false)
+        public TextAnnotation(int pageNumber, string text, Font font, System.Drawing.Color color, System.Windows.Forms.HorizontalAlignment alignment, RectangleF bounds, bool isLocked = false)
         {
             PageNumber = pageNumber;
             AnnotationText = text;
@@ -8016,7 +8240,7 @@ namespace AnonPDF
         public string AnnotationText { get; set; }
         public Font AnnotationFont { get; set; }
         public System.Drawing.Color AnnotationColor { get; set; }
-        public HorizontalAlignment AnnotationAlignment { get; set; }
+        public System.Windows.Forms.HorizontalAlignment AnnotationAlignment { get; set; }
         public int AnnotationRotation { get; set; }
         public Action ApplyChanges { get; set; }
         private bool suppressAutoApply;
@@ -8264,13 +8488,13 @@ namespace AnonPDF
             // Set alignment - select appropriate radio button
             switch (AnnotationAlignment)
             {
-                case HorizontalAlignment.Left:
+                case System.Windows.Forms.HorizontalAlignment.Left:
                     rbLeft.Checked = true;
                     break;
-                case HorizontalAlignment.Center:
+                case System.Windows.Forms.HorizontalAlignment.Center:
                     rbCenter.Checked = true;
                     break;
-                case HorizontalAlignment.Right:
+                case System.Windows.Forms.HorizontalAlignment.Right:
                     rbRight.Checked = true;
                     break;
             }
@@ -8310,15 +8534,15 @@ namespace AnonPDF
         {
             if (rbLeft.Checked)
             {
-                AnnotationAlignment = HorizontalAlignment.Left; ;
+                AnnotationAlignment = System.Windows.Forms.HorizontalAlignment.Left; ;
             }
             else if (rbCenter.Checked)
             {
-                AnnotationAlignment = HorizontalAlignment.Center;
+                AnnotationAlignment = System.Windows.Forms.HorizontalAlignment.Center;
             }
             else if (rbRight.Checked)
             {
-                AnnotationAlignment = HorizontalAlignment.Right;
+                AnnotationAlignment = System.Windows.Forms.HorizontalAlignment.Right;
             }
             txtText.SelectAll();
             txtText.SelectionAlignment = AnnotationAlignment;
@@ -8900,6 +9124,8 @@ namespace AnonPDF
                                 pdfDoc.CopyPagesTo(1, pdfDoc.GetNumberOfPages(), mergedDoc);
                             }
                         }
+
+                        PDFForm.ApplyDemoWatermarkIfNeeded(mergedDoc);
                     }
 
                     MessageBox.Show(this, Resources.Merge_Success, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
