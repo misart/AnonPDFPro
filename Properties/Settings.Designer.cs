@@ -181,7 +181,7 @@ namespace AnonPDF.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("SoftLight")]
+        [global::System.Configuration.DefaultSettingValueAttribute("BalticBreeze")]
         public string PreferredUiTheme {
             get {
                 return ((string)(this["PreferredUiTheme"]));

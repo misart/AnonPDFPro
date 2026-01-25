@@ -1054,9 +1054,9 @@
             // themeToolStripMenuItem
             // 
             this.themeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.themeBalticBreezeMenuItem,
             this.themeSoftLightMenuItem,
             this.themeNordCoolLightMenuItem,
-            this.themeBalticBreezeMenuItem,
             this.themeWarmSandMenuItem,
             this.themeForestGreenMenuItem,
             this.themeGraphiteDarkMenuItem,

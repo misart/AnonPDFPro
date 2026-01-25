@@ -42,7 +42,7 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="PreferredUiTheme" Type="System.String" Scope="User">
-      <Value Profile="(Default)">SoftLight</Value>
+      <Value Profile="(Default)">BalticBreeze</Value>
     </Setting>
   </Settings>
 </SettingsFile>

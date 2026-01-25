@@ -364,7 +364,7 @@ namespace AnonPDF
                 }
             };
 
-        private UiThemeKind currentThemeKind = UiThemeKind.SoftLight;
+        private UiThemeKind currentThemeKind = UiThemeKind.BalticBreeze;
         private UiThemePalette CurrentTheme => UiThemes[currentThemeKind];
 
         private sealed class MenuColorTable : ProfessionalColorTable
@@ -552,10 +552,46 @@ namespace AnonPDF
 
             removePageButton.Click += RemovePageButton_Click;
             removePageRangeButton.Click += RemovePageRangeButton_Click;
-            saveProjectButton.EnabledChanged += (_, __) => UpdateSaveGroupState();
-            saveProjectAsButton.EnabledChanged += (_, __) => UpdateSaveGroupState();
-            buttonRedactText.EnabledChanged += (_, __) => UpdateSaveGroupState();
+            saveProjectButton.EnabledChanged += (_, __) =>
+            {
+                UpdateSaveGroupState();
+                ApplySecondaryButtonTheme(saveProjectButton, CurrentTheme);
+            };
+            saveProjectAsButton.EnabledChanged += (_, __) =>
+            {
+                UpdateSaveGroupState();
+                ApplySecondaryButtonTheme(saveProjectAsButton, CurrentTheme);
+            };
+            buttonRedactText.EnabledChanged += (_, __) =>
+            {
+                UpdateSaveGroupState();
+                ApplySecondaryButtonTheme(buttonRedactText, CurrentTheme);
+            };
             savePdfMenuItem.EnabledChanged += (_, __) => UpdateSaveGroupState();
+
+            buttonFirst.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(buttonFirst, CurrentTheme);
+            buttonPrevious.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(buttonPrevious, CurrentTheme);
+            buttonNextPage.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(buttonNextPage, CurrentTheme);
+            buttonLast.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(buttonLast, CurrentTheme);
+            zoomMinButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(zoomMinButton, CurrentTheme);
+            zoomMaxButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(zoomMaxButton, CurrentTheme);
+            zoomOutButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(zoomOutButton, CurrentTheme);
+            zoomInButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(zoomInButton, CurrentTheme);
+
+            searchButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(searchButton, CurrentTheme);
+            searchToSelectionButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(searchToSelectionButton, CurrentTheme);
+            SearchClearButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(SearchClearButton, CurrentTheme);
+            personalDataButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(personalDataButton, CurrentTheme);
+            searchFirstButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(searchFirstButton, CurrentTheme);
+            searchPrevButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(searchPrevButton, CurrentTheme);
+            searchNextButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(searchNextButton, CurrentTheme);
+            searchLastButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(searchLastButton, CurrentTheme);
+
+            selectionFirstButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(selectionFirstButton, CurrentTheme);
+            selectionPrevButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(selectionPrevButton, CurrentTheme);
+            selectionNextButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(selectionNextButton, CurrentTheme);
+            selectionLastButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(selectionLastButton, CurrentTheme);
+            clearPageButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(clearPageButton, CurrentTheme);
             colorCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
             openSavedPDFCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
             safeModeCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
@@ -710,6 +746,8 @@ namespace AnonPDF
             try { groupBoxPages.Text = Resources.UI_Group_Pages; } catch { }
             try { groupBoxPagesToRemove.Text = Resources.UI_Group_PagesToRemove; } catch { }
             try { groupBoxFilter.Text = Resources.UI_Group_Filter; } catch { }
+
+            UpdateWindowTitle();
 
             // Tooltips
             try { toolTip1.SetToolTip(loadPdfButton, Resources.Tooltip_LoadPdf); } catch { }
@@ -7142,7 +7180,7 @@ namespace AnonPDF
             var demoUntil = ParseLicenseDate(info.Payload.DemoUntil);
             if (!demoUntil.HasValue)
             {
-                return IsPolishCulture() ? " [WERSJA DEMO]" : " [DEMO]";
+                return IsPolishCulture() ? " [WERSJA DEMO]" : " [DEMO VERSION]";
             }
 
             var daysLeft = (int)Math.Ceiling((demoUntil.Value.Date - DateTime.UtcNow.Date).TotalDays);
@@ -7150,12 +7188,12 @@ namespace AnonPDF
             {
                 return IsPolishCulture()
                     ? $" [WERSJA DEMO: {daysLeft} dni]"
-                    : $" [DEMO: {daysLeft} days]";
+                    : $" [DEMO: {daysLeft} days left]";
             }
 
             return IsPolishCulture()
                 ? $" [WERSJA DEMO: wygasla {demoUntil:yyyy-MM-dd}]"
-                : $" [DEMO: expired {demoUntil:yyyy-MM-dd}]";
+                : $" [DEMO: expired on {demoUntil:yyyy-MM-dd}]";
         }
 
         private static string GetLicenseStatusLine()
