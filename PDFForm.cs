@@ -140,7 +140,6 @@ namespace AnonPDF
         const int annotationsIconPadding = 4;
         private const int LeftPanelBaseWidth = 187;
         private const int LeftPanelScrollbarPadding = 6;
-        private static readonly System.Drawing.Color DocumentBackColor = System.Drawing.Color.White;
         private readonly SplashForm splashForm;
         private bool splashClosed;
 
@@ -162,6 +161,7 @@ namespace AnonPDF
                 System.Drawing.Color windowBackColor,
                 System.Drawing.Color panelBackColor,
                 System.Drawing.Color sectionBackColor,
+                System.Drawing.Color documentBackColor,
                 System.Drawing.Color borderColor,
                 System.Drawing.Color textPrimaryColor,
                 System.Drawing.Color textSecondaryColor,
@@ -180,6 +180,7 @@ namespace AnonPDF
                 WindowBackColor = windowBackColor;
                 PanelBackColor = panelBackColor;
                 SectionBackColor = sectionBackColor;
+                DocumentBackColor = documentBackColor;
                 BorderColor = borderColor;
                 TextPrimaryColor = textPrimaryColor;
                 TextSecondaryColor = textSecondaryColor;
@@ -199,6 +200,7 @@ namespace AnonPDF
             public System.Drawing.Color WindowBackColor { get; }
             public System.Drawing.Color PanelBackColor { get; }
             public System.Drawing.Color SectionBackColor { get; }
+            public System.Drawing.Color DocumentBackColor { get; }
             public System.Drawing.Color BorderColor { get; }
             public System.Drawing.Color TextPrimaryColor { get; }
             public System.Drawing.Color TextSecondaryColor { get; }
@@ -224,6 +226,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0xF5, 0xF6, 0xF8),
                         System.Drawing.Color.FromArgb(0xFF, 0xFF, 0xFF),
                         System.Drawing.Color.FromArgb(0xF1, 0xF3, 0xF6),
+                        System.Drawing.Color.FromArgb(0xFA, 0xFB, 0xFC),
                         System.Drawing.Color.FromArgb(0xD7, 0xDC, 0xE3),
                         System.Drawing.Color.FromArgb(0x1F, 0x29, 0x37),
                         System.Drawing.Color.FromArgb(0x6B, 0x72, 0x80),
@@ -245,6 +248,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0xEC, 0xEF, 0xF4),
                         System.Drawing.Color.FromArgb(0xFF, 0xFF, 0xFF),
                         System.Drawing.Color.FromArgb(0xE5, 0xE9, 0xF0),
+                        System.Drawing.Color.FromArgb(0xF5, 0xF7, 0xFA),
                         System.Drawing.Color.FromArgb(0xD8, 0xDE, 0xE9),
                         System.Drawing.Color.FromArgb(0x2E, 0x34, 0x40),
                         System.Drawing.Color.FromArgb(0x5E, 0x67, 0x77),
@@ -266,6 +270,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0xE6, 0xEF, 0xF3),
                         System.Drawing.Color.FromArgb(0x65, 0xA0, 0xB8),
                         System.Drawing.Color.FromArgb(0xE0, 0xE3, 0xE4),
+                        System.Drawing.Color.FromArgb(0xF1, 0xF5, 0xF8),
                         System.Drawing.Color.FromArgb(0xC9, 0xD6, 0xDF),
                         System.Drawing.Color.FromArgb(0x1F, 0x2A, 0x33),
                         System.Drawing.Color.FromArgb(0x55, 0x62, 0x70),
@@ -287,6 +292,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0xF6, 0xF1, 0xEA),
                         System.Drawing.Color.FromArgb(0xFF, 0xFC, 0xF7),
                         System.Drawing.Color.FromArgb(0xF1, 0xE8, 0xDD),
+                        System.Drawing.Color.FromArgb(0xF7, 0xF2, 0xEC),
                         System.Drawing.Color.FromArgb(0xE2, 0xD6, 0xC7),
                         System.Drawing.Color.FromArgb(0x2B, 0x2A, 0x28),
                         System.Drawing.Color.FromArgb(0x6A, 0x62, 0x5A),
@@ -308,6 +314,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0xF3, 0xF6, 0xF4),
                         System.Drawing.Color.FromArgb(0xFF, 0xFF, 0xFF),
                         System.Drawing.Color.FromArgb(0xE7, 0xEF, 0xEA),
+                        System.Drawing.Color.FromArgb(0xF4, 0xF7, 0xF5),
                         System.Drawing.Color.FromArgb(0xD3, 0xDE, 0xD7),
                         System.Drawing.Color.FromArgb(0x1F, 0x2A, 0x24),
                         System.Drawing.Color.FromArgb(0x5C, 0x6B, 0x63),
@@ -329,6 +336,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0x0F, 0x17, 0x2A),
                         System.Drawing.Color.FromArgb(0x11, 0x18, 0x27),
                         System.Drawing.Color.FromArgb(0x17, 0x20, 0x33),
+                        System.Drawing.Color.FromArgb(0x0E, 0x14, 0x1C),
                         System.Drawing.Color.FromArgb(0x2B, 0x36, 0x48),
                         System.Drawing.Color.FromArgb(0xE5, 0xE7, 0xEB),
                         System.Drawing.Color.FromArgb(0x9C, 0xA3, 0xAF),
@@ -350,6 +358,7 @@ namespace AnonPDF
                         System.Drawing.Color.FromArgb(0x0B, 0x0F, 0x14),
                         System.Drawing.Color.FromArgb(0x0F, 0x17, 0x20),
                         System.Drawing.Color.FromArgb(0x12, 0x1E, 0x2A),
+                        System.Drawing.Color.FromArgb(0x0B, 0x10, 0x16),
                         System.Drawing.Color.FromArgb(0x22, 0x32, 0x44),
                         System.Drawing.Color.FromArgb(0xE6, 0xED, 0xF3),
                         System.Drawing.Color.FromArgb(0x9A, 0xA7, 0xB2),
@@ -1991,8 +2000,8 @@ namespace AnonPDF
             this.BackColor = theme.WindowBackColor;
             mainAppSplitContainer.Panel1.BackColor = theme.PanelBackColor;
             mainAppSplitContainer.Panel1.ForeColor = theme.TextPrimaryColor;
-            mainAppSplitContainer.Panel2.BackColor = DocumentBackColor;
-            pdfViewer.BackColor = DocumentBackColor;
+            mainAppSplitContainer.Panel2.BackColor = theme.DocumentBackColor;
+            pdfViewer.BackColor = theme.DocumentBackColor;
 
             menuStrip1.BackColor = theme.MenuStripBackColor;
             menuStrip1.ForeColor = theme.TextPrimaryColor;

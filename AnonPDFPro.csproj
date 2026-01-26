@@ -205,8 +205,12 @@
       <DependentUpon>PDFForm.cs</DependentUpon>
     </Compile>
     <Compile Include="LicenseManager.cs" />
-    <Compile Include="SplashForm.cs" />
-    <Compile Include="ThemedControls.cs" />
+    <Compile Include="SplashForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ThemedControls.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="TutorialBrowserForm.cs" />
     <Compile Include="Branding.cs" />
     <Compile Include="Program.cs" />
