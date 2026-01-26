@@ -4119,7 +4119,9 @@ namespace AnonPDF
             TopMost = false;
         }
 
-        internal static void ApplyDemoWatermarkIfNeeded(iText.Kernel.Pdf.PdfDocument pdfDoc)
+        internal static void ApplyDemoWatermarkIfNeeded(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            Func<int, int> rotationProvider = null)
         {
             if (pdfDoc == null || !LicenseManager.RequiresDemoWatermark)
             {
@@ -4128,7 +4130,7 @@ namespace AnonPDF
 
             try
             {
-                ApplyDemoWatermark(pdfDoc);
+                ApplyDemoWatermark(pdfDoc, rotationProvider);
             }
             catch (Exception ex)
             {
@@ -4136,7 +4138,9 @@ namespace AnonPDF
             }
         }
 
-        private static void ApplyDemoWatermark(iText.Kernel.Pdf.PdfDocument pdfDoc)
+        private static void ApplyDemoWatermark(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            Func<int, int> rotationProvider)
         {
             string watermarkText = GetDemoWatermarkText();
             if (string.IsNullOrWhiteSpace(watermarkText))
@@ -4147,12 +4151,15 @@ namespace AnonPDF
             var font = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
             var watermarkColor = new DeviceRgb(220, 0, 0);
             var opacityState = new PdfExtGState().SetFillOpacity(0.15f);
-            float angle = (float)(Math.PI * 55.0 / 180.0);
 
             for (int pageNumber = 1; pageNumber <= pdfDoc.GetNumberOfPages(); pageNumber++)
             {
                 var page = pdfDoc.GetPage(pageNumber);
                 var pageSize = page.GetPageSize();
+                var rotatedSize = page.GetPageSizeWithRotation();
+
+                int rotationDeg = rotationProvider?.Invoke(pageNumber) ?? page.GetRotation();
+                float angle = ComputeWatermarkAngle(rotatedSize, rotationDeg);
                 float fontSize = GetWatermarkFontSize(pageSize);
 
                 var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page.NewContentStreamAfter(), page.GetResources(), pdfDoc);
@@ -4189,6 +4196,32 @@ namespace AnonPDF
         {
             float baseSize = Math.Min(pageSize.GetWidth(), pageSize.GetHeight()) * 0.06f;
             return Math.Max(30f, Math.Min(84f, baseSize));
+        }
+
+        private static float ComputeWatermarkAngle(iText.Kernel.Geom.Rectangle rotatedSize, int rotationDeg)
+        {
+            float baseAngle = (float)Math.Atan(rotatedSize.GetHeight() / rotatedSize.GetWidth());
+            float angle = baseAngle - (float)(rotationDeg * Math.PI / 180.0);
+            angle = NormalizeWatermarkAngle(angle);
+            angle = Math.Abs(angle);
+            if (angle > (float)Math.PI / 2f)
+            {
+                angle = (float)Math.PI - angle;
+            }
+            return angle;
+        }
+
+        private static float NormalizeWatermarkAngle(float angle)
+        {
+            float pi = (float)Math.PI;
+            float twoPi = pi * 2f;
+
+            while (angle <= -pi)
+                angle += twoPi;
+            while (angle > pi)
+                angle -= twoPi;
+
+            return angle;
         }
 
         private static string GetDemoWatermarkText()
