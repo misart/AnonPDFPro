@@ -716,6 +716,15 @@ namespace AnonPDF.Properties {
                 return ResourceManager.GetString("Menu_RecentFiles_Empty", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Zamknij dokument.
+        /// </summary>
+        internal static string Menu_CloseDocument {
+            get {
+                return ResourceManager.GetString("Menu_CloseDocument", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Zapisz projekt zaznaczeń.
@@ -922,6 +931,17 @@ namespace AnonPDF.Properties {
         internal static string Msg_Confirm_OpenNewWithUnsavedSelections {
             get {
                 return ResourceManager.GetString("Msg_Confirm_OpenNewWithUnsavedSelections", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Czy na pewno chcesz zamknąć dokument?
+        ///
+        ///Masz zdefiniowane i nie zapisane zaznaczenia w treści....
+        /// </summary>
+        internal static string Msg_Confirm_CloseWithUnsavedSelections {
+            get {
+                return ResourceManager.GetString("Msg_Confirm_CloseWithUnsavedSelections", resourceCulture);
             }
         }
         

@@ -638,6 +638,7 @@ namespace AnonPDF
             saveProjectMenuItem.Text = Resources.Menu_SaveProject;
             savePdfMenuItem.Text = Resources.Menu_SavePdf;
             recentFilesMenuItem.Text = Resources.Menu_RecentFiles;
+            closeDocumentMenuItem.Text = Resources.Menu_CloseDocument;
             exitMenuItem.Text = Resources.Menu_Exit;
 
             // Options menu
@@ -2595,6 +2596,10 @@ namespace AnonPDF
         private void RenderTimer_Tick(object sender, EventArgs e)
         {
             renderTimer.Stop();
+            if (pdf == null)
+            {
+                return;
+            }
             ShowRedactPreview();
             pdfViewer.Invalidate();
         }
@@ -2602,6 +2607,10 @@ namespace AnonPDF
         private void PagingTimer_Tick(object sender, EventArgs e)
         {
             pagingTimer.Stop();
+            if (pdf == null)
+            {
+                return;
+            }
             this.Cursor = Cursors.WaitCursor;
             DisplayPdfPage(currentPage);
             this.Cursor = Cursors.Default;
@@ -2610,6 +2619,11 @@ namespace AnonPDF
         private void ZoomTimer_Tick(object sender, EventArgs e)
         {
             zoomTimer.Stop();
+
+            if (pdf == null)
+            {
+                return;
+            }
 
             if (zoomPending)
             {
@@ -3019,6 +3033,10 @@ namespace AnonPDF
 
         private DrawingImage RenderOriginalPage(int pageNumber)
         {
+            if (pdf == null || pageNumber < 1 || pageNumber > pdf.Pages.Count)
+            {
+                return null;
+            }
 
             var page = pdf.Pages[pageNumber - 1]; // 'pdf' is PDFiumSharp.PdfDocument loaded original
             int offset = GetRotationOffset(pageNumber);
@@ -3287,7 +3305,11 @@ namespace AnonPDF
 
         private void DisplayPdfPage(int pageNumber)
         {
-            
+            if (pdf == null || numPages == 0)
+            {
+                pdfViewer.Image = null;
+                return;
+            }
 
             // 2) Correct scaleFactor if it went beyond [min, max]
             if ((scaleFactor < minScaleFactor))
@@ -4335,15 +4357,17 @@ namespace AnonPDF
 
             try
             {
-                pdf = new PDFiumSharp.PdfDocument(inputPdfPath, userPassword);
-            }
-            catch (Exception)
-            {
-                MessageBox.Show(this, Resources.Err_InvalidPdfFile, Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
+            pdf = new PDFiumSharp.PdfDocument(inputPdfPath, userPassword);
+        }
+        catch (Exception)
+        {
+            MessageBox.Show(this, Resources.Err_InvalidPdfFile, Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
 
-            LogDebug($"LoadPdf path={inputPdfPath} password={(string.IsNullOrEmpty(userPassword) ? "no" : "yes")}");
+        pdfViewer.SizeMode = PictureBoxSizeMode.AutoSize;
+
+        LogDebug($"LoadPdf path={inputPdfPath} password={(string.IsNullOrEmpty(userPassword) ? "no" : "yes")}");
 
             pdfCleanUpToolError = false;
             groupBoxFilter.Visible = false;
@@ -4441,6 +4465,7 @@ namespace AnonPDF
             rotatePageMenuItem.Enabled = true;
             copyToClipboardMenuItem.Enabled = true;
             exportGraphicsMenuItem.Enabled = true;
+            closeDocumentMenuItem.Enabled = true;
 
             removePageButton.Enabled = true;
             removePageRangeButton.Enabled = true;
@@ -4522,6 +4547,28 @@ namespace AnonPDF
             return true;
         }
 
+        private bool ConfirmCloseDocument()
+        {
+            if (redactionBlocks.Count > 0 && projectWasChangedAfterLastSave)
+            {
+                string msgText = Resources.Msg_Confirm_CloseWithUnsavedSelections;
+                DialogResult result = MessageBox.Show(this,
+                    msgText,
+                    Resources.Title_Confirmation,
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Exclamation,
+                    MessageBoxDefaultButton.Button2
+                );
+
+                if (result == DialogResult.No)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private void OpenPdfFromPath(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
@@ -4536,6 +4583,108 @@ namespace AnonPDF
 
             inputPdfPath = filePath;
             LoadPdf();
+        }
+
+        private void CloseCurrentDocument()
+        {
+            if (pdf == null)
+            {
+                return;
+            }
+
+            if (!ConfirmCloseDocument())
+            {
+                return;
+            }
+
+            try
+            {
+                pdf.Close();
+            }
+            catch
+            {
+            }
+
+            renderTimer.Stop();
+            pagingTimer.Stop();
+            zoomTimer.Stop();
+
+            pdf = null;
+            inputPdfPath = string.Empty;
+            inputProjectPath = string.Empty;
+            userPassword = string.Empty;
+            userNewPassword = null;
+            numPages = 0;
+            currentPage = 1;
+            scaleFactor = 0;
+            pendingScaleFactor = 0;
+
+            pageRotationOffsets.Clear();
+            ClearRedactionBlocks();
+            ClearPagesToRemove();
+            ClearTextAnnotations();
+            PdfTextSearcher.ClearCache();
+            signaturesToRemove.Clear();
+            hasCustomSignatureSelection = false;
+            allPageStatuses.Clear();
+            pagesListView.Clear();
+            searchTextBox.Text = string.Empty;
+            searchResultLabel.Text = string.Empty;
+            ClearSearchResult();
+
+            isDrawing = false;
+            currentSelection = System.Drawing.Rectangle.Empty;
+            zoomPending = false;
+
+            pdfViewer.Image = null;
+            pdfViewer.SizeMode = PictureBoxSizeMode.Normal;
+            ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
+            if (panel is ZoomPanel)
+            {
+                panel.AutoScrollPosition = new System.Drawing.Point(0, 0);
+                pdfViewer.Size = panel.ClientSize;
+            }
+
+            groupBoxFilter.Visible = false;
+            pagesListView.Visible = false;
+            groupBoxPages.Enabled = false;
+            groupBoxSelections.Enabled = false;
+            groupBoxPagesToRemove.Enabled = false;
+            groupBoxSearch.Enabled = false;
+
+            saveProjectAsButton.Enabled = false;
+            saveProjectButton.Enabled = false;
+            buttonRedactText.Enabled = false;
+            colorCheckBox.Enabled = false;
+            setSavePassword.Enabled = false;
+            openSavedPDFCheckBox.Enabled = false;
+            safeModeCheckBox.Enabled = false;
+            personalDataButton.Enabled = false;
+
+            saveProjectAsMenuItem.Enabled = false;
+            saveProjectMenuItem.Enabled = false;
+            savePdfMenuItem.Enabled = false;
+            addTextMenuItem.Enabled = false;
+            deletePageMenuItem.Enabled = false;
+            rotatePageMenuItem.Enabled = false;
+            copyToClipboardMenuItem.Enabled = false;
+            exportGraphicsMenuItem.Enabled = false;
+            closeDocumentMenuItem.Enabled = false;
+
+            removePageButton.Enabled = false;
+            removePageRangeButton.Enabled = false;
+
+            pageNumberTextBox.Visible = false;
+            numPagesLabel.Visible = false;
+
+            projectWasChangedAfterLastSave = false;
+            lastSavedProjectName = string.Empty;
+
+            UpdateNavigationButtons(currentPage);
+            UpdateSaveGroupState();
+            UpdateOptionsGroupState();
+            UpdateWindowTitle();
+            pdfViewer.Invalidate();
         }
 
         private void LoadPdfButton_Click(object sender, EventArgs e)
@@ -4840,6 +4989,11 @@ namespace AnonPDF
 
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
+            if (pdf == null)
+            {
+                return;
+            }
+
             // Reset icon click flag
             isClickOnIcon = false;
             clickedIconType = IconType.None;
@@ -4957,6 +5111,11 @@ namespace AnonPDF
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
+            if (pdf == null)
+            {
+                return;
+            }
+
             if (isDrawing)
             {
                 float x = Math.Min(startPoint.X, e.X);
@@ -8390,6 +8549,11 @@ namespace AnonPDF
         private void SearchButton_Click(object sender, EventArgs e)
         {
             SearchText();
+        }
+
+        private void CloseDocumentMenuItem_Click(object sender, EventArgs e)
+        {
+            CloseCurrentDocument();
         }
 
         private void TutorialToolStripMenuItem_Click(object sender, EventArgs e)

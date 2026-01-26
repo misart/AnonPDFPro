@@ -180,6 +180,9 @@
   <data name="Menu_RecentFiles_Empty" xml:space="preserve">
     <value>Brak</value>
   </data>
+  <data name="Menu_CloseDocument" xml:space="preserve">
+    <value>Zamknij dokument</value>
+  </data>
   <data name="Menu_Exit" xml:space="preserve">
     <value>Koniec</value>
   </data>
@@ -765,6 +768,11 @@ Skontaktuj się z autorem aplikacji.</value>
   </data>
   <data name="Msg_Confirm_OpenNewWithUnsavedSelections" xml:space="preserve">
     <value>Czy na pewno chcesz otworzyć nowy plik PDF?
+
+Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value>
+  </data>
+  <data name="Msg_Confirm_CloseWithUnsavedSelections" xml:space="preserve">
+    <value>Czy na pewno chcesz zamknąć dokument?
 
 Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value>
   </data>

@@ -180,6 +180,9 @@
   <data name="Menu_RecentFiles_Empty" xml:space="preserve">
     <value>No recent files</value>
   </data>
+  <data name="Menu_CloseDocument" xml:space="preserve">
+    <value>Close document</value>
+  </data>
   <data name="Menu_Exit" xml:space="preserve">
     <value>Exit</value>
   </data>
@@ -765,6 +768,11 @@ Contact the application author.</value>
   </data>
   <data name="Msg_Confirm_OpenNewWithUnsavedSelections" xml:space="preserve">
     <value>Are you sure you want to open a new PDF?
+
+You have defined, unsaved selections in the document...</value>
+  </data>
+  <data name="Msg_Confirm_CloseWithUnsavedSelections" xml:space="preserve">
+    <value>Are you sure you want to close the document?
 
 You have defined, unsaved selections in the document...</value>
   </data>
