@@ -1893,12 +1893,6 @@ namespace AnonPDF
             splashForm.UpdateUpdateStatus(GetUpdatesStatusLine());
         }
 
-        // Method called by timer for periodic version checking
-        void OnVersionCheck(object sender, EventArgs e)
-        {
-            CheckForNewVersion();
-        }
-
         private void ShowInfoMessage(string message)
         {
             if (InvokeRequired)
