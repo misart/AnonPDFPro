@@ -103,7 +103,6 @@ namespace AnonPDF
         private bool zoomPending = false;
         private readonly Timer pagingTimer;
         private readonly Timer renderTimer;
-        private static System.Timers.Timer versionCheckTimer;
         private static readonly HttpClient VersionHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(5)
@@ -487,11 +486,7 @@ namespace AnonPDF
             };
             renderTimer.Tick += RenderTimer_Tick;
 
-            // Version check timer – check every 10 minutes
-            versionCheckTimer = new System.Timers.Timer(10 * 60 * 1000);
-            versionCheckTimer.Elapsed += OnVersionCheck;
-            versionCheckTimer.AutoReset = true;
-            versionCheckTimer.Start();
+            // Version/licence check runs once at startup (see PDFForm_Shown).
 
             // Enable drag-and-drop of files on the entire form
             this.AllowDrop = true;
@@ -9527,7 +9522,7 @@ namespace AnonPDF
             this.Owner?.Activate();
         }
 
-        private void ButtonMerge_Click(object sender, EventArgs e)
+        private async void ButtonMerge_Click(object sender, EventArgs e)
         {
             if (pdfFiles.Count == 0)
             {
@@ -9582,14 +9577,24 @@ namespace AnonPDF
 
             // if all files are OK, only then ask for destination
             SaveFileDialog sfd = new SaveFileDialog { Filter = Resources.Dialog_Filter_PDF };
-            if (sfd.ShowDialog(this) == DialogResult.OK)
+            if (sfd.ShowDialog(this) != DialogResult.OK)
             {
-                try
+                return;
+            }
+
+            buttonMerge.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+            string destination = sfd.FileName;
+            var filesToMerge = pdfFiles.ToList(); // snapshot for background task
+
+            try
+            {
+                await Task.Run(() =>
                 {
-                    using (var writer = new iText.Kernel.Pdf.PdfWriter(sfd.FileName))
+                    using (var writer = new iText.Kernel.Pdf.PdfWriter(destination))
                     using (var mergedDoc = new iText.Kernel.Pdf.PdfDocument(writer))
                     {
-                        foreach (var file in pdfFiles)
+                        foreach (var file in filesToMerge)
                         {
                             using (var reader = new PdfReader(file))
                             using (var pdfDoc = new iText.Kernel.Pdf.PdfDocument(reader))
@@ -9600,29 +9605,34 @@ namespace AnonPDF
 
                         PDFForm.ApplyDemoWatermarkIfNeeded(mergedDoc);
                     }
+                });
 
-                    MessageBox.Show(this, Resources.Merge_Success, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    this.Hide();
-                    this.Owner?.Activate();
+                MessageBox.Show(this, Resources.Merge_Success, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                this.Hide();
+                this.Owner?.Activate();
 
-                    try
-                    {
-                        ProcessStartInfo psi = new ProcessStartInfo
-                        {
-                            FileName = sfd.FileName,
-                            UseShellExecute = true
-                        };
-                        Process.Start(psi);
-                    }
-                    catch (System.ComponentModel.Win32Exception wex)
-                    {
-                        MessageBox.Show(this, string.Format(Resources.Err_NoAssociatedPdfApp, wex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
-                catch (Exception ex)
+                try
                 {
-                    MessageBox.Show(this, string.Format(Resources.Merge_Err_Merge, ex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ProcessStartInfo psi = new ProcessStartInfo
+                    {
+                        FileName = destination,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
                 }
+                catch (System.ComponentModel.Win32Exception wex)
+                {
+                    MessageBox.Show(this, string.Format(Resources.Err_NoAssociatedPdfApp, wex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, string.Format(Resources.Merge_Err_Merge, ex.Message), Resources.Title_Error, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+                buttonMerge.Enabled = true;
             }
         }
 
