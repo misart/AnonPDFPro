@@ -2345,6 +2345,14 @@ namespace AnonPDF
             SetFullScreen(!isFullScreen);
         }
 
+        internal void ExitFullScreenIfNeeded()
+        {
+            if (isFullScreen)
+            {
+                SetFullScreen(false);
+            }
+        }
+
         private void SetFullScreen(bool enable)
         {
             if (enable == isFullScreen)
@@ -4476,10 +4484,12 @@ namespace AnonPDF
             if (PdfDocumentContainsText())
             {
                 groupBoxSearch.Enabled = true;
+                personalDataButton.Enabled = true;
             }
             else
             {
                 groupBoxSearch.Enabled = false;
+                personalDataButton.Enabled = false;
             }
             
             saveProjectAsButton.Enabled = true;
@@ -4995,7 +5005,10 @@ namespace AnonPDF
                         {
                             try
                             {
-                                ProcessStartInfo psi = new ProcessStartInfo
+                                // Temporarily exit fullscreen to allow external viewer to show
+                                ExitFullScreenIfNeeded();
+
+                                var psi = new ProcessStartInfo
                                 {
                                     FileName = saveFileDialog.FileName,
                                     UseShellExecute = true
@@ -9607,7 +9620,12 @@ namespace AnonPDF
 
                 try
                 {
-                    ProcessStartInfo psi = new ProcessStartInfo
+                    if (this.Owner is PDFForm parentForm)
+                    {
+                        parentForm.ExitFullScreenIfNeeded();
+                    }
+
+                    var psi = new ProcessStartInfo
                     {
                         FileName = destination,
                         UseShellExecute = true
