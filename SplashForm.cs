@@ -11,9 +11,20 @@ namespace AnonPDF
     {
         private const int BorderThickness = 2;
         private const int ShadowSize = 4;
+        private Color borderColor = Color.FromArgb(0xC9, 0xD6, 0xDF);
+        private Color titleColor = Color.FromArgb(0x1F, 0x2A, 0x33);
+        private Color secondaryTextColor = Color.FromArgb(0x55, 0x62, 0x70);
+        private readonly Label titleLabel;
+        private readonly Label descriptionLabel;
+        private readonly Label versionLabel;
         private readonly Label licensedToLabel;
         private readonly Label licenseStatusLabel;
         private readonly Label updateStatusLabel;
+        private readonly Button openPdfButton;
+        private readonly Button openProjectButton;
+
+        public event EventHandler OpenPdfRequested;
+        public event EventHandler OpenProjectRequested;
 
         public SplashForm()
         {
@@ -24,7 +35,7 @@ namespace AnonPDF
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Color.White;
-            ClientSize = new Size(420, 260);
+            ClientSize = new Size(420, 320);
             Text = Branding.ProductName;
             DoubleBuffered = true;
             Padding = new Padding(BorderThickness, BorderThickness, BorderThickness + ShadowSize, BorderThickness + ShadowSize);
@@ -32,7 +43,7 @@ namespace AnonPDF
             var layout = new TableLayoutPanel
             {
                 ColumnCount = 1,
-                RowCount = 10,
+                RowCount = 12,
                 Dock = DockStyle.Fill,
                 Padding = new Padding(20),
             };
@@ -47,7 +58,8 @@ namespace AnonPDF
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
 
             var logoBox = new PictureBox
             {
@@ -57,32 +69,32 @@ namespace AnonPDF
             };
             logoBox.Image = LoadLogoImage();
 
-            var titleLabel = new Label
+            titleLabel = new Label
             {
                 Text = Branding.ProductName,
                 AutoSize = true,
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0x1F, 0x2A, 0x33),
+                ForeColor = titleColor,
                 Anchor = AnchorStyles.None,
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            var descriptionLabel = new Label
+            descriptionLabel = new Label
             {
                 Text = GetDescriptionText(),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(0x55, 0x62, 0x70),
+                ForeColor = secondaryTextColor,
                 Anchor = AnchorStyles.None,
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            var versionLabel = new Label
+            versionLabel = new Label
             {
                 Text = $"{GetVersionLabelText()}: {GetFileVersion()}",
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(0x1F, 0x2A, 0x33),
+                ForeColor = titleColor,
                 Anchor = AnchorStyles.None,
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -92,7 +104,7 @@ namespace AnonPDF
                 Text = GetLicensedToText(),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(0x55, 0x62, 0x70),
+                ForeColor = secondaryTextColor,
                 Anchor = AnchorStyles.None,
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -102,7 +114,7 @@ namespace AnonPDF
                 Text = GetLicenseStatusText(),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(0x55, 0x62, 0x70),
+                ForeColor = secondaryTextColor,
                 Anchor = AnchorStyles.None,
                 TextAlign = ContentAlignment.MiddleCenter
             };
@@ -112,10 +124,43 @@ namespace AnonPDF
                 Text = GetUpdateStatusText(),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(0x55, 0x62, 0x70),
+                ForeColor = secondaryTextColor,
                 Anchor = AnchorStyles.None,
                 TextAlign = ContentAlignment.MiddleCenter
             };
+
+            openPdfButton = new Button
+            {
+                Text = Properties.Resources.UI_Button_OpenPdf,
+                Size = new Size(170, 36),
+                Anchor = AnchorStyles.Left,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+            };
+            openPdfButton.Click += (_, __) => OpenPdfRequested?.Invoke(this, EventArgs.Empty);
+
+            openProjectButton = new Button
+            {
+                Text = Properties.Resources.UI_Button_OpenProject,
+                Size = new Size(170, 36),
+                Anchor = AnchorStyles.Right,
+                FlatStyle = FlatStyle.Flat,
+                UseVisualStyleBackColor = false,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
+            };
+            openProjectButton.Click += (_, __) => OpenProjectRequested?.Invoke(this, EventArgs.Empty);
+
+            var buttonsLayout = new TableLayoutPanel
+            {
+                ColumnCount = 2,
+                RowCount = 1,
+                Dock = DockStyle.Fill
+            };
+            buttonsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            buttonsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            buttonsLayout.Controls.Add(openPdfButton, 0, 0);
+            buttonsLayout.Controls.Add(openProjectButton, 1, 0);
 
             layout.Controls.Add(logoBox, 0, 0);
             layout.Controls.Add(titleLabel, 0, 1);
@@ -127,14 +172,17 @@ namespace AnonPDF
             layout.Controls.Add(licensedToLabel, 0, 7);
             layout.Controls.Add(licenseStatusLabel, 0, 8);
             layout.Controls.Add(updateStatusLabel, 0, 9);
+            layout.Controls.Add(new Panel { Height = 12, Dock = DockStyle.Fill }, 0, 10);
+            layout.Controls.Add(buttonsLayout, 0, 11);
 
             Controls.Add(layout);
+            UpdateLocalization();
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            using (var pen = new Pen(Color.FromArgb(0xC9, 0xD6, 0xDF), BorderThickness))
+            using (var pen = new Pen(borderColor, BorderThickness))
             {
                 int inset = BorderThickness / 2;
                 var rect = new Rectangle(inset, inset, Width - BorderThickness - 1, Height - BorderThickness - 1);
@@ -175,6 +223,99 @@ namespace AnonPDF
             }
 
             updateStatusLabel.Text = text;
+        }
+
+        public void UpdateLocalization()
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            if (titleLabel != null)
+            {
+                titleLabel.Text = Branding.ProductName;
+            }
+
+            if (descriptionLabel != null)
+            {
+                descriptionLabel.Text = GetDescriptionText();
+            }
+
+            if (versionLabel != null)
+            {
+                versionLabel.Text = $"{GetVersionLabelText()}: {GetFileVersion()}";
+            }
+
+            if (openPdfButton != null)
+            {
+                openPdfButton.Text = Properties.Resources.UI_Button_OpenPdf;
+            }
+
+            if (openProjectButton != null)
+            {
+                openProjectButton.Text = Properties.Resources.UI_Button_OpenProject;
+            }
+
+            if (licensedToLabel != null)
+            {
+                licensedToLabel.Text = GetLicensedToText();
+            }
+
+            if (licenseStatusLabel != null)
+            {
+                licenseStatusLabel.Text = GetLicenseStatusText();
+            }
+
+            if (updateStatusLabel != null)
+            {
+                updateStatusLabel.Text = GetUpdateStatusText();
+            }
+        }
+
+        public void ApplyTheme(
+            Color windowBackColor,
+            Color border,
+            Color textPrimary,
+            Color textSecondary,
+            Color primaryButtonBack,
+            Color primaryButtonFore,
+            Color secondaryButtonBack,
+            Color secondaryButtonFore)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            borderColor = border;
+            titleColor = textPrimary;
+            secondaryTextColor = textSecondary;
+
+            BackColor = windowBackColor;
+
+            if (titleLabel != null) titleLabel.ForeColor = textPrimary;
+            if (versionLabel != null) versionLabel.ForeColor = textPrimary;
+            if (descriptionLabel != null) descriptionLabel.ForeColor = textSecondary;
+            if (licensedToLabel != null) licensedToLabel.ForeColor = textSecondary;
+            if (licenseStatusLabel != null) licenseStatusLabel.ForeColor = textSecondary;
+            if (updateStatusLabel != null) updateStatusLabel.ForeColor = textSecondary;
+
+            if (openPdfButton != null)
+            {
+                openPdfButton.BackColor = primaryButtonBack;
+                openPdfButton.ForeColor = primaryButtonFore;
+                openPdfButton.FlatAppearance.BorderColor = border;
+            }
+
+            if (openProjectButton != null)
+            {
+                openProjectButton.BackColor = secondaryButtonBack;
+                openProjectButton.ForeColor = secondaryButtonFore;
+                openProjectButton.FlatAppearance.BorderColor = border;
+            }
+
+            Invalidate();
         }
 
         private static Image LoadLogoImage()

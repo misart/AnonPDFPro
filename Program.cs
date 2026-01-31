@@ -46,6 +46,8 @@ namespace AnonPDF
             }
             var splash = new SplashForm();
             var mainForm = new PDFForm(splash);
+            splash.OpenPdfRequested += (_, __) => mainForm.OpenPdfFromSplash();
+            splash.OpenProjectRequested += (_, __) => mainForm.OpenProjectFromSplash();
             splash.Owner = mainForm;
             splash.Show();
             Application.DoEvents();

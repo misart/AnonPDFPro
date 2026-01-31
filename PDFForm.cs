@@ -616,6 +616,28 @@ namespace AnonPDF
             return IsEnglish() ? en : pl;
         }
 
+        public void OpenPdfFromSplash()
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(OpenPdfFromSplash));
+                return;
+            }
+
+            LoadPdfButton_Click(this, EventArgs.Empty);
+        }
+
+        public void OpenProjectFromSplash()
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(OpenProjectFromSplash));
+                return;
+            }
+
+            OpenProjectButton_Click(this, EventArgs.Empty);
+        }
+
         private void EnsureToolTipActive()
         {
             if (toolTip1 == null)
@@ -753,6 +775,10 @@ namespace AnonPDF
             try { groupBoxFilter.Text = Resources.UI_Group_Filter; } catch { }
 
             UpdateWindowTitle();
+            if (splashForm != null && !splashClosed && !splashForm.IsDisposed)
+            {
+                splashForm.UpdateLocalization();
+            }
 
             // Tooltips
             EnsureToolTipActive();
@@ -2049,6 +2075,19 @@ namespace AnonPDF
             UpdateOptionsGroupState();
             UpdateRecentFilesMenu();
             UpdateThemeMenuChecks();
+
+            if (splashForm != null && !splashClosed && !splashForm.IsDisposed)
+            {
+                splashForm.ApplyTheme(
+                    theme.WindowBackColor,
+                    theme.BorderColor,
+                    theme.TextPrimaryColor,
+                    theme.TextSecondaryColor,
+                    theme.PrimaryButtonBackColor,
+                    theme.PrimaryButtonForeColor,
+                    theme.SecondaryButtonBackColor,
+                    theme.SecondaryButtonForeColor);
+            }
         }
 
         private void LoadPreferredTheme()
