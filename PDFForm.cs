@@ -4798,6 +4798,9 @@ namespace AnonPDF
                     boundsPt.Width / pxToPtX,
                     boundsPt.Height / pxToPtY
                 );
+
+                // Keep annotation rotation relative to the page orientation
+                annotation.AnnotationRotation = NormalizeRotation(annotation.AnnotationRotation + 90);
             }
 
             int offset = GetRotationOffset(currentPage);
