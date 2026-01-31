@@ -157,7 +157,7 @@
     <value>Open PDF</value>
   </data>
   <data name="Menu_OpenProject" xml:space="preserve">
-    <value>Open Project</value>
+    <value>Open project</value>
   </data>
   <data name="Menu_OpenLast" xml:space="preserve">
     <value>Open last PDF and project</value>
@@ -298,7 +298,7 @@
     <value>Open PDF</value>
   </data>
   <data name="UI_Button_OpenProject" xml:space="preserve">
-    <value>Open Project</value>
+    <value>Open project</value>
   </data>
   <data name="UI_Button_SaveProject" xml:space="preserve">
     <value>Save Project</value>
@@ -791,7 +791,7 @@ Are you sure you want to discard them?</value>
     <value>Open a PDF file first.</value>
   </data>
   <data name="Msg_DragDrop_UnsupportedFileType" xml:space="preserve">
-    <value>Unsupported file type. Drag a PDF or .pap file.</value>
+    <value>Unsupported file type. Drag a PDF or .app file.</value>
   </data>
   <data name="Msg_NoPasswordOpenCancelled" xml:space="preserve">
     <value>No password provided — opening canceled.</value>
@@ -853,7 +853,7 @@ Project: {0}</value>
     <value>PDF files (*.pdf)|*.pdf</value>
   </data>
   <data name="Dialog_Filter_PAP" xml:space="preserve">
-    <value>PAP files (*.pap)|*.pap</value>
+    <value>APP project files (*.app)|*.app|Legacy PAP files (*.pap)|*.pap</value>
   </data>
   <data name="Dialog_Title_OpenPdf" xml:space="preserve">
     <value>Select a PDF file</value>

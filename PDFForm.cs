@@ -142,6 +142,8 @@ namespace AnonPDF
         private readonly SplashForm splashForm;
         private bool splashClosed;
         private readonly CultureInfo systemUiCulture;
+        private const string ProjectFileExtension = ".app";
+        private const string LegacyProjectFileExtension = ".pap";
 
         private enum UiThemeKind
         {
@@ -2769,11 +2771,12 @@ namespace AnonPDF
                 // 2) Load PDF (e.g. your method that you already have in code)
                 LoadPdf();
             }
-            else if (extension == ".pap")
+            else if (string.Equals(extension, ProjectFileExtension, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, LegacyProjectFileExtension, StringComparison.OrdinalIgnoreCase))
             {
-                // 2) Load project (e.g. your method to load .pap)
+                // 2) Load project (e.g. your method to load .app)
                 //    NOTE: for this to make sense, PDF should also be already loaded
-                //    or .pap knows which PDF to work with.
+                //    or .app knows which PDF to work with.
 
                 LoadRedactionBlocks(droppedFile);
             }
@@ -6183,7 +6186,7 @@ namespace AnonPDF
 
                 saveFileDialog.Filter = Resources.Dialog_Filter_PAP;
                 saveFileDialog.Title = string.Format(Resources.Dialog_Title_SavePap, Branding.ProductName);
-                saveFileDialog.FileName = $"{System.IO.Path.GetFileNameWithoutExtension(filePapName)}.pap";
+                saveFileDialog.FileName = $"{System.IO.Path.GetFileNameWithoutExtension(filePapName)}{ProjectFileExtension}";
 
                 if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
                 {
@@ -6210,7 +6213,7 @@ namespace AnonPDF
                         // Serialize list to JSON string
                         string json = JsonConvert.SerializeObject(projectData, jsonSettings);
 
-                        // Write to .pap file (plain text)
+                        // Write to .app file (plain text)
                         lastSavedProjectName = saveFileDialog.FileName;
                         File.WriteAllText(lastSavedProjectName, json);
 
@@ -6951,7 +6954,8 @@ namespace AnonPDF
 
             string ext = Path.GetExtension(filePath);
             if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(ext, ".pap", StringComparison.OrdinalIgnoreCase))
+                !string.Equals(ext, ProjectFileExtension, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(ext, LegacyProjectFileExtension, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -7007,7 +7011,8 @@ namespace AnonPDF
 
                 string ext = Path.GetExtension(path);
                 if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(ext, ".pap", StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(ext, ProjectFileExtension, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(ext, LegacyProjectFileExtension, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -7087,7 +7092,8 @@ namespace AnonPDF
                 return;
             }
 
-            if (string.Equals(ext, ".pap", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(ext, ProjectFileExtension, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ext, LegacyProjectFileExtension, StringComparison.OrdinalIgnoreCase))
             {
                 LoadRedactionBlocks(filePath);
             }

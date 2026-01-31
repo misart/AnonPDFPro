@@ -791,7 +791,7 @@ Czy na pewno chcesz je utracić?</value>
     <value>Otwórz najpierw plik PDF.</value>
   </data>
   <data name="Msg_DragDrop_UnsupportedFileType" xml:space="preserve">
-    <value>Jest to nieobsługiwany typ pliku. Przeciągnij plik PDF lub plik .pap.</value>
+    <value>Jest to nieobsługiwany typ pliku. Przeciągnij plik PDF lub plik .app.</value>
   </data>
   <data name="Msg_NoPasswordOpenCancelled" xml:space="preserve">
     <value>Nie podano hasła – otwarcie anulowane.</value>
@@ -853,7 +853,7 @@ Projekt: {0}</value>
     <value>Pliki PDF (*.pdf)|*.pdf</value>
   </data>
   <data name="Dialog_Filter_PAP" xml:space="preserve">
-    <value>Pliki PAP (*.pap)|*.pap</value>
+    <value>Pliki APP (*.app)|*.app|Starsze projekty (*.pap)|*.pap</value>
   </data>
   <data name="Dialog_Title_OpenPdf" xml:space="preserve">
     <value>Wybierz plik PDF</value>
