@@ -141,6 +141,7 @@ namespace AnonPDF
         private const int LeftPanelScrollbarPadding = 6;
         private readonly SplashForm splashForm;
         private bool splashClosed;
+        private readonly CultureInfo systemUiCulture;
 
         private enum UiThemeKind
         {
@@ -432,6 +433,7 @@ namespace AnonPDF
         public PDFForm(SplashForm splash = null)
         {
             splashForm = splash;
+            systemUiCulture = CultureInfo.CurrentUICulture;
             // Read version info
             var assembly = Assembly.GetExecutingAssembly();
             var fileVersionInfo = FileVersionInfo.GetVersionInfo(assembly.Location);
@@ -451,7 +453,7 @@ namespace AnonPDF
             else
             {
                 // Use current OS UI culture for "System" default (user's display language)
-                var sys = CultureInfo.CurrentUICulture;
+                var sys = systemUiCulture ?? CultureInfo.CurrentUICulture;
                 System.Threading.Thread.CurrentThread.CurrentUICulture = sys;
                 System.Threading.Thread.CurrentThread.CurrentCulture = sys;
                 AnonPDF.Properties.Resources.Culture = sys;
@@ -614,6 +616,27 @@ namespace AnonPDF
             return IsEnglish() ? en : pl;
         }
 
+        private void EnsureToolTipActive()
+        {
+            if (toolTip1 == null)
+            {
+                toolTip1 = new ToolTip(components) { IsBalloon = true, ShowAlways = true };
+                return;
+            }
+
+            try
+            {
+                toolTip1.RemoveAll();
+                toolTip1.Active = true;
+                toolTip1.ShowAlways = true;
+                toolTip1.IsBalloon = true;
+            }
+            catch (ObjectDisposedException)
+            {
+                toolTip1 = new ToolTip(components) { IsBalloon = true, ShowAlways = true };
+            }
+        }
+
         private void ApplyLocalization()
         {
             // Use already-set Resources.Culture (SetLanguage/startup decide it)
@@ -732,6 +755,7 @@ namespace AnonPDF
             UpdateWindowTitle();
 
             // Tooltips
+            EnsureToolTipActive();
             try { toolTip1.SetToolTip(loadPdfButton, Resources.Tooltip_LoadPdf); } catch { }
             try { toolTip1.SetToolTip(setSavePassword, Resources.Tooltip_SetPassword); } catch { }
             try { toolTip1.SetToolTip(safeModeCheckBox, Resources.Tooltip_SafeMode); } catch { }
@@ -852,7 +876,7 @@ namespace AnonPDF
             // Clear preference to use system culture
             Properties.Settings.Default.PreferredUICulture = string.Empty;
             Properties.Settings.Default.Save();
-            var sys = CultureInfo.CurrentUICulture;
+            var sys = systemUiCulture ?? CultureInfo.InstalledUICulture ?? CultureInfo.CurrentUICulture;
             System.Threading.Thread.CurrentThread.CurrentUICulture = sys;
             System.Threading.Thread.CurrentThread.CurrentCulture = sys;
             Resources.Culture = sys;
