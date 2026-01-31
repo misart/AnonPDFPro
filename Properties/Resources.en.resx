@@ -430,7 +430,7 @@
     <value>Create a signatures report on an extra page.</value>
   </data>
   <data name="Tooltip_Signatures_Original" xml:space="preserve">
-    <value>Keep qualified signatures in the PDF.</value>
+    <value>Anonymize signatures and keep their original visual appearance.</value>
   </data>
   <data name="Tooltip_Signatures_Remove" xml:space="preserve">
     <value>Remove qualified signatures before saving.</value>

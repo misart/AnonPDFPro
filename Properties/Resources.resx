@@ -430,7 +430,7 @@
     <value>Wygeneruj raport podpisów na dodatkowej stronie.</value>
   </data>
   <data name="Tooltip_Signatures_Original" xml:space="preserve">
-    <value>Pozostaw podpisy kwalifikowane w pliku.</value>
+    <value>Anonimizuje podpisy i pozostawia oryginalne ich wizualizacje.</value>
   </data>
   <data name="Tooltip_Signatures_Remove" xml:space="preserve">
     <value>Usuń podpisy kwalifikowane przed zapisaniem.</value>
