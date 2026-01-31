@@ -210,6 +210,9 @@
   <data name="Menu_IgnorePdfRestrictions" xml:space="preserve">
     <value>Pomijaj ograniczenia PDF</value>
   </data>
+  <data name="Menu_IgnorePdfRestrictions_Tooltip" xml:space="preserve">
+    <value>Pozwala przetwarzać pliki PDF z ograniczeniami edycji ustawionymi przez właściciela.</value>
+  </data>
   <data name="Menu_Language" xml:space="preserve">
     <value>Język</value>
   </data>

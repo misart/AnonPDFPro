@@ -702,6 +702,11 @@ namespace AnonPDF
               exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
               selectSignaturesToRemoveMenuItem.Text = Resources.Menu_SelectSignaturesToRemove;
               ignorePdfRestrictionsToolStripMenuItem.Text = Resources.Menu_IgnorePdfRestrictions;
+              var ignoreTooltip = Resources.ResourceManager.GetString("Menu_IgnorePdfRestrictions_Tooltip", currentCulture);
+              if (!string.IsNullOrWhiteSpace(ignoreTooltip))
+              {
+                  ignorePdfRestrictionsToolStripMenuItem.ToolTipText = ignoreTooltip;
+              }
               var themeText = Resources.ResourceManager.GetString("Menu_Options_Theme", currentCulture);
               if (!string.IsNullOrWhiteSpace(themeText))
               {
