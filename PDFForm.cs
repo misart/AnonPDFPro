@@ -7905,19 +7905,19 @@ namespace AnonPDF
             }
             if (inputPdfPath != "")
             {
-                string pdfFileName = Path.GetFileName(inputPdfPath);
+                string pdfFileName = ShortenFileName(Path.GetFileName(inputPdfPath));
                 titleText += $"              pdf: [{pdfFileName}]";
             }
             string papText = "";
             if (inputProjectPath != "")
             {
-                string papFileName = Path.GetFileName(inputProjectPath);
+                string papFileName = ShortenFileName(Path.GetFileName(inputProjectPath));
                 papText = $"        projekt: [{papFileName}]";
             }
 
             if (lastSavedProjectName != "")
             {
-                string papFileName = Path.GetFileName(lastSavedProjectName);
+                string papFileName = ShortenFileName(Path.GetFileName(lastSavedProjectName));
                 papText = $"        projekt: [{papFileName}]";
             }
 
@@ -7927,6 +7927,27 @@ namespace AnonPDF
             }
 
             this.Text = titleText;
+        }
+
+        private static string ShortenFileName(string fileName, int maxLength = 30)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return fileName;
+            }
+
+            if (fileName.Length <= maxLength)
+            {
+                return fileName;
+            }
+
+            int suffixLength = 3;
+            if (maxLength <= suffixLength)
+            {
+                return fileName.Substring(0, maxLength);
+            }
+
+            return fileName.Substring(0, maxLength - suffixLength) + "...";
         }
 
         private static string GetDemoTitleSuffix()
