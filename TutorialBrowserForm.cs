@@ -156,7 +156,18 @@ namespace AnonPDF
             MinimizeBox = false;
             MaximizeBox = false;
             ClientSize = new Size(720, 420);
-            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            try
+            {
+                using (var extractedIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
+                {
+                    Icon = extractedIcon != null ? (Icon)extractedIcon.Clone() : SystemIcons.Application;
+                }
+            }
+            catch
+            {
+                // ExtractAssociatedIcon can fail for UNC launch paths.
+                Icon = SystemIcons.Application;
+            }
 
             var layout = new TableLayoutPanel
             {

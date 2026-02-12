@@ -2,6 +2,7 @@
 using System.Windows.Forms;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 
 // Suppress spell-check warning for project name 'AnonPDF'
@@ -120,16 +121,31 @@ namespace AnonPDF
             return true;
         }
 
+        private static string GetErrorLogDirectory()
+        {
+            string companyName = GetSafeDirectoryName(Application.CompanyName, "MISART");
+            string productName = GetSafeDirectoryName(Application.ProductName, "AnonPDFPro");
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                companyName,
+                productName);
+        }
+
+        private static string GetSafeDirectoryName(string value, string fallback)
+        {
+            string source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            var invalidChars = Path.GetInvalidFileNameChars();
+            string normalized = new string(source.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
+            return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+        }
+
         // Log unhandled exceptions to AppData
         private static void LogUnhandledException(Exception ex, string exceptionType)
         {
             try
             {
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "WINF",
-                    "AnonPDF"
-                );
+                string appDataDir = GetErrorLogDirectory();
                 Directory.CreateDirectory(appDataDir);
 
                 string logPath = Path.Combine(appDataDir, "error.log");
@@ -148,11 +164,7 @@ namespace AnonPDF
         // Show an error dialog (includes log file location)
         private static void ShowError(Exception ex)
         {
-            string appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "WINF",
-                "AnonPDF"
-            );
+            string appDataDir = GetErrorLogDirectory();
             string logPath = Path.Combine(appDataDir, "error.log");
 
             MessageBox.Show(
