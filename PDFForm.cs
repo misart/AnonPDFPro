@@ -104,6 +104,8 @@ namespace AnonPDF
         private int oldScrollValue = 0;
         private int wheelResistanceCurentValue = 0;
         private readonly int wheelResistanceMaxValue = 5;
+        private enum WheelPageAnchor { None, Top, Bottom }
+        private WheelPageAnchor pendingWheelPageAnchor = WheelPageAnchor.None;
         private HashSet<int> pagesToRemove = new HashSet<int>();
         private Dictionary<int, int> pageRotationOffsets = new Dictionary<int, int>();
 
@@ -2976,6 +2978,7 @@ namespace AnonPDF
             }
             this.Cursor = Cursors.WaitCursor;
             DisplayPdfPage(currentPage);
+            ApplyPendingWheelPageAnchor();
             this.Cursor = Cursors.Default;
         }
 
@@ -3179,16 +3182,55 @@ namespace AnonPDF
                     }
                     if (rollUp)
                     {
-                        PreviousPage();
+                        if (currentPage > 1)
+                        {
+                            pendingWheelPageAnchor = WheelPageAnchor.Bottom;
+                            PreviousPage();
+                        }
                     }
                     else
                     {
-                        NextPage();
+                        if (currentPage < numPages)
+                        {
+                            pendingWheelPageAnchor = WheelPageAnchor.Top;
+                            NextPage();
+                        }
                     }
                     wheelResistanceCurentValue = 0;
                 }
                 oldScrollValue = newScrollValue;
             }
+        }
+
+        private void ApplyPendingWheelPageAnchor()
+        {
+            if (pendingWheelPageAnchor == WheelPageAnchor.None)
+            {
+                return;
+            }
+
+            ZoomPanel panel = mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
+            if (!(panel is ZoomPanel))
+            {
+                pendingWheelPageAnchor = WheelPageAnchor.None;
+                return;
+            }
+
+            int targetScrollY = panel.VerticalScroll.Minimum;
+            if (pendingWheelPageAnchor == WheelPageAnchor.Bottom)
+            {
+                int maxScrollableY = panel.VerticalScroll.Maximum - panel.VerticalScroll.LargeChange + 1;
+                if (maxScrollableY < panel.VerticalScroll.Minimum)
+                {
+                    maxScrollableY = panel.VerticalScroll.Minimum;
+                }
+                targetScrollY = maxScrollableY;
+            }
+
+            panel.AutoScrollPosition = new Point(panel.HorizontalScroll.Minimum, targetScrollY);
+            oldScrollValue = panel.VerticalScroll.Value;
+            wheelResistanceCurentValue = 0;
+            pendingWheelPageAnchor = WheelPageAnchor.None;
         }
 
         private static int NormalizeRotation(int rotation)
