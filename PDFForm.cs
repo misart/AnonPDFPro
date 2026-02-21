@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using System.IO;
+using System.IO.Compression;
 using System.ComponentModel;
 using System.Reflection;
 using System.Diagnostics;
@@ -117,9 +118,21 @@ namespace AnonPDF
         {
             Timeout = TimeSpan.FromSeconds(5)
         };
+        private static readonly HttpClient UpdatePackageHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(15)
+        };
         private string lastNotifiedVersion = "";
+        private int updateCheckInProgress;
+        private int standaloneUpdateDownloadInProgress;
+        private bool suppressCloseConfirmation;
+        private bool launchStandaloneInstallerAfterClose;
+        private bool standaloneInstallerLaunchAttempted;
+        private string pendingStandaloneInstallerPath = string.Empty;
         private static bool updatesOutOfRangeNotified;
         private static bool revokedNotified;
+        private ToolStripMenuItem checkForUpdatesToolStripMenuItem;
+        private ToolStripMenuItem activateLicenseToolStripMenuItem;
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -474,6 +487,7 @@ namespace AnonPDF
             }
 
             InitializeComponent();
+            InitializeUpdateMenu();
             LoadPreferredTheme();
             ApplyTheme();
             this.HandleCreated += (_, __) => ApplyTitleBarColor();
@@ -550,6 +564,7 @@ namespace AnonPDF
             pdfViewer.Paint += OnPaint;
             this.Shown += PDFForm_Shown;
             this.Closing += new CancelEventHandler(MainWindow_Closing);
+            this.FormClosed += MainWindow_Closed;
 
             pagesListView.View = View.List;
             pagesListView.MultiSelect = false;
@@ -657,6 +672,23 @@ namespace AnonPDF
         private static string L(string pl, string en)
         {
             return IsEnglish() ? en : pl;
+        }
+
+        private void InitializeUpdateMenu()
+        {
+            checkForUpdatesToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "checkForUpdatesToolStripMenuItem"
+            };
+            checkForUpdatesToolStripMenuItem.Click += CheckForUpdatesToolStripMenuItem_Click;
+            menuHelpItem.DropDownItems.Insert(1, checkForUpdatesToolStripMenuItem);
+
+            activateLicenseToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "activateLicenseToolStripMenuItem"
+            };
+            activateLicenseToolStripMenuItem.Click += ActivateLicenseToolStripMenuItem_Click;
+            menuHelpItem.DropDownItems.Insert(2, activateLicenseToolStripMenuItem);
         }
 
         public void OpenPdfFromSplash()
@@ -774,6 +806,14 @@ namespace AnonPDF
 
             // Help menu
             helpMenuItem.Text = Resources.Menu_Help_Help;
+            if (checkForUpdatesToolStripMenuItem != null)
+            {
+                checkForUpdatesToolStripMenuItem.Text = L("Sprawdź aktualizacje...", "Check for updates...");
+            }
+            if (activateLicenseToolStripMenuItem != null)
+            {
+                activateLicenseToolStripMenuItem.Text = L("Aktywuj licencję...", "Activate license...");
+            }
             tutorialMenuItem.Text = Resources.Menu_Help_Tutorial;
             diagnosticModeMenuItem.Text = Resources.Menu_Help_DiagnosticMode;
             aboutMenuItem.Text = Resources.Menu_Help_About;
@@ -912,6 +952,13 @@ namespace AnonPDF
                 && (File.Exists(Path.Combine(tutorialDir, "tutorial.json"))
                     || File.Exists(Path.Combine(tutorialDir, "tutorial-en.json")));
             tutorialMenuItem.Enabled = hasTutorialJson;
+
+            if (activateLicenseToolStripMenuItem != null)
+            {
+                bool standaloneMode = LicenseManager.Config?.IsStandaloneUpdateMode == true;
+                activateLicenseToolStripMenuItem.Visible = standaloneMode;
+                activateLicenseToolStripMenuItem.Enabled = standaloneMode;
+            }
         }
 
         private void SetLanguage(string cultureName)
@@ -2084,26 +2131,33 @@ namespace AnonPDF
 
         private sealed class RemoteVersionInfo
         {
-            public RemoteVersionInfo(string version, string updated, string changesText, string downloadUrl)
+            public RemoteVersionInfo(string version, string updated, string changesText, string downloadUrl, string downloadUrlMsi)
             {
                 Version = version;
                 Updated = updated;
                 ChangesText = changesText;
                 DownloadUrl = downloadUrl;
+                DownloadUrlMsi = downloadUrlMsi;
             }
 
             public string Version { get; }
             public string Updated { get; }
             public string ChangesText { get; }
             public string DownloadUrl { get; }
+            public string DownloadUrlMsi { get; }
+        }
+
+        private enum UpdateCheckSource
+        {
+            Startup,
+            Manual
         }
 
         private RemoteVersionInfo FetchRemoteVersionInfo()
         {
             try
             {
-                string baseUrl = LicenseManager.Config?.ServerBaseUrl ?? "https://misart.pl/anonpdfpro";
-                string url = baseUrl.TrimEnd('/') + "/version.json";
+                string url = LicenseManager.Config?.ResolveVersionInfoUrl() ?? "https://misart.pl/anonpdfpro/version.json";
                 var response = VersionHttpClient.GetAsync(url).GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
                 {
@@ -2134,11 +2188,12 @@ namespace AnonPDF
                 }
 
                 string downloadUrl = (string)obj["downloadUrl"];
-                return new RemoteVersionInfo(version, updated, changesText, downloadUrl);
+                string downloadUrlMsi = (string)obj["downloadUrlMsi"] ?? (string)obj["msiDownloadUrl"];
+                return new RemoteVersionInfo(version, updated, changesText, downloadUrl, downloadUrlMsi);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error while checking version: " + ex.Message);
+                LogDebug("Error while checking version: " + ex.Message);
                 return null;
             }
         }
@@ -2158,7 +2213,7 @@ namespace AnonPDF
             return !string.Equals(remoteVersion, localVersion, StringComparison.OrdinalIgnoreCase);
         }
 
-        private string BuildNewVersionMessage(RemoteVersionInfo info)
+        private string BuildNewVersionMessage(RemoteVersionInfo info, string downloadUrlOverride = null)
         {
             string dateText = string.IsNullOrWhiteSpace(info.Updated) ? "-" : info.Updated;
             string message = string.Format(Resources.Msg_NewVersionAvailable, info.Version, dateText);
@@ -2174,32 +2229,466 @@ namespace AnonPDF
                 message += Environment.NewLine + Environment.NewLine + Resources.Msg_NewVersionNoChanges;
             }
 
-            if (!string.IsNullOrWhiteSpace(info.DownloadUrl))
+            string downloadUrl = string.IsNullOrWhiteSpace(downloadUrlOverride) ? info.DownloadUrl : downloadUrlOverride;
+            if (!string.IsNullOrWhiteSpace(downloadUrl))
             {
                 message += Environment.NewLine + Environment.NewLine
-                    + string.Format(Resources.Msg_NewVersionDownload, info.DownloadUrl);
+                    + string.Format(Resources.Msg_NewVersionDownload, downloadUrl);
             }
 
             return message;
         }
 
-        private void CheckForNewVersion()
+        private static string GetStandaloneMsiDownloadUrl(RemoteVersionInfo info)
         {
+            if (info == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(info.DownloadUrlMsi))
+            {
+                return info.DownloadUrlMsi;
+            }
+
+            return info.DownloadUrl;
+        }
+
+        private void CheckForNewVersion(UpdateCheckSource source)
+        {
+            if (System.Threading.Interlocked.Exchange(ref updateCheckInProgress, 1) == 1)
+            {
+                if (source == UpdateCheckSource.Manual)
+                {
+                    ShowInfoMessage(L("Sprawdzanie aktualizacji jest już w toku.", "Update check is already in progress."));
+                }
+                return;
+            }
+
+            try
+            {
             var info = FetchRemoteVersionInfo();
-            if (info == null || !IsRemoteVersionNewer(info.Version, fileVersion))
+                if (info == null)
+                {
+                    if (source == UpdateCheckSource.Manual)
+                    {
+                        ShowInfoMessage(L("Nie udało się pobrać informacji o aktualizacji.", "Could not fetch update information."));
+                    }
+                    return;
+                }
+
+                if (!IsRemoteVersionNewer(info.Version, fileVersion))
+                {
+                    if (source == UpdateCheckSource.Manual)
+                    {
+                        ShowInfoMessage(L("Masz już najnowszą wersję programu.", "You are already using the latest version."));
+                    }
+                    return;
+                }
+
+                bool standaloneMode = LicenseManager.Config?.IsStandaloneUpdateMode == true;
+                if (!standaloneMode && source == UpdateCheckSource.Startup
+                    && string.Equals(lastNotifiedVersion, info.Version, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                lastNotifiedVersion = info.Version;
+
+                if (standaloneMode)
+                {
+                    PromptStandaloneUpdateInstall(info, source == UpdateCheckSource.Manual);
+                    return;
+                }
+
+                var message = BuildNewVersionMessage(info);
+                ShowInfoMessage(message);
+            }
+            finally
             {
+                System.Threading.Interlocked.Exchange(ref updateCheckInProgress, 0);
+            }
+        }
+
+        private static bool TryGetMsiFileName(string downloadUrl, string version, out string fileName)
+        {
+            fileName = string.Empty;
+            if (string.IsNullOrWhiteSpace(downloadUrl) || !Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri))
+            {
+                return false;
+            }
+
+            string extracted = Path.GetFileName(uri.LocalPath);
+            if (string.IsNullOrWhiteSpace(extracted))
+            {
+                string safeVersion = Regex.Replace(version ?? string.Empty, @"[^0-9A-Za-z\.\-_]", "-");
+                extracted = string.IsNullOrWhiteSpace(safeVersion) ? "AnonPDFPro-update.msi" : $"AnonPDFPro-{safeVersion}.msi";
+            }
+
+            if (!extracted.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            fileName = extracted;
+            return true;
+        }
+
+        private DialogResult ShowQuestionMessage(string message, string title)
+        {
+            if (InvokeRequired)
+            {
+                return (DialogResult)Invoke(new Func<DialogResult>(() => ShowQuestionMessage(message, title)));
+            }
+
+            return MessageBox.Show(this, message, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        }
+
+        private void PromptStandaloneUpdateInstall(RemoteVersionInfo info, bool manualRequest)
+        {
+            string msiDownloadUrl = GetStandaloneMsiDownloadUrl(info);
+            string prompt = BuildNewVersionMessage(info, msiDownloadUrl)
+                + Environment.NewLine + Environment.NewLine
+                + L("Czy pobrać i uruchomić instalator MSI teraz?", "Do you want to download and run the MSI installer now?");
+            var result = ShowQuestionMessage(prompt, L("Dostępna aktualizacja", "Update available"));
+            if (result != DialogResult.Yes)
+            {
+                if (manualRequest)
+                {
+                    ShowInfoMessage(L("Aktualizacja została anulowana.", "Update was cancelled."));
+                }
                 return;
             }
 
-            if (string.Equals(lastNotifiedVersion, info.Version, StringComparison.OrdinalIgnoreCase))
+            if (!TryGetMsiFileName(msiDownloadUrl, info.Version, out string msiFileName))
             {
+                ShowInfoMessage(L(
+                    "Brak poprawnego linku do instalatora MSI w version.json (downloadUrl).",
+                    "No valid MSI installer link found in version.json (downloadUrl)."));
                 return;
             }
 
-            lastNotifiedVersion = info.Version;
-            var message = BuildNewVersionMessage(info);
+            if (System.Threading.Interlocked.CompareExchange(ref standaloneUpdateDownloadInProgress, 1, 0) != 0)
+            {
+                ShowInfoMessage(L(
+                    "Pobieranie instalatora aktualizacji już trwa. Proszę poczekać.",
+                    "Update installer download is already in progress. Please wait."));
+                return;
+            }
 
-            ShowInfoMessage(message);
+            string tempDirectory = Path.Combine(Path.GetTempPath(), "AnonPDFPro", "updates");
+            Directory.CreateDirectory(tempDirectory);
+            string targetPath = Path.Combine(tempDirectory, msiFileName);
+            ShowInfoMessage(L(
+                "Trwa pobieranie instalatora aktualizacji. Proszę poczekać.\r\n\r\nOtrzymasz powiadomienie po zakończeniu pobierania.",
+                "Downloading update installer. Please wait.\r\n\r\nYou will be notified when the download is complete."));
+            Task.Run(() => DownloadAndInstallStandaloneMsi(msiDownloadUrl, targetPath));
+        }
+
+        private void DownloadAndInstallStandaloneMsi(string downloadUrl, string targetPath)
+        {
+            try
+            {
+                LogDebug($"Standalone update download start url={downloadUrl} target={targetPath}");
+                using (var response = UpdatePackageHttpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult())
+                {
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new InvalidOperationException($"HTTP {(int)response.StatusCode}");
+                    }
+
+                    using (var source = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
+                    using (var target = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        source.CopyTo(target);
+                        target.Flush();
+                    }
+                }
+
+                LogDebug($"Standalone update download completed target={targetPath}");
+                PromptStandaloneInstallerReady(targetPath);
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Standalone update download/install failed: " + ex);
+                ShowInfoMessage(string.Format(
+                    L("Nie udało się pobrać lub uruchomić aktualizacji: {0}", "Failed to download or start update: {0}"),
+                    ex.Message));
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref standaloneUpdateDownloadInProgress, 0);
+            }
+        }
+
+        private void PromptStandaloneInstallerReady(string msiPath)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => PromptStandaloneInstallerReady(msiPath)));
+                return;
+            }
+
+            string message = L(
+                "Instalator aktualizacji został pobrany.\r\n\r\nCzy zamknąć aplikację i uruchomić instalator teraz?",
+                "The update installer has been downloaded.\r\n\r\nClose the application and run the installer now?");
+            var result = MessageBox.Show(this, message, L("Aktualizacja gotowa", "Update ready"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result != DialogResult.Yes)
+            {
+                ShowInfoMessage(string.Format(
+                    L("Instalator zapisano tutaj: {0}", "Installer saved here: {0}"),
+                    msiPath));
+                return;
+            }
+
+            LaunchStandaloneMsiInstaller(msiPath);
+        }
+
+        private void LaunchStandaloneMsiInstaller(string msiPath)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => LaunchStandaloneMsiInstaller(msiPath)));
+                return;
+            }
+
+            try
+            {
+                pendingStandaloneInstallerPath = msiPath;
+                suppressCloseConfirmation = true;
+                launchStandaloneInstallerAfterClose = true;
+                standaloneInstallerLaunchAttempted = false;
+                LogDebug($"Standalone update installer scheduled path={msiPath}");
+                Close();
+            }
+            catch (Exception ex)
+            {
+                pendingStandaloneInstallerPath = string.Empty;
+                suppressCloseConfirmation = false;
+                launchStandaloneInstallerAfterClose = false;
+                standaloneInstallerLaunchAttempted = false;
+                LogDebug("Standalone update installer launch failed: " + ex);
+                ShowInfoMessage(string.Format(
+                    L("Nie udało się uruchomić instalatora MSI: {0}", "Failed to start MSI installer: {0}"),
+                    ex.Message));
+            }
+        }
+
+        private void CheckForUpdatesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Task.Run(() => CheckForNewVersion(UpdateCheckSource.Manual));
+        }
+
+        private void ActivateLicenseToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (LicenseManager.Config?.IsStandaloneUpdateMode != true)
+            {
+                ShowInfoMessage(L(
+                    "Aktywacja licencji z pliku jest dostępna tylko w trybie standalone.",
+                    "License activation from file is available only in standalone mode."));
+                return;
+            }
+
+            using (var dialog = new OpenFileDialog())
+            {
+                dialog.Title = L("Wybierz paczkę licencji", "Select license package");
+                dialog.Filter = L("Paczki licencyjne (*.zip)|*.zip|Wszystkie pliki (*.*)|*.*", "License packages (*.zip)|*.zip|All files (*.*)|*.*");
+                dialog.Multiselect = false;
+                dialog.CheckFileExists = true;
+
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                string selectedPath = dialog.FileName;
+                Task.Run(() => ActivateLicenseFromPackage(selectedPath));
+            }
+        }
+
+        private void ActivateLicenseFromPackage(string packagePath)
+        {
+            string tempDirectory = Path.Combine(Path.GetTempPath(), "AnonPDFPro", "activation", Guid.NewGuid().ToString("N"));
+            string backupDirectory = Path.Combine(tempDirectory, "backup");
+            string userLicenseDirectory = LicenseManager.UserLicenseDirectory;
+            string[] requiredFiles = { "config.json", "license.json", "license_public.xml" };
+            var requiredSet = new HashSet<string>(requiredFiles, StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(userLicenseDirectory))
+            {
+                userLicenseDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "MISART",
+                    "AnonPDFPro");
+            }
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(packagePath) || !File.Exists(packagePath))
+                {
+                    throw new FileNotFoundException(L("Nie znaleziono wskazanej paczki licencji.", "Selected license package was not found."));
+                }
+
+                Directory.CreateDirectory(tempDirectory);
+                var extractedFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                using (var archive = ZipFile.OpenRead(packagePath))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (string.IsNullOrWhiteSpace(entry.Name))
+                        {
+                            continue;
+                        }
+
+                        string fileName = entry.Name.Trim();
+                        if (!requiredSet.Contains(fileName))
+                        {
+                            throw new InvalidOperationException(string.Format(
+                                L("Paczka zawiera niedozwolony plik: {0}", "Package contains unsupported file: {0}"),
+                                fileName));
+                        }
+
+                        if (extractedFiles.ContainsKey(fileName))
+                        {
+                            throw new InvalidOperationException(string.Format(
+                                L("Paczka zawiera zduplikowany plik: {0}", "Package contains duplicate file: {0}"),
+                                fileName));
+                        }
+
+                        string targetPath = Path.Combine(tempDirectory, fileName);
+                        entry.ExtractToFile(targetPath, true);
+                        extractedFiles[fileName] = targetPath;
+                    }
+                }
+
+                foreach (string requiredFile in requiredFiles)
+                {
+                    if (!extractedFiles.ContainsKey(requiredFile))
+                    {
+                        throw new InvalidOperationException(string.Format(
+                            L("Brakuje wymaganego pliku w paczce: {0}", "Required file is missing in package: {0}"),
+                            requiredFile));
+                    }
+                }
+
+                EnsureStandaloneConfig(extractedFiles["config.json"]);
+
+                Directory.CreateDirectory(userLicenseDirectory);
+                Directory.CreateDirectory(backupDirectory);
+
+                foreach (string fileName in requiredFiles)
+                {
+                    string destinationPath = Path.Combine(userLicenseDirectory, fileName);
+                    if (File.Exists(destinationPath))
+                    {
+                        File.Copy(destinationPath, Path.Combine(backupDirectory, fileName), true);
+                    }
+                }
+
+                foreach (string fileName in requiredFiles)
+                {
+                    File.Copy(extractedFiles[fileName], Path.Combine(userLicenseDirectory, fileName), true);
+                }
+
+                LicenseManager.Initialize(AppDomain.CurrentDomain.BaseDirectory);
+                bool activationValid = LicenseManager.Current != null
+                    && LicenseManager.Current.IsSignatureValid
+                    && LicenseManager.Current.Payload != null
+                    && string.Equals(LicenseManager.Current.Payload.Product, "AnonPDFPro", StringComparison.OrdinalIgnoreCase);
+
+                if (!activationValid)
+                {
+                    RestoreLicenseBackup(backupDirectory, userLicenseDirectory, requiredFiles);
+                    LicenseManager.Initialize(AppDomain.CurrentDomain.BaseDirectory);
+                    throw new InvalidOperationException(L("Paczka nie zawiera poprawnej licencji AnonPDFPro.", "Package does not contain a valid AnonPDFPro license."));
+                }
+
+                updatesOutOfRangeNotified = false;
+                revokedNotified = false;
+                lastNotifiedVersion = string.Empty;
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        ApplyLicenseStatusUi();
+                        UpdateHelpMenuAvailability();
+                        ShowInfoMessage(L("Licencja została aktywowana.", "License has been activated."));
+                    }));
+                }
+                else
+                {
+                    ApplyLicenseStatusUi();
+                    UpdateHelpMenuAvailability();
+                    ShowInfoMessage(L("Licencja została aktywowana.", "License has been activated."));
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("License activation failed: " + ex);
+                ShowInfoMessage(string.Format(
+                    L("Nie udało się aktywować licencji: {0}", "Failed to activate license: {0}"),
+                    ex.Message));
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(tempDirectory))
+                    {
+                        Directory.Delete(tempDirectory, true);
+                    }
+                }
+                catch
+                {
+                    // Ignore temp cleanup errors.
+                }
+            }
+        }
+
+        private static void EnsureStandaloneConfig(string configPath)
+        {
+            JObject config;
+            try
+            {
+                config = JObject.Parse(File.ReadAllText(configPath));
+            }
+            catch
+            {
+                config = new JObject();
+            }
+
+            if (config["licenseFile"] == null)
+            {
+                config["licenseFile"] = "license.json";
+            }
+            if (config["publicKeyFile"] == null)
+            {
+                config["publicKeyFile"] = "license_public.xml";
+            }
+            if (config["serverBaseUrl"] == null)
+            {
+                config["serverBaseUrl"] = "https://misart.pl/anonpdfpro";
+            }
+            config["updateMode"] = "standalone";
+
+            File.WriteAllText(configPath, config.ToString(Formatting.Indented), new System.Text.UTF8Encoding(false));
+        }
+
+        private static void RestoreLicenseBackup(string backupDirectory, string targetDirectory, IEnumerable<string> fileNames)
+        {
+            foreach (string fileName in fileNames)
+            {
+                string backupPath = Path.Combine(backupDirectory, fileName);
+                string destinationPath = Path.Combine(targetDirectory, fileName);
+
+                if (File.Exists(backupPath))
+                {
+                    File.Copy(backupPath, destinationPath, true);
+                }
+                else if (File.Exists(destinationPath))
+                {
+                    File.Delete(destinationPath);
+                }
+            }
         }
 
         private void RefreshLicenseStatusFromServer()
@@ -2259,7 +2748,7 @@ namespace AnonPDF
 
             PromptMaintenanceRecoveryIfAvailable();
             UpdateLeftPanelWidth();
-            Task.Run(() => CheckForNewVersion());
+            Task.Run(() => CheckForNewVersion(UpdateCheckSource.Startup));
             Task.Run(() => RefreshLicenseStatusFromServer());
         }
 
@@ -7154,26 +7643,29 @@ namespace AnonPDF
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            // Show dialog box with confirmation question
-            string msqOutText = "";
-            if (redactionBlocks.Count > 0 && projectWasChangedAfterLastSave)
+            if (!suppressCloseConfirmation)
             {
-                msqOutText += Resources.Msg_Closing_UnsavedSelectionsPrefix;
-            }
-            msqOutText += Resources.Msg_Confirm_CloseApp;
+                // Show dialog box with confirmation question
+                string msqOutText = "";
+                if (redactionBlocks.Count > 0 && projectWasChangedAfterLastSave)
+                {
+                    msqOutText += Resources.Msg_Closing_UnsavedSelectionsPrefix;
+                }
+                msqOutText += Resources.Msg_Confirm_CloseApp;
 
-            DialogResult result = MessageBox.Show(this,
-                msqOutText,
-                Resources.Title_Confirmation,
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Exclamation,
-                MessageBoxDefaultButton.Button2
-            );
+                DialogResult result = MessageBox.Show(this,
+                    msqOutText,
+                    Resources.Title_Confirmation,
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Exclamation,
+                    MessageBoxDefaultButton.Button2
+                );
 
-            // If user selects "No", cancel closing
-            if (result == DialogResult.No)
-            {
-                e.Cancel = true;
+                // If user selects "No", cancel closing
+                if (result == DialogResult.No)
+                {
+                    e.Cancel = true;
+                }
             }
 
             if (!e.Cancel)
@@ -7195,6 +7687,57 @@ namespace AnonPDF
                 Properties.Settings.Default.LastPapPath = inputProjectPath;
             }
             Properties.Settings.Default.Save();
+        }
+
+        private void MainWindow_Closed(object sender, FormClosedEventArgs e)
+        {
+            if (!launchStandaloneInstallerAfterClose || standaloneInstallerLaunchAttempted)
+            {
+                return;
+            }
+
+            standaloneInstallerLaunchAttempted = true;
+            string msiPath = pendingStandaloneInstallerPath;
+            if (string.IsNullOrWhiteSpace(msiPath))
+            {
+                return;
+            }
+
+            try
+            {
+                LogDebug($"Starting standalone installer after app close path={msiPath}");
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "msiexec.exe",
+                    Arguments = $"/i \"{msiPath}\"",
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                var process = Process.Start(psi);
+                if (process == null)
+                {
+                    throw new InvalidOperationException("msiexec returned null process instance.");
+                }
+                LogDebug($"Standalone installer process started path={msiPath}");
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Standalone installer start after close failed: " + ex);
+                try
+                {
+                    MessageBox.Show(
+                        string.Format(
+                            L("Nie udało się uruchomić instalatora MSI: {0}", "Failed to start MSI installer: {0}"),
+                            ex.Message),
+                        Resources.Title_Error,
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+                catch
+                {
+                    // Ignore message errors during shutdown.
+                }
+            }
         }
 
         private void SaveProjectButton_Click(object sender, EventArgs e)

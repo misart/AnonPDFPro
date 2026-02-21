@@ -67,8 +67,9 @@ namespace AnonPDF
         {
             var issues = new List<string>();
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var config = LicenseManager.Config;
 
-            string configPath = Path.Combine(baseDir, "config.json");
+            string configPath = config?.ConfigFilePath ?? Path.Combine(baseDir, "config.json");
             if (!File.Exists(configPath))
             {
                 issues.Add(string.Format(Properties.Resources.License_ConfigMissing, configPath));
@@ -85,14 +86,13 @@ namespace AnonPDF
                 }
             }
 
-            var config = LicenseManager.Config;
-            string licensePath = config?.ResolveLicensePath(baseDir) ?? Path.Combine(baseDir, "license.json");
+            string licensePath = config?.ResolveLicensePath() ?? Path.Combine(baseDir, "license.json");
             if (!File.Exists(licensePath))
             {
                 issues.Add(string.Format(Properties.Resources.License_FileMissing, licensePath));
             }
 
-            string publicKeyPath = config?.ResolvePublicKeyPath(baseDir) ?? Path.Combine(baseDir, "license_public.xml");
+            string publicKeyPath = config?.ResolvePublicKeyPath() ?? Path.Combine(baseDir, "license_public.xml");
             if (!File.Exists(publicKeyPath))
             {
                 issues.Add(string.Format(Properties.Resources.License_PublicKeyMissing, publicKeyPath));

@@ -17,72 +17,185 @@ namespace AnonPDF
             string licenseFile,
             string publicKeyFile,
             string serverBaseUrl,
+            string versionInfoUrl,
+            string updateMode,
             string defaultTheme,
-            string licenseId)
+            string licenseId,
+            string configFilePath,
+            string installBaseDir,
+            string userBaseDir,
+            string sourceBaseDir)
         {
             LicenseFile = licenseFile;
             PublicKeyFile = publicKeyFile;
             ServerBaseUrl = serverBaseUrl;
+            VersionInfoUrl = versionInfoUrl;
+            UpdateMode = updateMode;
             DefaultTheme = defaultTheme;
             LicenseId = licenseId;
+            ConfigFilePath = configFilePath;
+            InstallBaseDir = installBaseDir;
+            UserBaseDir = userBaseDir;
+            SourceBaseDir = sourceBaseDir;
         }
 
         internal string LicenseFile { get; }
         internal string PublicKeyFile { get; }
         internal string ServerBaseUrl { get; }
+        internal string VersionInfoUrl { get; }
+        internal string UpdateMode { get; }
         internal string DefaultTheme { get; }
         internal string LicenseId { get; }
+        internal string ConfigFilePath { get; }
+        internal string InstallBaseDir { get; }
+        internal string UserBaseDir { get; }
+        internal string SourceBaseDir { get; }
+        internal bool IsStandaloneUpdateMode => string.Equals(UpdateMode, "standalone", StringComparison.OrdinalIgnoreCase);
 
-        internal static AppConfig Load(string baseDir)
+        internal static AppConfig Load(string installBaseDir, string userBaseDir)
         {
-            string configPath = Path.Combine(baseDir, "config.json");
-            var defaults = new AppConfig(
-                licenseFile: "license.json",
-                publicKeyFile: "license_public.xml",
-                serverBaseUrl: "https://misart.pl/anonpdfpro",
-                defaultTheme: string.Empty,
-                licenseId: string.Empty);
-
-            if (!File.Exists(configPath))
+            if (string.IsNullOrWhiteSpace(installBaseDir))
             {
-                return defaults;
+                installBaseDir = AppDomain.CurrentDomain.BaseDirectory;
+            }
+
+            if (string.IsNullOrWhiteSpace(userBaseDir))
+            {
+                userBaseDir = installBaseDir;
+            }
+
+            string installConfigPath = Path.Combine(installBaseDir, "config.json");
+            string userConfigPath = Path.Combine(userBaseDir, "config.json");
+            JObject installConfig = ParseConfigFile(installConfigPath);
+            JObject userConfig = ParseConfigFile(userConfigPath);
+
+            bool hasUserConfig = userConfig != null;
+            string sourceBaseDir = hasUserConfig ? userBaseDir : installBaseDir;
+            string configFilePath = hasUserConfig ? userConfigPath : installConfigPath;
+
+            return new AppConfig(
+                licenseFile: GetConfigValue(userConfig, installConfig, "licenseFile", "license.json"),
+                publicKeyFile: GetConfigValue(userConfig, installConfig, "publicKeyFile", "license_public.xml"),
+                serverBaseUrl: GetConfigValue(userConfig, installConfig, "serverBaseUrl", "https://misart.pl/anonpdfpro"),
+                versionInfoUrl: GetConfigValue(userConfig, installConfig, "versionInfoUrl", string.Empty),
+                updateMode: GetConfigValue(userConfig, installConfig, "updateMode", "central"),
+                defaultTheme: GetConfigValue(userConfig, installConfig, "defaultTheme", string.Empty),
+                licenseId: GetConfigValue(userConfig, installConfig, "licenseId", string.Empty),
+                configFilePath: configFilePath,
+                installBaseDir: installBaseDir,
+                userBaseDir: userBaseDir,
+                sourceBaseDir: sourceBaseDir);
+        }
+
+        private static JObject ParseConfigFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return null;
             }
 
             try
             {
-                var json = File.ReadAllText(configPath);
-                var root = JObject.Parse(json);
-                return new AppConfig(
-                    licenseFile: (string)root["licenseFile"] ?? defaults.LicenseFile,
-                    publicKeyFile: (string)root["publicKeyFile"] ?? defaults.PublicKeyFile,
-                    serverBaseUrl: (string)root["serverBaseUrl"] ?? defaults.ServerBaseUrl,
-                    defaultTheme: (string)root["defaultTheme"] ?? defaults.DefaultTheme,
-                    licenseId: (string)root["licenseId"] ?? defaults.LicenseId);
+                string json = File.ReadAllText(path);
+                return JObject.Parse(json);
             }
             catch
             {
-                return defaults;
+                return null;
             }
         }
 
-        internal string ResolveLicensePath(string baseDir)
+        private static string GetConfigValue(JObject user, JObject install, string key, string fallback)
         {
-            return ResolvePath(baseDir, LicenseFile);
-        }
-
-        internal string ResolvePublicKeyPath(string baseDir)
-        {
-            return ResolvePath(baseDir, PublicKeyFile);
-        }
-
-        private static string ResolvePath(string baseDir, string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
+            string value = (string)user?[key];
+            if (!string.IsNullOrWhiteSpace(value))
             {
-                return Path.Combine(baseDir, "license.json");
+                return value;
             }
 
-            return Path.IsPathRooted(path) ? path : Path.Combine(baseDir, path);
+            value = (string)install?[key];
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            return fallback;
+        }
+
+        internal string ResolveLicensePath()
+        {
+            return ResolvePath(LicenseFile, "license.json");
+        }
+
+        internal string ResolvePublicKeyPath()
+        {
+            return ResolvePath(PublicKeyFile, "license_public.xml");
+        }
+
+        internal string ResolveVersionInfoUrl()
+        {
+            if (!string.IsNullOrWhiteSpace(VersionInfoUrl))
+            {
+                return VersionInfoUrl;
+            }
+
+            if (string.IsNullOrWhiteSpace(ServerBaseUrl))
+            {
+                return "https://misart.pl/anonpdfpro/version.json";
+            }
+
+            return ServerBaseUrl.TrimEnd('/') + "/version.json";
+        }
+
+        private string ResolvePath(string path, string fallbackFileName)
+        {
+            string relativePath = string.IsNullOrWhiteSpace(path) ? fallbackFileName : path;
+            if (Path.IsPathRooted(relativePath))
+            {
+                return relativePath;
+            }
+
+            var candidates = new List<string>();
+            if (IsStandaloneUpdateMode)
+            {
+                AddCandidate(candidates, Path.Combine(UserBaseDir, relativePath));
+            }
+
+            AddCandidate(candidates, Path.Combine(SourceBaseDir, relativePath));
+            AddCandidate(candidates, Path.Combine(InstallBaseDir, relativePath));
+
+            foreach (string candidate in candidates)
+            {
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            if (candidates.Count > 0)
+            {
+                return candidates[0];
+            }
+
+            return Path.Combine(InstallBaseDir, relativePath);
+        }
+
+        private static void AddCandidate(List<string> list, string candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                return;
+            }
+
+            foreach (string item in list)
+            {
+                if (string.Equals(item, candidate, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            list.Add(candidate);
         }
     }
 
@@ -126,14 +239,14 @@ namespace AnonPDF
         internal bool IsDemoExpired { get; }
         internal string Error { get; }
 
-        internal static LicenseInfo Load(AppConfig config, string baseDir)
+        internal static LicenseInfo Load(AppConfig config)
         {
             if (config == null)
             {
                 return Invalid("Config missing.");
             }
 
-            string licensePath = config.ResolveLicensePath(baseDir);
+            string licensePath = config.ResolveLicensePath();
             if (!File.Exists(licensePath))
             {
                 return Invalid("License file not found.");
@@ -159,7 +272,7 @@ namespace AnonPDF
 
                 var payload = LicensePayload.FromJObject(payloadToken);
                 string dataToSign = LicensePayload.SerializeForSigning(payload);
-                bool signatureValid = VerifySignature(dataToSign, signature, config.ResolvePublicKeyPath(baseDir), out string error);
+                bool signatureValid = VerifySignature(dataToSign, signature, config.ResolvePublicKeyPath(), out string error);
 
                 return new LicenseInfo(payload, signatureValid, error);
             }
@@ -347,6 +460,8 @@ namespace AnonPDF
     {
         internal static AppConfig Config { get; private set; }
         internal static LicenseInfo Current { get; private set; }
+        internal static string InstallBaseDirectory { get; private set; }
+        internal static string UserLicenseDirectory { get; private set; }
         internal static bool IsUpdateOutOfRangeForCurrentVersion { get; private set; }
         internal static DateTime? CurrentBuildDate { get; private set; }
         internal static DateTime? ServerSupportUntil { get; private set; }
@@ -388,9 +503,20 @@ namespace AnonPDF
 
         internal static void Initialize(string baseDir)
         {
-            Config = AppConfig.Load(baseDir);
-            Current = LicenseInfo.Load(Config, baseDir);
+            InstallBaseDirectory = string.IsNullOrWhiteSpace(baseDir)
+                ? AppDomain.CurrentDomain.BaseDirectory
+                : baseDir;
+            UserLicenseDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MISART",
+                "AnonPDFPro");
+
+            Config = AppConfig.Load(InstallBaseDirectory, UserLicenseDirectory);
+            Current = LicenseInfo.Load(Config);
             CurrentBuildDate = GetBuildDateFromFileVersion();
+            ServerSupportUntil = null;
+            IsRevoked = false;
+            ServerMessage = null;
             RefreshUpdateRange();
         }
 
