@@ -133,6 +133,7 @@ namespace AnonPDF
         private static bool revokedNotified;
         private ToolStripMenuItem checkForUpdatesToolStripMenuItem;
         private ToolStripMenuItem activateLicenseToolStripMenuItem;
+        private bool pagesListTooltipShownThisSession;
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -568,6 +569,7 @@ namespace AnonPDF
 
             pagesListView.View = View.List;
             pagesListView.MultiSelect = false;
+            pagesListView.MouseUp += PagesListView_MouseUp;
 
             filterComboBox.SelectedIndex = 0;            
             filterComboBox.DrawMode = DrawMode.OwnerDrawFixed;
@@ -719,20 +721,40 @@ namespace AnonPDF
             if (toolTip1 == null)
             {
                 toolTip1 = new ToolTip(components) { IsBalloon = true, ShowAlways = true };
+            }
+            else
+            {
+                try
+                {
+                    toolTip1.RemoveAll();
+                    toolTip1.Active = true;
+                    toolTip1.ShowAlways = true;
+                    toolTip1.IsBalloon = true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    toolTip1 = new ToolTip(components) { IsBalloon = true, ShowAlways = true };
+                }
+            }
+
+            toolTip1.Popup -= ToolTip1_Popup;
+            toolTip1.Popup += ToolTip1_Popup;
+        }
+
+        private void ToolTip1_Popup(object sender, PopupEventArgs e)
+        {
+            if (e?.AssociatedControl != pagesListView)
+            {
                 return;
             }
 
-            try
+            if (pagesListTooltipShownThisSession)
             {
-                toolTip1.RemoveAll();
-                toolTip1.Active = true;
-                toolTip1.ShowAlways = true;
-                toolTip1.IsBalloon = true;
+                e.Cancel = true;
+                return;
             }
-            catch (ObjectDisposedException)
-            {
-                toolTip1 = new ToolTip(components) { IsBalloon = true, ShowAlways = true };
-            }
+
+            pagesListTooltipShownThisSession = true;
         }
 
         private void ApplyLocalization()
@@ -3390,8 +3412,19 @@ namespace AnonPDF
                     offset++;
                 }
 
-                Size textSize = TextRenderer.MeasureText(e.Item.Text, e.Item.Font);
-                DrawingRectangle textRect = new DrawingRectangle(e.Bounds.Left + rectangleWidth + 4, e.Bounds.Top, textSize.Width, e.Bounds.Height);
+                int textLeft = e.Bounds.Left + rectangleWidth + 4;
+                int textWidth = Math.Max(1, e.Bounds.Right - textLeft - 2);
+                DrawingRectangle textRect = new DrawingRectangle(textLeft, e.Bounds.Top, textWidth, e.Bounds.Height);
+                const TextFormatFlags textFlags = TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+                Size measuredText = TextRenderer.MeasureText(
+                    e.Graphics,
+                    e.Item.Text,
+                    e.Item.Font,
+                    new Size(int.MaxValue, e.Bounds.Height),
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+                const int selectionRightMargin = 2;
+                int selectionWidth = Math.Min(textRect.Width, Math.Max(1, measuredText.Width + 4 + selectionRightMargin));
+                DrawingRectangle selectionRect = new DrawingRectangle(textRect.Left, textRect.Top, selectionWidth, textRect.Height);
                 bool isMarkedForDeletion = status.MarkedForDeletion;
                 if (isMarkedForDeletion)
                 {
@@ -3399,17 +3432,17 @@ namespace AnonPDF
                     {
                         using (SolidBrush highlightBrush = new SolidBrush(SystemColors.Highlight))
                         {
-                            e.Graphics.FillRectangle(highlightBrush, textRect);
+                            e.Graphics.FillRectangle(highlightBrush, selectionRect);
                         }
-                        TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, SystemColors.HighlightText, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                        TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, SystemColors.HighlightText, textFlags);
                     }
                     else
                     {
                         using (SolidBrush deletedBrush = new SolidBrush(System.Drawing.Color.Black))
                         {
-                            e.Graphics.FillRectangle(deletedBrush, textRect);
+                            e.Graphics.FillRectangle(deletedBrush, selectionRect);
                         }
-                        TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, System.Drawing.Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                        TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, System.Drawing.Color.White, textFlags);
                     }
                     return;
                 }
@@ -3421,14 +3454,14 @@ namespace AnonPDF
                 {
                     using (SolidBrush highlightBrush = new SolidBrush(SystemColors.Highlight))
                     {
-                        e.Graphics.FillRectangle(highlightBrush, textRect);
+                        e.Graphics.FillRectangle(highlightBrush, selectionRect);
                     }
-                    TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, SystemColors.HighlightText, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                    TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, SystemColors.HighlightText, textFlags);
                 }
                 else
                 {
                     // Normal text drawing for remaining elements
-                    TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, e.Item.ForeColor, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+                    TextRenderer.DrawText(e.Graphics, e.Item.Text, e.Item.Font, textRect, e.Item.ForeColor, textFlags);
                 }
 
             }
@@ -7097,6 +7130,10 @@ namespace AnonPDF
             {
                 // Take the first selected item
                 ListViewItem selectedItem = pagesListView.SelectedItems[0];
+                if (DebugLogEnabled)
+                {
+                    LogDebug($"PagesList selected count={pagesListView.SelectedItems.Count} item={DescribePageListItem(selectedItem)}");
+                }
 
 
                 // Item text, e.g. "Page 1"
@@ -7150,7 +7187,93 @@ namespace AnonPDF
                 UpdateSearchNavigationButtons();
                 //pagesListView.Invalidate();
                 pagesListView.Invalidate(selectedItem.Bounds);
+                return;
             }
+
+            if (DebugLogEnabled)
+            {
+                LogDebug("PagesList selected count=0");
+            }
+        }
+
+        private void PagesListView_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left)
+            {
+                return;
+            }
+
+            if (pagesListView.Items.Count == 0)
+            {
+                return;
+            }
+
+            ListViewItem hitItem = pagesListView.HitTest(e.Location).Item;
+            if (DebugLogEnabled)
+            {
+                LogDebug(
+                    $"PagesList mouseup x={e.X} y={e.Y} hit={DescribePageListItem(hitItem)} selectedBefore={pagesListView.SelectedItems.Count} currentPage={currentPage}");
+            }
+
+            // Let native ListView finish processing click first.
+            BeginInvoke(new Action(() =>
+            {
+                if (pagesListView.IsDisposed)
+                {
+                    return;
+                }
+
+                if (pagesListView.SelectedItems.Count > 0)
+                {
+                    if (DebugLogEnabled)
+                    {
+                        LogDebug($"PagesList mouseup post selected={DescribePageListItem(pagesListView.SelectedItems[0])}");
+                    }
+                    return;
+                }
+
+                // Keep stable selection for clicks in empty area / non-hit zones.
+                ListViewItem target = hitItem
+                    ?? FindListViewItemByPageNumber(currentPage)
+                    ?? pagesListView.Items[0];
+
+                if (DebugLogEnabled)
+                {
+                    LogDebug($"PagesList restore selection target={DescribePageListItem(target)}");
+                }
+
+                ForcePageListSelection(target);
+            }));
+        }
+
+        private void ForcePageListSelection(ListViewItem item)
+        {
+            if (item == null || item.ListView != pagesListView)
+            {
+                return;
+            }
+
+            if (pagesListView.SelectedItems.Count != 1 || pagesListView.SelectedItems[0] != item || !item.Selected)
+            {
+                pagesListView.SelectedItems.Clear();
+                item.Selected = true;
+            }
+
+            item.Focused = true;
+        }
+
+        private string DescribePageListItem(ListViewItem item)
+        {
+            if (item == null)
+            {
+                return "null";
+            }
+
+            string page = item.Tag is PageItemStatus status
+                ? status.PageNumber.ToString(CultureInfo.InvariantCulture)
+                : "?";
+            DrawingRectangle bounds = item.Bounds;
+            return $"idx={item.Index} page={page} text=\"{item.Text}\" bounds={bounds.Left},{bounds.Top},{bounds.Width},{bounds.Height}";
         }
 
 
