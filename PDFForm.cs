@@ -107,6 +107,9 @@ namespace AnonPDF
         private readonly int wheelResistanceMaxValue = 5;
         private enum WheelPageAnchor { None, Top, Bottom }
         private WheelPageAnchor pendingWheelPageAnchor = WheelPageAnchor.None;
+        private int? pendingWheelScrollX;
+        private int? pendingViewScrollX;
+        private int? pendingViewScrollY;
         private HashSet<int> pagesToRemove = new HashSet<int>();
         private Dictionary<int, int> pageRotationOffsets = new Dictionary<int, int>();
 
@@ -129,12 +132,18 @@ namespace AnonPDF
         private bool launchStandaloneInstallerAfterClose;
         private bool standaloneInstallerLaunchAttempted;
         private string pendingStandaloneInstallerPath = string.Empty;
+        private string pendingStandaloneInstallerLogPath = string.Empty;
         private static bool updatesOutOfRangeNotified;
         private static bool revokedNotified;
         private ToolStripMenuItem checkForUpdatesToolStripMenuItem;
         private ToolStripMenuItem activateLicenseToolStripMenuItem;
         private bool pagesListTooltipShownThisSession;
         private int busyCursorDepth;
+        private bool isMiddleMousePanning;
+        private Point middlePanStartCursorScreen;
+        private int middlePanStartScrollX;
+        private int middlePanStartScrollY;
+        private Cursor middlePanPreviousCursor;
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -563,6 +572,7 @@ namespace AnonPDF
             pdfViewer.MouseDown += OnMouseDown;
             pdfViewer.MouseMove += OnMouseMove;
             pdfViewer.MouseUp += OnMouseUp;
+            pdfViewer.MouseCaptureChanged += PdfViewer_MouseCaptureChanged;
             pdfViewer.Paint += OnPaint;
             this.Shown += PDFForm_Shown;
             this.Closing += new CancelEventHandler(MainWindow_Closing);
@@ -1373,6 +1383,10 @@ namespace AnonPDF
                 JObject root = JObject.Parse(json);
                 int pageToSave = Math.Max(1, Math.Min(currentPage, numPages));
                 root["CurrentPage"] = pageToSave;
+                CaptureCurrentViewState(out float zoomFactor, out int scrollX, out int scrollY);
+                root["ZoomFactor"] = zoomFactor;
+                root["ScrollX"] = scrollX;
+                root["ScrollY"] = scrollY;
                 File.WriteAllText(projectPath, root.ToString(Formatting.Indented));
             }
             catch
@@ -2437,6 +2451,39 @@ namespace AnonPDF
             return true;
         }
 
+        private static string BuildStandaloneInstallerLogPath(string msiPath)
+        {
+            string updatesDirectory = Path.Combine(Path.GetTempPath(), "AnonPDFPro", "updates");
+            Directory.CreateDirectory(updatesDirectory);
+
+            string baseName = Path.GetFileNameWithoutExtension(msiPath);
+            if (string.IsNullOrWhiteSpace(baseName))
+            {
+                baseName = "AnonPDFPro-update";
+            }
+
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            string safeBaseName = new string(baseName.Select(ch => invalidChars.Contains(ch) ? '-' : ch).ToArray());
+            if (string.IsNullOrWhiteSpace(safeBaseName))
+            {
+                safeBaseName = "AnonPDFPro-update";
+            }
+
+            string timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            return Path.Combine(updatesDirectory, $"{safeBaseName}-{timestamp}.log");
+        }
+
+        private static string BuildStandaloneInstallerArguments(string msiPath, string logPath)
+        {
+            string args = $"/i \"{msiPath}\"";
+            if (!string.IsNullOrWhiteSpace(logPath))
+            {
+                args += $" /l*v \"{logPath}\"";
+            }
+
+            return args;
+        }
+
         private DialogResult ShowQuestionMessage(string message, string title)
         {
             if (InvokeRequired)
@@ -2546,15 +2593,17 @@ namespace AnonPDF
             try
             {
                 pendingStandaloneInstallerPath = msiPath;
+                pendingStandaloneInstallerLogPath = BuildStandaloneInstallerLogPath(msiPath);
                 suppressCloseConfirmation = true;
                 launchStandaloneInstallerAfterClose = true;
                 standaloneInstallerLaunchAttempted = false;
-                LogDebug($"Standalone update installer scheduled path={msiPath}");
+                LogDebug($"Standalone update installer scheduled path={msiPath} logPath={pendingStandaloneInstallerLogPath}");
                 Close();
             }
             catch (Exception ex)
             {
                 pendingStandaloneInstallerPath = string.Empty;
+                pendingStandaloneInstallerLogPath = string.Empty;
                 suppressCloseConfirmation = false;
                 launchStandaloneInstallerAfterClose = false;
                 standaloneInstallerLaunchAttempted = false;
@@ -3587,6 +3636,7 @@ namespace AnonPDF
             this.Cursor = Cursors.WaitCursor;
             DisplayPdfPage(currentPage);
             ApplyPendingWheelPageAnchor();
+            ApplyPendingViewScrollRestore();
             this.Cursor = Cursors.Default;
         }
 
@@ -3792,6 +3842,7 @@ namespace AnonPDF
                     {
                         if (currentPage > 1)
                         {
+                            pendingWheelScrollX = panel.HorizontalScroll.Value;
                             pendingWheelPageAnchor = WheelPageAnchor.Bottom;
                             PreviousPage();
                         }
@@ -3800,6 +3851,7 @@ namespace AnonPDF
                     {
                         if (currentPage < numPages)
                         {
+                            pendingWheelScrollX = panel.HorizontalScroll.Value;
                             pendingWheelPageAnchor = WheelPageAnchor.Top;
                             NextPage();
                         }
@@ -3821,6 +3873,7 @@ namespace AnonPDF
             if (!(panel is ZoomPanel))
             {
                 pendingWheelPageAnchor = WheelPageAnchor.None;
+                pendingWheelScrollX = null;
                 return;
             }
 
@@ -3835,10 +3888,20 @@ namespace AnonPDF
                 targetScrollY = maxScrollableY;
             }
 
-            panel.AutoScrollPosition = new Point(panel.HorizontalScroll.Minimum, targetScrollY);
+            int targetScrollX = panel.HorizontalScroll.Minimum;
+            if (pendingWheelScrollX.HasValue)
+            {
+                targetScrollX = ClampScrollValue(
+                    pendingWheelScrollX.Value,
+                    panel.HorizontalScroll.Minimum,
+                    GetScrollMaximum(panel.HorizontalScroll));
+            }
+
+            panel.AutoScrollPosition = new Point(targetScrollX, targetScrollY);
             oldScrollValue = panel.VerticalScroll.Value;
             wheelResistanceCurentValue = 0;
             pendingWheelPageAnchor = WheelPageAnchor.None;
+            pendingWheelScrollX = null;
         }
 
         private static int NormalizeRotation(int rotation)
@@ -5782,6 +5845,8 @@ namespace AnonPDF
 
             inputProjectPath = "";
             lastSavedProjectName = "";
+            pendingViewScrollX = null;
+            pendingViewScrollY = null;
             pageNumberTextBox.Visible = true;
             numPagesLabel.Visible = true;
             numPages = pdf.Pages.Count;
@@ -6438,10 +6503,361 @@ namespace AnonPDF
             }
         }
 
+        private ZoomPanel GetZoomPanel()
+        {
+            if (mainAppSplitContainer.Panel2.Controls.Count == 0)
+            {
+                return null;
+            }
+
+            return mainAppSplitContainer.Panel2.Controls[0] as ZoomPanel;
+        }
+
+        private static int GetScrollMaximum(ScrollProperties scroll)
+        {
+            int max = scroll.Maximum - scroll.LargeChange + 1;
+            return max < scroll.Minimum ? scroll.Minimum : max;
+        }
+
+        private static int ClampScrollValue(int value, int min, int max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+
+            if (value > max)
+            {
+                return max;
+            }
+
+            return value;
+        }
+
+        private static bool ArePathsEqual(string left, string right)
+        {
+            if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            {
+                return false;
+            }
+
+            try
+            {
+                string normalizedLeft = Path.GetFullPath(left.Trim());
+                string normalizedRight = Path.GetFullPath(right.Trim());
+                return string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private static string GetUserDataDirectory()
+        {
+            string userDir = LicenseManager.UserLicenseDirectory;
+            if (!string.IsNullOrWhiteSpace(userDir))
+            {
+                return userDir;
+            }
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MISART",
+                "AnonPDFPro");
+        }
+
+        private static string GetResumeStateFilePath()
+        {
+            return Path.Combine(GetUserDataDirectory(), "resume-state.json");
+        }
+
+        private string GetCurrentProjectPath()
+        {
+            if (!string.IsNullOrWhiteSpace(lastSavedProjectName))
+            {
+                return lastSavedProjectName;
+            }
+
+            return inputProjectPath;
+        }
+
+        private void CaptureCurrentViewState(out float zoomFactor, out int scrollX, out int scrollY)
+        {
+            zoomFactor = scaleFactor;
+            scrollX = 0;
+            scrollY = 0;
+
+            ZoomPanel panel = GetZoomPanel();
+            if (panel is ZoomPanel)
+            {
+                scrollX = panel.HorizontalScroll.Value;
+                scrollY = panel.VerticalScroll.Value;
+            }
+        }
+
+        private void QueuePendingViewScrollRestore(int scrollX, int scrollY)
+        {
+            pendingViewScrollX = Math.Max(0, scrollX);
+            pendingViewScrollY = Math.Max(0, scrollY);
+        }
+
+        private void ApplyPendingViewScrollRestore()
+        {
+            if (!pendingViewScrollX.HasValue && !pendingViewScrollY.HasValue)
+            {
+                return;
+            }
+
+            ZoomPanel panel = GetZoomPanel();
+            if (!(panel is ZoomPanel))
+            {
+                pendingViewScrollX = null;
+                pendingViewScrollY = null;
+                return;
+            }
+
+            int targetX = pendingViewScrollX ?? panel.HorizontalScroll.Minimum;
+            int targetY = pendingViewScrollY ?? panel.VerticalScroll.Minimum;
+
+            targetX = ClampScrollValue(targetX, panel.HorizontalScroll.Minimum, GetScrollMaximum(panel.HorizontalScroll));
+            targetY = ClampScrollValue(targetY, panel.VerticalScroll.Minimum, GetScrollMaximum(panel.VerticalScroll));
+
+            panel.AutoScrollPosition = new Point(targetX, targetY);
+            pendingViewScrollX = null;
+            pendingViewScrollY = null;
+        }
+
+        private void PersistResumeState()
+        {
+            if (pdf == null || numPages <= 0 || string.IsNullOrWhiteSpace(inputPdfPath))
+            {
+                return;
+            }
+
+            try
+            {
+                CaptureCurrentViewState(out float zoomFactor, out int scrollX, out int scrollY);
+                var state = new ResumeState
+                {
+                    PdfPath = inputPdfPath,
+                    ProjectPath = GetCurrentProjectPath(),
+                    CurrentPage = Math.Max(1, Math.Min(currentPage, numPages)),
+                    ZoomFactor = zoomFactor > 0 ? zoomFactor : (float?)null,
+                    ScrollX = scrollX,
+                    ScrollY = scrollY
+                };
+
+                string stateFilePath = GetResumeStateFilePath();
+                string stateDirectory = Path.GetDirectoryName(stateFilePath);
+                if (!string.IsNullOrWhiteSpace(stateDirectory))
+                {
+                    Directory.CreateDirectory(stateDirectory);
+                }
+
+                string json = JsonConvert.SerializeObject(state, Formatting.Indented);
+                File.WriteAllText(stateFilePath, json);
+                LogDebug($"Resume state saved pdf={state.PdfPath} project={state.ProjectPath} page={state.CurrentPage} zoom={(state.ZoomFactor.HasValue ? state.ZoomFactor.Value.ToString(CultureInfo.InvariantCulture) : "-")} scroll={state.ScrollX},{state.ScrollY}");
+            }
+            catch
+            {
+                // Keep close flow even if resume-state update fails.
+            }
+        }
+
+        private static ResumeState LoadResumeState()
+        {
+            try
+            {
+                string stateFilePath = GetResumeStateFilePath();
+                if (!File.Exists(stateFilePath))
+                {
+                    return null;
+                }
+
+                string json = File.ReadAllText(stateFilePath);
+                return JsonConvert.DeserializeObject<ResumeState>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void SelectPageInListView(int pageNumber)
+        {
+            if (pageNumber < 1 || pageNumber > numPages)
+            {
+                return;
+            }
+
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                if (pageNumber - 1 < pagesListView.Items.Count)
+                {
+                    pagesListView.Items[pageNumber - 1].Selected = true;
+                    pagesListView.Items[pageNumber - 1].EnsureVisible();
+                }
+            }
+            else
+            {
+                ListViewItem currentItem = FindListViewItemByPageNumber(pageNumber);
+                if (currentItem != null)
+                {
+                    currentItem.Selected = true;
+                    currentItem.EnsureVisible();
+                }
+            }
+        }
+
+        private void RestoreViewFromResumeStateIfMatches(ResumeState state)
+        {
+            if (state == null || pdf == null || numPages <= 0 || string.IsNullOrWhiteSpace(inputPdfPath))
+            {
+                return;
+            }
+
+            string currentProjectPath = GetCurrentProjectPath();
+            bool projectMatch = !string.IsNullOrWhiteSpace(currentProjectPath) && ArePathsEqual(state.ProjectPath, currentProjectPath);
+            bool pdfMatch = ArePathsEqual(state.PdfPath, inputPdfPath);
+            if (!projectMatch && !pdfMatch)
+            {
+                LogDebug($"Resume state skipped (path mismatch) statePdf={state.PdfPath} stateProject={state.ProjectPath} currentPdf={inputPdfPath} currentProject={currentProjectPath}");
+                return;
+            }
+
+            if (state.CurrentPage > 0)
+            {
+                currentPage = Math.Max(1, Math.Min(state.CurrentPage, numPages));
+            }
+
+            if (state.ZoomFactor.HasValue && state.ZoomFactor.Value > 0)
+            {
+                scaleFactor = state.ZoomFactor.Value;
+                pendingScaleFactor = scaleFactor;
+                minScaleButton = false;
+                maxScaleButton = false;
+            }
+
+            QueuePendingViewScrollRestore(state.ScrollX, state.ScrollY);
+            SelectPageInListView(currentPage);
+            ReloadRefreshCurrentPage();
+            UpdateNavigationButtons(currentPage);
+            LogDebug($"Resume state applied page={currentPage} zoom={scaleFactor.ToString(CultureInfo.InvariantCulture)} scroll={state.ScrollX},{state.ScrollY}");
+        }
+
+        private bool TryBeginMiddleMousePan()
+        {
+            ZoomPanel panel = GetZoomPanel();
+            if (!(panel is ZoomPanel))
+            {
+                return false;
+            }
+
+            bool canPanX = panel.HorizontalScroll.Visible && GetScrollMaximum(panel.HorizontalScroll) > panel.HorizontalScroll.Minimum;
+            bool canPanY = panel.VerticalScroll.Visible && GetScrollMaximum(panel.VerticalScroll) > panel.VerticalScroll.Minimum;
+            if (!canPanX && !canPanY)
+            {
+                return false;
+            }
+
+            isMiddleMousePanning = true;
+            middlePanStartCursorScreen = Cursor.Position;
+            middlePanStartScrollX = panel.HorizontalScroll.Value;
+            middlePanStartScrollY = panel.VerticalScroll.Value;
+            middlePanPreviousCursor = this.Cursor;
+            this.Cursor = Cursors.SizeAll;
+            pdfViewer.Capture = true;
+            return true;
+        }
+
+        private void UpdateMiddleMousePan()
+        {
+            if (!isMiddleMousePanning)
+            {
+                return;
+            }
+
+            if ((Control.MouseButtons & MouseButtons.Middle) == 0)
+            {
+                EndMiddleMousePan();
+                return;
+            }
+
+            ZoomPanel panel = GetZoomPanel();
+            if (!(panel is ZoomPanel))
+            {
+                EndMiddleMousePan();
+                return;
+            }
+
+            Point cursorScreen = Cursor.Position;
+            int deltaX = cursorScreen.X - middlePanStartCursorScreen.X;
+            int deltaY = cursorScreen.Y - middlePanStartCursorScreen.Y;
+
+            int targetX = ClampScrollValue(
+                middlePanStartScrollX - deltaX,
+                panel.HorizontalScroll.Minimum,
+                GetScrollMaximum(panel.HorizontalScroll));
+            int targetY = ClampScrollValue(
+                middlePanStartScrollY - deltaY,
+                panel.VerticalScroll.Minimum,
+                GetScrollMaximum(panel.VerticalScroll));
+
+            bool horizontalChanged = panel.HorizontalScroll.Visible && panel.HorizontalScroll.Value != targetX;
+            bool verticalChanged = panel.VerticalScroll.Visible && panel.VerticalScroll.Value != targetY;
+            if (!horizontalChanged && !verticalChanged)
+            {
+                return;
+            }
+
+            panel.AutoScrollPosition = new Point(targetX, targetY);
+            panel.Refresh();
+        }
+
+        private void EndMiddleMousePan()
+        {
+            if (!isMiddleMousePanning)
+            {
+                return;
+            }
+
+            isMiddleMousePanning = false;
+            pdfViewer.Capture = false;
+            this.Cursor = middlePanPreviousCursor ?? Cursors.Default;
+            middlePanPreviousCursor = null;
+        }
+
+        private void PdfViewer_MouseCaptureChanged(object sender, EventArgs e)
+        {
+            if (!isMiddleMousePanning)
+            {
+                return;
+            }
+
+            if ((Control.MouseButtons & MouseButtons.Middle) == 0)
+            {
+                EndMiddleMousePan();
+            }
+        }
+
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
             if (pdf == null)
             {
+                return;
+            }
+
+            if (e.Button == MouseButtons.Middle)
+            {
+                isDrawing = false;
+                isMoving = false;
+                annotationToMove = null;
+                currentSelection = RectangleF.Empty;
+                isClickOnIcon = false;
+                clickedIconType = IconType.None;
+                annotationForIcon = null;
+                TryBeginMiddleMousePan();
                 return;
             }
 
@@ -6570,6 +6986,13 @@ namespace AnonPDF
             {
                 return;
             }
+
+            if (isMiddleMousePanning)
+            {
+                UpdateMiddleMousePan();
+                return;
+            }
+
             if (IsCurrentPageMarkedForDeletion())
             {
                 isDrawing = false;
@@ -6665,7 +7088,13 @@ namespace AnonPDF
             if (pdf == null)
                 return;
 
-            
+            if (e.Button == MouseButtons.Middle)
+            {
+                EndMiddleMousePan();
+                return;
+            }
+
+             
             //if ((string)filterComboBox.SelectedItem == allComboItem)
             //{
             
@@ -6879,11 +7308,6 @@ namespace AnonPDF
                     renderTimer.Start();
                 }
             }
-            else if (e.Button == MouseButtons.Middle)
-            {
-                pdfViewer.Image = RenderOriginalPage(currentPage);
-            }
-
             isDrawing = false;
             currentSelection = System.Drawing.Rectangle.Empty;
             pdfViewer.Invalidate();
@@ -7547,6 +7971,19 @@ namespace AnonPDF
                         currentPage = Math.Max(1, Math.Min(projectData.CurrentPage, numPages));
                     }
 
+                    if (projectData.ZoomFactor.HasValue && projectData.ZoomFactor.Value > 0)
+                    {
+                        scaleFactor = projectData.ZoomFactor.Value;
+                        pendingScaleFactor = scaleFactor;
+                        minScaleButton = false;
+                        maxScaleButton = false;
+                    }
+
+                    if (projectData.ScrollX.HasValue || projectData.ScrollY.HasValue)
+                    {
+                        QueuePendingViewScrollRestore(projectData.ScrollX ?? 0, projectData.ScrollY ?? 0);
+                    }
+
                     foreach (var statusItem in allPageStatuses)
                     {
                         statusItem.HasRotation = false;
@@ -7708,6 +8145,7 @@ namespace AnonPDF
                         };
 
 
+                        CaptureCurrentViewState(out float zoomFactor, out int scrollX, out int scrollY);
                         ProjectData projectData = new ProjectData
                         {
                             RedactionBlocks = redactionBlocks,
@@ -7716,6 +8154,9 @@ namespace AnonPDF
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
                             CurrentPage = currentPage,
+                            ZoomFactor = zoomFactor,
+                            ScrollX = scrollX,
+                            ScrollY = scrollY,
                             SignaturesMode = GetSignatureModeForProject(),
                             SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
                         };
@@ -8025,6 +8466,7 @@ namespace AnonPDF
             if (!e.Cancel)
             {
                 PersistCurrentPageToProjectFile();
+                PersistResumeState();
             }
 
             if (inputPdfPath != "")
@@ -8052,6 +8494,7 @@ namespace AnonPDF
 
             standaloneInstallerLaunchAttempted = true;
             string msiPath = pendingStandaloneInstallerPath;
+            string logPath = pendingStandaloneInstallerLogPath;
             if (string.IsNullOrWhiteSpace(msiPath))
             {
                 return;
@@ -8059,11 +8502,12 @@ namespace AnonPDF
 
             try
             {
-                LogDebug($"Starting standalone installer after app close path={msiPath}");
+                string installerArguments = BuildStandaloneInstallerArguments(msiPath, logPath);
+                LogDebug($"Starting standalone installer after app close path={msiPath} logPath={(string.IsNullOrWhiteSpace(logPath) ? "-" : logPath)}");
                 var psi = new ProcessStartInfo
                 {
                     FileName = "msiexec.exe",
-                    Arguments = $"/i \"{msiPath}\"",
+                    Arguments = installerArguments,
                     UseShellExecute = true,
                     Verb = "runas"
                 };
@@ -8072,7 +8516,7 @@ namespace AnonPDF
                 {
                     throw new InvalidOperationException(LocalizedText("Err_StandaloneUpdate_MsiexecNoProcess"));
                 }
-                LogDebug($"Standalone installer process started path={msiPath}");
+                LogDebug($"Standalone installer process started path={msiPath} logPath={(string.IsNullOrWhiteSpace(logPath) ? "-" : logPath)}");
             }
             catch (Exception ex)
             {
@@ -8121,6 +8565,7 @@ namespace AnonPDF
                             lastSavedProjectName = inputProjectPath;
                         }
 
+                        CaptureCurrentViewState(out float zoomFactor, out int scrollX, out int scrollY);
                         ProjectData projectData = new ProjectData
                         {
                             RedactionBlocks = redactionBlocks,
@@ -8129,6 +8574,9 @@ namespace AnonPDF
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
                             CurrentPage = currentPage,
+                            ZoomFactor = zoomFactor,
+                            ScrollX = scrollX,
+                            ScrollY = scrollY,
                             SignaturesMode = GetSignatureModeForProject(),
                             SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
                         };
@@ -8451,6 +8899,7 @@ namespace AnonPDF
             string lastPap = Properties.Settings.Default.LastPapPath;
             bool hasPdf = !string.IsNullOrWhiteSpace(lastPdf) && File.Exists(lastPdf);
             bool hasProject = !string.IsNullOrWhiteSpace(lastPap) && File.Exists(lastPap);
+            ResumeState resumeState = LoadResumeState();
 
             try
             {
@@ -8470,11 +8919,13 @@ namespace AnonPDF
                             msg += string.Format(Resources.Msg_LoadedProjectLine, inputProjectPath);
                         }
                     }
+                    RestoreViewFromResumeStateIfMatches(resumeState);
                     MessageBox.Show(this, $"{msg}.", Resources.Title_Info, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else if (hasProject)
                 {
                     LoadRedactionBlocks(lastPap);
+                    RestoreViewFromResumeStateIfMatches(resumeState);
 
                     string msg = string.Empty;
                     if (!string.IsNullOrEmpty(inputPdfPath))
@@ -11366,6 +11817,14 @@ namespace AnonPDF
 
     public class ZoomPanel : Panel
     {
+        public ZoomPanel()
+        {
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            UpdateStyles();
+        }
+
         protected override void WndProc(ref Message m)
         {
             const int WM_MOUSEWHEEL = 0x020A;
@@ -11540,9 +11999,22 @@ namespace AnonPDF
         public List<TextAnnotation> TextAnnotations { get; set; }
         public Dictionary<int, int> PageRotationOffsets { get; set; }
         public int CurrentPage { get; set; }
+        public float? ZoomFactor { get; set; }
+        public int? ScrollX { get; set; }
+        public int? ScrollY { get; set; }
         public List<string> SignaturesToRemove { get; set; }
         public string SignaturesMode { get; set; }
         public String FilePath { get; set; }
+    }
+
+    public class ResumeState
+    {
+        public string PdfPath { get; set; }
+        public string ProjectPath { get; set; }
+        public int CurrentPage { get; set; }
+        public float? ZoomFactor { get; set; }
+        public int ScrollX { get; set; }
+        public int ScrollY { get; set; }
     }
 
     public class PageItemStatus
