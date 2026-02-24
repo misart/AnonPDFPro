@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
@@ -1554,12 +1554,12 @@ namespace AnonPDF
                         
 
                         PageItemStatus status = allPageStatuses[currentPage - 1];
-                        status.HasTextAnnotations = true;
+                        status.HasObjects = true;
 
                         if ((string)filterComboBox.SelectedItem == allComboItem)
                         {
                             ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                            UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                            UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                             pagesListView.Invalidate(currentItem.Bounds);
                         }
                         else
@@ -1637,12 +1637,12 @@ namespace AnonPDF
             selectedRasterObject = null;
 
             PageItemStatus status = allPageStatuses[currentPage - 1];
-            status.HasTextAnnotations = true;
+            status.HasObjects = true;
 
             if ((string)filterComboBox.SelectedItem == allComboItem)
             {
                 ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                 pagesListView.Invalidate(currentItem.Bounds);
             }
             else
@@ -2070,11 +2070,11 @@ namespace AnonPDF
             Func<PageItemStatus, bool> predicate = filter switch
             {
                 var f when f == filterSelections => s => s.HasSelections,
-                var f when f == filterObjects => s => s.HasTextAnnotations,
+                var f when f == filterObjects => s => s.HasObjects,
                 var f when f == filterSearches => s => s.HasSearchResults,
                 var f when f == filterDeletions => s => s.MarkedForDeletion,
                 var f when f == filterRotations => s => s.HasRotation,
-                _ => s => s.HasSelections || s.HasTextAnnotations || s.HasSearchResults || s.MarkedForDeletion || s.HasRotation
+                _ => s => s.HasSelections || s.HasObjects || s.HasSearchResults || s.MarkedForDeletion || s.HasRotation
             };
 
             // Add only those statuses that pass the predicate
@@ -3556,7 +3556,7 @@ namespace AnonPDF
             return Path.Combine(tutorialDir, "tutorial.json");
         }
 
-        private void UpdateItemTag(ListViewItem item, int pageNumber, bool hasSelections, bool hasSearchResults, bool markedForDeletion, bool hasTextAnnotations = false)
+        private void UpdateItemTag(ListViewItem item, int pageNumber, bool hasSelections, bool hasSearchResults, bool markedForDeletion, bool hasObjects = false)
         {
             bool hasRotation = pageRotationOffsets.ContainsKey(pageNumber);
             // Create new PageItemStatus object with new values
@@ -3566,7 +3566,7 @@ namespace AnonPDF
                 HasSelections = hasSelections,
                 HasSearchResults = hasSearchResults,
                 MarkedForDeletion = markedForDeletion,
-                HasTextAnnotations = hasTextAnnotations,
+                HasObjects = hasObjects,
                 HasRotation = hasRotation
             };
 
@@ -3596,7 +3596,7 @@ namespace AnonPDF
                     (status.HasSearchResults,  System.Drawing.Color.FromArgb(255, 255, 215, 0)),
                     (status.MarkedForDeletion, System.Drawing.Color.Black),
                     (status.HasRotation,        System.Drawing.Color.FromArgb(255, 140, 169, 255)),
-                    (status.HasTextAnnotations, System.Drawing.Color.Green)
+                    (status.HasObjects, System.Drawing.Color.Green)
                 };
                 int gap = 1;
                 int rectangleHeight = Math.Max(2, (e.Bounds.Height - (statusColors.Length - 1) * gap) / statusColors.Length);
@@ -5838,7 +5838,7 @@ namespace AnonPDF
                 //var item = pagesListView.Items[currentPage - 1];
                 //bool hasSearchResults = ((PageItemStatus)currentItem.Tag).HasSearchResults;
                 //bool markedForDeletion = ((PageItemStatus)currentItem.Tag).MarkedForDeletion;
-                //bool hasTextAnnotations = ((PageItemStatus)currentItem.Tag).HasTextAnnotations;
+                //bool hasObjects = ((PageItemStatus)currentItem.Tag).HasObjects;
                 
                 status.HasSelections = false;
                 
@@ -5846,7 +5846,7 @@ namespace AnonPDF
                 if ((string)filterComboBox.SelectedItem == allComboItem)
                 {
                     ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                     
                 }
                 else
@@ -6060,7 +6060,7 @@ namespace AnonPDF
                     MarkedForDeletion = false,
                     HasSearchResults = false,
                     HasSelections = false,
-                    HasTextAnnotations = false,
+                    HasObjects = false,
                     HasRotation = false
                 };
 
@@ -6524,7 +6524,7 @@ namespace AnonPDF
             if ((string)filterComboBox.SelectedItem == allComboItem)
             {
                 ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                 pagesListView.Invalidate(currentItem.Bounds);
             }
             else
@@ -7598,11 +7598,11 @@ namespace AnonPDF
                                         selectedRasterObject = null;
                                     }
 
-                                    status.HasTextAnnotations = HasAnyObjectsOnPage(currentPage);
+                                    status.HasObjects = HasAnyObjectsOnPage(currentPage);
                                     if ((string)filterComboBox.SelectedItem == allComboItem)
                                     {
                                         ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                                        UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                                        UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                                         pagesListView.Invalidate(currentItem.Bounds);
                                     }
                                     else
@@ -7676,14 +7676,14 @@ namespace AnonPDF
 
                             
                             
-                            status.HasTextAnnotations = HasAnyObjectsOnPage(currentPage);
+                            status.HasObjects = HasAnyObjectsOnPage(currentPage);
                             
 
                             if ((string)filterComboBox.SelectedItem == allComboItem)
                             {
                                 // only refresh this row
                                 ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                                 pagesListView.Invalidate(currentItem.Bounds);
                             }
                             else
@@ -7729,7 +7729,7 @@ namespace AnonPDF
                                 if ((string)filterComboBox.SelectedItem == allComboItem)
                                 {
                                     ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                                     pagesListView.Invalidate(currentItem.Bounds);
                                 }
                                 else
@@ -7759,7 +7759,7 @@ namespace AnonPDF
                                 if ((string)filterComboBox.SelectedItem == allComboItem)
                                 {
                                     ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                                     pagesListView.Invalidate(currentItem.Bounds);
                                 }
                                 else
@@ -7800,7 +7800,7 @@ namespace AnonPDF
                         if ((string)filterComboBox.SelectedItem == allComboItem)
                         {
                             ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                            UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                            UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                             pagesListView.Invalidate(currentItem.Bounds);
                         }
                         else
@@ -8199,21 +8199,21 @@ namespace AnonPDF
                 bool hasSelectionsForThisPage = redactionBlocks.Any(rb => rb.PageNumber == currentPage);
                 bool hasSearchResultsForThisPage = searchLocations.Any(sr => sr.PageNumber == currentPage);
                 bool markedForDeletionForThisPage = pagesToRemove.Contains(currentPage);
-                bool hasTextAnnotationsForThisPage = HasAnyObjectsOnPage(currentPage);
+                bool hasObjectsForThisPage = HasAnyObjectsOnPage(currentPage);
 
                 status.HasSelections = hasSelectionsForThisPage;
                 status.HasSearchResults = hasSearchResultsForThisPage;
                 status.MarkedForDeletion = markedForDeletionForThisPage;
-                status.HasTextAnnotations = hasTextAnnotationsForThisPage;
+                status.HasObjects = hasObjectsForThisPage;
                 status.HasRotation = pageRotationOffsets.ContainsKey(currentPage);
 
-                //UpdateItemTag(selectedItem, pageNumber, hasSelectionsForThisPage, hasSearchResultsForThisPage, markedForDeletionForThisPage, hasTextAnnotationsForThisPage);
+                //UpdateItemTag(selectedItem, pageNumber, hasSelectionsForThisPage, hasSearchResultsForThisPage, markedForDeletionForThisPage, hasObjectsForThisPage);
 
                 //if ((string)filterComboBox.SelectedItem == allComboItem)
                 //{
                     // only refresh this row
                     //ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                UpdateItemTag(selectedItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                UpdateItemTag(selectedItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                 //}
                 //else
                 //{
@@ -8563,11 +8563,11 @@ namespace AnonPDF
                         var item = pagesListView.Items[block.PageNumber - 1];
                         //bool hasSearchResults = ((PageItemStatus)item.Tag).HasSearchResults;
                         //bool markedForDeletion = ((PageItemStatus)item.Tag).MarkedForDeletion;
-                        //bool hasTextAnnotations = ((PageItemStatus)item.Tag).HasTextAnnotations;
+                        //bool hasObjects = ((PageItemStatus)item.Tag).HasObjects;
                         status.HasSelections = true;
                         //allPageStatuses.Add(status);
-                        //UpdateItemTag(item, block.PageNumber, true, hasSearchResults, markedForDeletion, hasTextAnnotations);
-                        UpdateItemTag(item, block.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                        //UpdateItemTag(item, block.PageNumber, true, hasSearchResults, markedForDeletion, hasObjects);
+                        UpdateItemTag(item, block.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -8579,8 +8579,8 @@ namespace AnonPDF
                         //bool hasSearchResults = ((PageItemStatus)item.Tag).HasSearchResults;
                         //bool markedForDeletion = ((PageItemStatus)item.Tag).MarkedForDeletion;
                         //UpdateItemTag(item, block.PageNumber, hasSelections, hasSearchResults, markedForDeletion, true);
-                        status.HasTextAnnotations = true;
-                        UpdateItemTag(item, block.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                        status.HasObjects = true;
+                        UpdateItemTag(item, block.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -8588,8 +8588,8 @@ namespace AnonPDF
                     {
                         status = allPageStatuses[rasterObject.PageNumber - 1];
                         var item = pagesListView.Items[rasterObject.PageNumber - 1];
-                        status.HasTextAnnotations = true;
-                        UpdateItemTag(item, rasterObject.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                        status.HasObjects = true;
+                        UpdateItemTag(item, rasterObject.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -8604,11 +8604,11 @@ namespace AnonPDF
 
                         //bool hasSelections = ((PageItemStatus)item.Tag).HasSelections;
                         //bool hasSearchResults = ((PageItemStatus)item.Tag).HasSearchResults;
-                        //bool hasTextAnnotations = ((PageItemStatus)item.Tag).HasTextAnnotations;
-                        //UpdateItemTag(item, pageNum, hasSelections, hasSearchResults, true, hasTextAnnotations);
+                        //bool hasObjects = ((PageItemStatus)item.Tag).HasObjects;
+                        //UpdateItemTag(item, pageNum, hasSelections, hasSearchResults, true, hasObjects);
                         //pagesListView.Invalidate();
                         status.MarkedForDeletion = true;
-                        UpdateItemTag(item, pageNum, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                        UpdateItemTag(item, pageNum, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -8616,7 +8616,7 @@ namespace AnonPDF
                     {
                         int pageNum = ((PageItemStatus)item.Tag).PageNumber;
                         PageItemStatus currentStatus = allPageStatuses[pageNum - 1];
-                        UpdateItemTag(item, pageNum, currentStatus.HasSelections, currentStatus.HasSearchResults, currentStatus.MarkedForDeletion, currentStatus.HasTextAnnotations);
+                        UpdateItemTag(item, pageNum, currentStatus.HasSelections, currentStatus.HasSearchResults, currentStatus.MarkedForDeletion, currentStatus.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -9625,11 +9625,11 @@ namespace AnonPDF
             if (currentPage >= 1 && currentPage <= allPageStatuses.Count)
             {
                 PageItemStatus status = allPageStatuses[currentPage - 1];
-                status.HasTextAnnotations = HasAnyObjectsOnPage(currentPage);
+                status.HasObjects = HasAnyObjectsOnPage(currentPage);
                 if ((string)filterComboBox.SelectedItem == allComboItem)
                 {
                     ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                     pagesListView.Invalidate(currentItem.Bounds);
                 }
                 else
@@ -10201,11 +10201,11 @@ namespace AnonPDF
             if (currentPage >= 1 && currentPage <= allPageStatuses.Count)
             {
                 PageItemStatus status = allPageStatuses[currentPage - 1];
-                status.HasTextAnnotations = HasAnyObjectsOnPage(currentPage);
+                status.HasObjects = HasAnyObjectsOnPage(currentPage);
                 if ((string)filterComboBox.SelectedItem == allComboItem)
                 {
                     ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                     pagesListView.Invalidate(currentItem.Bounds);
                 }
                 else
@@ -11680,7 +11680,7 @@ namespace AnonPDF
             {
                 // only refresh this row
                 ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
             }
             else
             {
@@ -11812,8 +11812,8 @@ namespace AnonPDF
                                 //int pageNumber = ((PageItemStatus)item.Tag).PageNumber;
                                 //bool hasSelections = ((PageItemStatus)item.Tag).HasSelections;
                                 //bool hasSearchResults = ((PageItemStatus)item.Tag).HasSearchResults;
-                                //bool hasTextAnnotations = ((PageItemStatus)item.Tag).HasTextAnnotations;
-                                //UpdateItemTag(item, pageNumber, hasSelections, hasSearchResults, true, hasTextAnnotations);
+                                //bool hasObjects = ((PageItemStatus)item.Tag).HasObjects;
+                                //UpdateItemTag(item, pageNumber, hasSelections, hasSearchResults, true, hasObjects);
 
                                 status = allPageStatuses[i - 1];
                                 status.MarkedForDeletion = true;
@@ -11822,7 +11822,7 @@ namespace AnonPDF
                                 {
                                     // only refresh this row
                                     ListViewItem currentItem = pagesListView.Items[i - 1];
-                                    UpdateItemTag(currentItem, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                                    UpdateItemTag(currentItem, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                                     //pagesListView.Invalidate(currentItem.Bounds);
                                 }
                                 pagesToRemove.Add(i);
@@ -11853,7 +11853,7 @@ namespace AnonPDF
                             {
                                 // only refresh this row
                                 ListViewItem currentItem = pagesListView.Items[i - 1];
-                                UpdateItemTag(currentItem, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                                UpdateItemTag(currentItem, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                                 
                             }
                             pagesToRemove.Remove(i);
@@ -11968,7 +11968,7 @@ namespace AnonPDF
                     if (itemSl is TextLocation searchLocation)
                     {
                         int pageNumber = searchLocation.PageNumber;
-                        //UpdateItemTag(item, pageNumber, hasSelections, true, markedForDeletion, hasTextAnnotations);
+                        //UpdateItemTag(item, pageNumber, hasSelections, true, markedForDeletion, hasObjects);
                         
 
                         PageItemStatus status = allPageStatuses[pageNumber - 1];
@@ -11977,7 +11977,7 @@ namespace AnonPDF
                         if ((string)filterComboBox.SelectedItem == allComboItem)
                         {
                             ListViewItem currentItem = pagesListView.Items[pageNumber - 1];
-                            UpdateItemTag(currentItem, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                            UpdateItemTag(currentItem, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                             pagesListView.Invalidate(currentItem.Bounds);
                         }
 
@@ -12128,7 +12128,7 @@ namespace AnonPDF
                     if ((string)filterComboBox.SelectedItem == allComboItem)
                     {
                         ListViewItem item = pagesListView.Items[pageNumber - 1];
-                        UpdateItemTag(item, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                        UpdateItemTag(item, pageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
                     else
@@ -12275,7 +12275,7 @@ namespace AnonPDF
             if ((string)filterComboBox.SelectedItem == allComboItem)
             {
                 ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasTextAnnotations);
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                 pagesListView.Invalidate(currentItem.Bounds);
             }
             else
@@ -13818,7 +13818,7 @@ namespace AnonPDF
         public bool MarkedForDeletion { get; set; }
         public bool HasSearchResults { get; set; }
         public bool HasSelections { get; set; }
-        public bool HasTextAnnotations { get; set; }
+        public bool HasObjects { get; set; }
         public bool HasRotation { get; set; }
     }
 
