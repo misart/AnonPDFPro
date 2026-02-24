@@ -201,6 +201,9 @@
   <data name="Menu_AddText" xml:space="preserve">
     <value>Dodaj napis</value>
   </data>
+  <data name="Menu_AddRasterImage" xml:space="preserve">
+    <value>Dodaj obraz rastrowy</value>
+  </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
     <value>Kopiuj do schowka</value>
   </data>
@@ -599,7 +602,7 @@ Aplikacja zostanie zamknięta.</value>
     <value>Zaznaczenia</value>
   </data>
   <data name="UI_Filter_Annotations" xml:space="preserve">
-    <value>Napisy</value>
+    <value>Obiekty</value>
   </data>
   <data name="UI_Filter_Searches" xml:space="preserve">
     <value>Wyszukania</value>
@@ -721,7 +724,7 @@ Sprawdź czy możesz go otworzyć w innej aplikacji.</value>
     <value>Brak skojarzonej aplikacji PDF: {0}</value>
   </data>
   <data name="Msg_TextPositionInfo" xml:space="preserve">
-    <value>{0} możliwość zmiany pozycji tekstu.</value>
+    <value>{0} możliwość zmiany pozycji obiektu.</value>
   </data>
   <data name="Err_SelectValidProjectFile" xml:space="preserve">
     <value>Wybierz właściwy plik projektu.</value>
@@ -761,11 +764,23 @@ Skontaktuj się z autorem aplikacji.</value>
   <data name="Msg_NoTextFromSelections" xml:space="preserve">
     <value>Nie udało się pobrać tekstu z żadnego zaznaczenia.</value>
   </data>
+  <data name="Msg_RasterImageAdded" xml:space="preserve">
+    <value>Dodano obiekt rastrowy na bieżącej stronie.</value>
+  </data>
+  <data name="Msg_NoRasterImageInClipboard" xml:space="preserve">
+    <value>Schowek nie zawiera obrazu rastrowego.</value>
+  </data>
+  <data name="Msg_PasteVectorGraphic_NotImplemented" xml:space="preserve">
+    <value>Wklejanie grafiki wektorowej ze schowka będzie dostępne w kolejnym etapie.</value>
+  </data>
   <data name="Msg_PasteGraphic_NotImplemented" xml:space="preserve">
     <value>Wklejanie grafiki ze schowka (rastrowej i wektorowej) będzie dostępne w kolejnym etapie.</value>
   </data>
   <data name="Msg_ClipboardUnavailable" xml:space="preserve">
     <value>Schowek jest chwilowo niedostępny. Spróbuj ponownie.</value>
+  </data>
+  <data name="Err_RasterImageLoad" xml:space="preserve">
+    <value>Nie udało się dodać obrazu: {0}</value>
   </data>
   <data name="Err_InvalidPageNumberValue" xml:space="preserve">
     <value>Nieprawidłowy numer strony: '{0}'.</value>
@@ -803,6 +818,9 @@ Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value>
   </data>
   <data name="Msg_Confirm_DeleteTextAnnotation" xml:space="preserve">
     <value>Czy na pewno chcesz usunąć ten napis?</value>
+  </data>
+  <data name="Msg_Confirm_DeleteRasterObject" xml:space="preserve">
+    <value>Czy na pewno chcesz usunąć ten obiekt graficzny?</value>
   </data>
   <data name="Msg_Confirm_ClearAllSelections" xml:space="preserve">
     <value>Czy na pewno chcesz usunąć wszystkie zaznaczenia z dokumentu?</value>
@@ -850,7 +868,7 @@ Szczegóły zapisano w:
 pod wybraną nazwą.</value>
   </data>
   <data name="Msg_Closing_UnsavedSelectionsPrefix" xml:space="preserve">
-    <value>Masz zdefiniowane zaznaczenia w treści
+    <value>Masz nie zapisane zmiany w projekcie
 
 </value>
   </data>
@@ -880,6 +898,9 @@ Projekt: {0}</value>
   <data name="Dialog_Filter_PAP" xml:space="preserve">
     <value>Pliki APP (*.app)|*.app|Starsze projekty (*.pap)|*.pap</value>
   </data>
+  <data name="Dialog_Filter_RasterImages" xml:space="preserve">
+    <value>Pliki obrazów (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|Wszystkie pliki (*.*)|*.*</value>
+  </data>
   <data name="Dialog_Title_OpenPdf" xml:space="preserve">
     <value>Wybierz plik PDF</value>
   </data>
@@ -891,6 +912,9 @@ Projekt: {0}</value>
   </data>
   <data name="Dialog_Title_SavePap" xml:space="preserve">
     <value>Podaj nazwę pliku projektu {0}</value>
+  </data>
+  <data name="Dialog_Title_AddRasterImage" xml:space="preserve">
+    <value>Wybierz obraz rastrowy - {0}</value>
   </data>
   <data name="About_Message" xml:space="preserve">
     <value>Nazwa aplikacji: {0}

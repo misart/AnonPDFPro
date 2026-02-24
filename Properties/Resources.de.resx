@@ -395,6 +395,9 @@ Anwendung schließen und Installer jetzt starten?</value>
   <data name="Menu_AddText" xml:space="preserve">
     <value>Text hinzufügen</value>
   </data>
+  <data name="Menu_AddRasterImage" xml:space="preserve">
+    <value>Rasterbild hinzufuegen</value>
+  </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
     <value>In Zwischenablage kopieren</value>
   </data>
@@ -522,7 +525,7 @@ Anwendung schließen und Installer jetzt starten?</value>
     <value>Markierungen</value>
   </data>
   <data name="UI_Filter_Annotations" xml:space="preserve">
-    <value>Anmerkungen</value>
+    <value>Objekte</value>
   </data>
   <data name="UI_Filter_Searches" xml:space="preserve">
     <value>Suchergebnisse</value>
@@ -682,6 +685,9 @@ Repository: https://github.com/misart/AnonPDFPro</value>
   <data name="Dialog_Filter_PAP" xml:space="preserve">
     <value>APP-Projektdateien (*.app)|*.app|Ältere PAP-Dateien (*.pap)|*.pap</value>
   </data>
+  <data name="Dialog_Filter_RasterImages" xml:space="preserve">
+    <value>Bilddateien (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|Alle Dateien (*.*)|*.*</value>
+  </data>
   <data name="Dialog_Filter_PDF" xml:space="preserve">
     <value>PDF-Dateien (*.pdf)|*.pdf</value>
   </data>
@@ -693,6 +699,9 @@ Repository: https://github.com/misart/AnonPDFPro</value>
   </data>
   <data name="Dialog_Title_SavePap" xml:space="preserve">
     <value>Namen der Projektdatei für {0} eingeben</value>
+  </data>
+  <data name="Dialog_Title_AddRasterImage" xml:space="preserve">
+    <value>Rasterbild auswählen - {0}</value>
   </data>
   <data name="Dialog_Title_SavePdfAs" xml:space="preserve">
     <value>PDF unter anderem Namen speichern</value>
@@ -854,7 +863,7 @@ Die Anwendung wird geschlossen.</value>
     <value>Zuletzt verwendete Dateien können nicht geladen werden.</value>
   </data>
   <data name="Msg_Closing_UnsavedSelectionsPrefix" xml:space="preserve">
-    <value>Sie haben Markierungen im Dokument definiert
+    <value>Sie haben nicht gespeicherte Aenderungen im Projekt
 
 </value>
   </data>
@@ -871,6 +880,9 @@ Sie haben im Dokument definierte, nicht gespeicherte Markierungen...</value>
   </data>
   <data name="Msg_Confirm_DeleteTextAnnotation" xml:space="preserve">
     <value>Möchten Sie diesen Text wirklich löschen?</value>
+  </data>
+  <data name="Msg_Confirm_DeleteRasterObject" xml:space="preserve">
+    <value>Möchten Sie dieses Grafikobjekt wirklich löschen?</value>
   </data>
   <data name="Msg_Confirm_DiscardUnsavedRedactions" xml:space="preserve">
     <value>Sie haben ungespeicherte Schwärzungsänderungen im Dokument.
@@ -961,11 +973,23 @@ Bitte speichern Sie Ihre Arbeit und schließen Sie die Anwendung.
   <data name="Msg_NoTextFromSelections" xml:space="preserve">
     <value>Text konnte aus keiner Markierung gelesen werden.</value>
   </data>
+  <data name="Msg_RasterImageAdded" xml:space="preserve">
+    <value>Rasterobjekt auf der aktuellen Seite hinzugefuegt.</value>
+  </data>
+  <data name="Msg_NoRasterImageInClipboard" xml:space="preserve">
+    <value>Die Zwischenablage enthaelt kein Rasterbild.</value>
+  </data>
+  <data name="Msg_PasteVectorGraphic_NotImplemented" xml:space="preserve">
+    <value>Das Einfuegen von Vektorgrafiken aus der Zwischenablage wird im naechsten Schritt verfuegbar sein.</value>
+  </data>
   <data name="Msg_PasteGraphic_NotImplemented" xml:space="preserve">
     <value>Das EinfĂĽgen von Grafiken aus der Zwischenablage (Raster und Vektor) wird im nĂ¤chsten Schritt verfĂĽgbar sein.</value>
   </data>
   <data name="Msg_ClipboardUnavailable" xml:space="preserve">
     <value>Die Zwischenablage ist vorĂĽbergehend nicht verfĂĽgbar. Bitte versuchen Sie es erneut.</value>
+  </data>
+  <data name="Err_RasterImageLoad" xml:space="preserve">
+    <value>Bild konnte nicht hinzugefuegt werden: {0}</value>
   </data>
   <data name="Msg_NoticesNotFound" xml:space="preserve">
     <value>Die Drittanbieterhinweise "THIRD-PARTY-NOTICES.md" wurden im Anwendungsordner nicht gefunden.</value>
@@ -990,7 +1014,7 @@ unter dem gewählten Namen gespeichert.</value>
     <value>Eine Wartungsaktualisierung von {1} läuft bis {0}.</value>
   </data>
   <data name="Msg_TextPositionInfo" xml:space="preserve">
-    <value>{0} ermöglicht das Ändern der Textposition.</value>
+    <value>{0} ermöglicht das Ändern der Objektposition.</value>
   </data>
   <data name="Msg_TextsCopiedToClipboard" xml:space="preserve">
     <value>Texte aus den Markierungen wurden in die Zwischenablage kopiert.</value>
