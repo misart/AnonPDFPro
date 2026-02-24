@@ -142,6 +142,7 @@ namespace AnonPDF
         private ToolStripMenuItem checkForUpdatesToolStripMenuItem;
         private ToolStripMenuItem activateLicenseToolStripMenuItem;
         private ToolStripMenuItem addRasterImageToolStripMenuItem;
+        private ToolStripMenuItem pasteObjectFromClipboardToolStripMenuItem;
         private bool pagesListTooltipShownThisSession;
         private int busyCursorDepth;
         private bool isMiddleMousePanning;
@@ -796,6 +797,14 @@ namespace AnonPDF
             addRasterImageToolStripMenuItem.Enabled = false;
             addRasterImageToolStripMenuItem.Click += AddRasterImageToolStripMenuItem_Click;
 
+            pasteObjectFromClipboardToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "pasteObjectFromClipboardToolStripMenuItem",
+                ShortcutKeys = Keys.Control | Keys.V
+            };
+            pasteObjectFromClipboardToolStripMenuItem.Enabled = false;
+            pasteObjectFromClipboardToolStripMenuItem.Click += PasteObjectFromClipboardToolStripMenuItem_Click;
+
             if (menuOptionsItem == null)
             {
                 return;
@@ -805,10 +814,12 @@ namespace AnonPDF
             if (insertIndex < 0)
             {
                 menuOptionsItem.DropDownItems.Add(addRasterImageToolStripMenuItem);
+                menuOptionsItem.DropDownItems.Add(pasteObjectFromClipboardToolStripMenuItem);
             }
             else
             {
                 menuOptionsItem.DropDownItems.Insert(insertIndex + 1, addRasterImageToolStripMenuItem);
+                menuOptionsItem.DropDownItems.Insert(insertIndex + 2, pasteObjectFromClipboardToolStripMenuItem);
             }
         }
 
@@ -954,6 +965,10 @@ namespace AnonPDF
               if (addRasterImageToolStripMenuItem != null)
               {
                   addRasterImageToolStripMenuItem.Text = LocalizedText("Menu_AddRasterImage");
+              }
+              if (pasteObjectFromClipboardToolStripMenuItem != null)
+              {
+                  pasteObjectFromClipboardToolStripMenuItem.Text = LocalizedText("Menu_PasteObjectFromClipboard");
               }
               copyToClipboardMenuItem.Text = Resources.Menu_CopyToClipboard;
               exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
@@ -6117,6 +6132,10 @@ namespace AnonPDF
             {
                 addRasterImageToolStripMenuItem.Enabled = true;
             }
+            if (pasteObjectFromClipboardToolStripMenuItem != null)
+            {
+                pasteObjectFromClipboardToolStripMenuItem.Enabled = true;
+            }
             deletePageMenuItem.Enabled = true;
             rotatePageMenuItem.Enabled = true;
             copyToClipboardMenuItem.Enabled = true;
@@ -6352,6 +6371,10 @@ namespace AnonPDF
             {
                 addRasterImageToolStripMenuItem.Enabled = false;
             }
+            if (pasteObjectFromClipboardToolStripMenuItem != null)
+            {
+                pasteObjectFromClipboardToolStripMenuItem.Enabled = false;
+            }
             deletePageMenuItem.Enabled = false;
             rotatePageMenuItem.Enabled = false;
             copyToClipboardMenuItem.Enabled = false;
@@ -6421,6 +6444,10 @@ namespace AnonPDF
             if (addRasterImageToolStripMenuItem != null)
             {
                 addRasterImageToolStripMenuItem.Enabled = canEditCurrentPage;
+            }
+            if (pasteObjectFromClipboardToolStripMenuItem != null)
+            {
+                pasteObjectFromClipboardToolStripMenuItem.Enabled = canEditCurrentPage;
             }
             rotatePageMenuItem.Enabled = canEditCurrentPage;
             searchToSelectionButton.Enabled = canEditCurrentPage && groupBoxSearch.Enabled;
@@ -12732,6 +12759,11 @@ namespace AnonPDF
         private void AddRasterImageToolStripMenuItem_Click(object sender, EventArgs e)
         {
             AddRasterImageFromFileDialog();
+        }
+
+        private void PasteObjectFromClipboardToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            TryHandleGlobalPasteShortcut();
         }
 
         private void DeletePageToolStripMenuItem_Click(object sender, EventArgs e)

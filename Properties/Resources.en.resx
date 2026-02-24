@@ -202,10 +202,13 @@
     <value>Add text</value>
   </data>
   <data name="Menu_AddRasterImage" xml:space="preserve">
-    <value>Add raster image</value>
+    <value>Add image</value>
+  </data>
+  <data name="Menu_PasteObjectFromClipboard" xml:space="preserve">
+    <value>Paste object from clipboard</value>
   </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
-    <value>Copy to clipboard</value>
+    <value>Copy text to clipboard</value>
   </data>
   <data name="Menu_ExportGraphics" xml:space="preserve">
     <value>Export graphics</value>

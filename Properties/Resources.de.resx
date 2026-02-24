@@ -396,10 +396,13 @@ Anwendung schließen und Installer jetzt starten?</value>
     <value>Text hinzufügen</value>
   </data>
   <data name="Menu_AddRasterImage" xml:space="preserve">
-    <value>Rasterbild hinzufuegen</value>
+    <value>Bild hinzufuegen</value>
+  </data>
+  <data name="Menu_PasteObjectFromClipboard" xml:space="preserve">
+    <value>Objekt aus Zwischenablage einfuegen</value>
   </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
-    <value>In Zwischenablage kopieren</value>
+    <value>Text in Zwischenablage kopieren</value>
   </data>
   <data name="Menu_ExportGraphics" xml:space="preserve">
     <value>Grafiken exportieren</value>

@@ -202,10 +202,13 @@
     <value>Dodaj napis</value>
   </data>
   <data name="Menu_AddRasterImage" xml:space="preserve">
-    <value>Dodaj obraz rastrowy</value>
+    <value>Dodaj obraz</value>
+  </data>
+  <data name="Menu_PasteObjectFromClipboard" xml:space="preserve">
+    <value>Wklej obiekt ze schowka</value>
   </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
-    <value>Kopiuj do schowka</value>
+    <value>Kopiuj tekst do schowka</value>
   </data>
   <data name="Menu_ExportGraphics" xml:space="preserve">
     <value>Eksport obiektów graficznych</value>
