@@ -760,6 +760,9 @@ Repository: https://github.com/misart/AnonPDFPro</value>
   <data name="EditRaster_CheckLocked" xml:space="preserve">
     <value>Objekt sperren</value>
   </data>
+  <data name="EditRaster_CheckTransparentBackground" xml:space="preserve">
+    <value>Transparenter Hintergrund</value>
+  </data>
   <data name="EditRaster_LabelOpacity" xml:space="preserve">
     <value>Transparenz (%):</value>
   </data>
@@ -780,6 +783,9 @@ Repository: https://github.com/misart/AnonPDFPro</value>
   </data>
   <data name="EditRaster_ButtonResetAspect" xml:space="preserve">
     <value>Seitenverhältnis zurücksetzen</value>
+  </data>
+  <data name="EditRaster_ButtonResetOneToOne" xml:space="preserve">
+    <value>1:1</value>
   </data>
   <data name="EditText_GroupAlignment" xml:space="preserve">
     <value>Ausrichtung</value>

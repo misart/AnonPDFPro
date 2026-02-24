@@ -311,11 +311,29 @@ namespace AnonPDF.Properties {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to 1:1.
+        /// </summary>
+        internal static string EditRaster_ButtonResetOneToOne {
+            get {
+                return ResourceManager.GetString("EditRaster_ButtonResetOneToOne", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Wyszukuje zlokalizowany ciąg podobny do ciągu Zablokuj obiekt.
         /// </summary>
         internal static string EditRaster_CheckLocked {
             get {
                 return ResourceManager.GetString("EditRaster_CheckLocked", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Wyszukuje zlokalizowany ciąg podobny do ciągu Przeźroczyste tło.
+        /// </summary>
+        internal static string EditRaster_CheckTransparentBackground {
+            get {
+                return ResourceManager.GetString("EditRaster_CheckTransparentBackground", resourceCulture);
             }
         }
 

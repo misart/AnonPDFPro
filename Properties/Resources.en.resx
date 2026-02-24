@@ -700,6 +700,9 @@ The application will close.</value>
   <data name="EditRaster_CheckLocked" xml:space="preserve">
     <value>Lock object</value>
   </data>
+  <data name="EditRaster_CheckTransparentBackground" xml:space="preserve">
+    <value>Transparent background</value>
+  </data>
   <data name="EditRaster_LabelOpacity" xml:space="preserve">
     <value>Opacity (%):</value>
   </data>
@@ -720,6 +723,9 @@ The application will close.</value>
   </data>
   <data name="EditRaster_ButtonResetAspect" xml:space="preserve">
     <value>Reset aspect</value>
+  </data>
+  <data name="EditRaster_ButtonResetOneToOne" xml:space="preserve">
+    <value>1:1</value>
   </data>
   <data name="Signatures_Select_Title" xml:space="preserve">
     <value>Select signatures to remove</value>

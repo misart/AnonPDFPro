@@ -1671,6 +1671,121 @@ namespace AnonPDF
             saveProjectMenuItem.Enabled = true;
         }
 
+        private void UpdateCurrentPageObjectsMarker()
+        {
+            if (currentPage < 1 || currentPage > allPageStatuses.Count)
+            {
+                return;
+            }
+
+            PageItemStatus status = allPageStatuses[currentPage - 1];
+            status.HasObjects = HasAnyObjectsOnPage(currentPage);
+
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                pagesListView.Invalidate(currentItem.Bounds);
+            }
+            else
+            {
+                ApplyFilter((string)filterComboBox.SelectedItem);
+            }
+        }
+
+        private bool DeleteTextObjectWithConfirmation(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return false;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            DialogResult result = MessageBox.Show(
+                this,
+                Resources.Msg_Confirm_DeleteTextAnnotation,
+                Resources.Title_Confirmation,
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Exclamation,
+                MessageBoxDefaultButton.Button2);
+
+            if (result != DialogResult.Yes)
+            {
+                return true;
+            }
+
+            textAnnotations.Remove(annotation);
+            if (selectedTextAnnotation != null && ReferenceEquals(selectedTextAnnotation, annotation))
+            {
+                selectedTextAnnotation = null;
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateCurrentPageObjectsMarker();
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private bool DeleteRasterObjectWithConfirmation(RasterObject rasterObject)
+        {
+            if (rasterObject == null)
+            {
+                return false;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            DialogResult deleteResult = MessageBox.Show(
+                this,
+                LocalizedText("Msg_Confirm_DeleteRasterObject"),
+                Resources.Title_Confirmation,
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Exclamation,
+                MessageBoxDefaultButton.Button2);
+
+            if (deleteResult != DialogResult.Yes)
+            {
+                return true;
+            }
+
+            rasterObjects.RemoveAll(obj => obj != null && obj.Id == rasterObject.Id);
+            if (selectedRasterObject != null && selectedRasterObject.Id == rasterObject.Id)
+            {
+                selectedRasterObject = null;
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateCurrentPageObjectsMarker();
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private bool TryDeleteActiveObjectByKeyboard()
+        {
+            if (selectedRasterObject != null && selectedRasterObject.PageNumber == currentPage)
+            {
+                return DeleteRasterObjectWithConfirmation(selectedRasterObject);
+            }
+
+            if (selectedTextAnnotation != null && selectedTextAnnotation.PageNumber == currentPage)
+            {
+                return DeleteTextObjectWithConfirmation(selectedTextAnnotation);
+            }
+
+            return false;
+        }
+
         public bool PageHasVectorDrawing(iText.Kernel.Pdf.PdfPage page)
         {
             var contentBytes = page.GetContentBytes();
@@ -7621,42 +7736,7 @@ namespace AnonPDF
                             ResetRasterObjectSize(rasterObjectForIcon);
                             break;
                         case RasterIconType.Delete:
-                            if (EnsureCurrentPageEditable(true))
-                            {
-                                DialogResult deleteResult = MessageBox.Show(
-                                    this,
-                                    LocalizedText("Msg_Confirm_DeleteRasterObject"),
-                                    Resources.Title_Confirmation,
-                                    MessageBoxButtons.YesNo,
-                                    MessageBoxIcon.Exclamation,
-                                    MessageBoxDefaultButton.Button2);
-
-                                if (deleteResult == DialogResult.Yes)
-                                {
-                                    rasterObjects.RemoveAll(obj => obj != null && obj.Id == rasterObjectForIcon.Id);
-                                    if (selectedRasterObject != null && selectedRasterObject.Id == rasterObjectForIcon.Id)
-                                    {
-                                        selectedRasterObject = null;
-                                    }
-
-                                    status.HasObjects = HasAnyObjectsOnPage(currentPage);
-                                    if ((string)filterComboBox.SelectedItem == allComboItem)
-                                    {
-                                        ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                                        UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
-                                        pagesListView.Invalidate(currentItem.Bounds);
-                                    }
-                                    else
-                                    {
-                                        ApplyFilter((string)filterComboBox.SelectedItem);
-                                    }
-
-                                    projectWasChangedAfterLastSave = true;
-                                    saveProjectButton.Enabled = true;
-                                    saveProjectMenuItem.Enabled = true;
-                                    pdfViewer.Invalidate();
-                                }
-                            }
+                            DeleteRasterObjectWithConfirmation(rasterObjectForIcon);
                             break;
                     }
 
@@ -7693,47 +7773,7 @@ namespace AnonPDF
                     }
                     else if (clickedIconType == IconType.Delete)
                     {
-                        string msqOutText = Resources.Msg_Confirm_DeleteTextAnnotation;
-                        DialogResult result = MessageBox.Show(this,
-                            msqOutText,
-                            Resources.Title_Confirmation,
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Exclamation,
-                            MessageBoxDefaultButton.Button2
-                        );
-
-                        if (result == DialogResult.Yes)
-                        {
-                            // For example: remove annotation from list
-                            textAnnotations.Remove(annotationForIcon);
-                            if (selectedTextAnnotation != null && ReferenceEquals(selectedTextAnnotation, annotationForIcon))
-                            {
-                                selectedTextAnnotation = null;
-                            }
-
-                            projectWasChangedAfterLastSave = true;
-                            saveProjectButton.Enabled = true;
-                            saveProjectMenuItem.Enabled = true;
-
-                            
-                            
-                            status.HasObjects = HasAnyObjectsOnPage(currentPage);
-                            
-
-                            if ((string)filterComboBox.SelectedItem == allComboItem)
-                            {
-                                // only refresh this row
-                                ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
-                                pagesListView.Invalidate(currentItem.Bounds);
-                            }
-                            else
-                            {
-                                // rebuild list according to filter
-                                ApplyFilter((string)filterComboBox.SelectedItem);
-                            }
-
-                        }
+                        DeleteTextObjectWithConfirmation(annotationForIcon);
 
                     }
                     else if (clickedIconType == IconType.Duplicate)
@@ -9501,6 +9541,10 @@ namespace AnonPDF
                 if (searchTextBox.Focused)
                     return false;  // we don't handle - pass on to control
 
+                // 2) If any object is active, delete that object first.
+                if (TryDeleteActiveObjectByKeyboard())
+                    return true;
+
                 // 2) Otherwise treat Delete as "delete page":
                 RemovePage();
                 return true;     // handled, don't pass on
@@ -9596,7 +9640,8 @@ namespace AnonPDF
                         sourceType: RasterSourceClipboard,
                         filePath: null,
                         embeddedBytes: imageBytes,
-                        mimeType: "image/png");
+                        mimeType: "image/png",
+                        preferOneToOne: true);
                 }
 
                 return true;
@@ -9645,7 +9690,8 @@ namespace AnonPDF
                             sourceType: RasterSourceFile,
                             filePath: selectedPath,
                             embeddedBytes: null,
-                            mimeType: GetRasterMimeTypeFromPath(selectedPath));
+                            mimeType: GetRasterMimeTypeFromPath(selectedPath),
+                            preferOneToOne: false);
                     }
                 }
                 catch (Exception ex)
@@ -9662,14 +9708,17 @@ namespace AnonPDF
             string sourceType,
             string filePath,
             byte[] embeddedBytes,
-            string mimeType)
+            string mimeType,
+            bool preferOneToOne = false)
         {
             if (imageWidth <= 0 || imageHeight <= 0)
             {
                 return;
             }
 
-            RectangleF initialBounds = GetInitialRasterBounds(imageWidth, imageHeight);
+            RectangleF initialBounds = preferOneToOne
+                ? GetInitialRasterBoundsOneToOne(imageWidth, imageHeight)
+                : GetInitialRasterBounds(imageWidth, imageHeight);
             var now = DateTime.UtcNow;
             var rasterObject = new RasterObject
             {
@@ -9679,6 +9728,7 @@ namespace AnonPDF
                 InitialBounds = initialBounds,
                 Rotation = 0,
                 Opacity = 1f,
+                TransparentBackground = false,
                 LockAspect = true,
                 IsLocked = false,
                 SourceType = sourceType,
@@ -9736,6 +9786,22 @@ namespace AnonPDF
             scale = Math.Min(scale, 1f);
             float width = sourceWidth * scale;
             float height = sourceHeight * scale;
+            float x = (pageSize.Width - width) / 2f;
+            float y = (pageSize.Height - height) / 2f;
+            return new RectangleF(x, y, width, height);
+        }
+
+        private RectangleF GetInitialRasterBoundsOneToOne(int sourceWidth, int sourceHeight)
+        {
+            var pageSize = GetPageSizeWithOffset(currentPage);
+            if (pageSize.Width <= 0f || pageSize.Height <= 0f)
+            {
+                return new RectangleF(0f, 0f, sourceWidth, sourceHeight);
+            }
+
+            float viewScale = Math.Max(0.01f, scaleFactor);
+            float width = sourceWidth / viewScale;
+            float height = sourceHeight / viewScale;
             float x = (pageSize.Width - width) / 2f;
             float y = (pageSize.Height - height) / 2f;
             return new RectangleF(x, y, width, height);
@@ -10277,6 +10343,7 @@ namespace AnonPDF
                 InitialBounds = copyBounds,
                 Rotation = source.Rotation,
                 Opacity = source.Opacity,
+                TransparentBackground = source.TransparentBackground,
                 LockAspect = source.LockAspect,
                 IsLocked = source.IsLocked,
                 SourceType = source.SourceType,
@@ -10323,6 +10390,7 @@ namespace AnonPDF
             RectangleF newBounds,
             int newRotation,
             float newOpacity,
+            bool newTransparentBackground,
             bool newLockAspect,
             bool newIsLocked,
             string newFilePath)
@@ -10341,6 +10409,11 @@ namespace AnonPDF
             }
 
             if (!AreSameFloat(NormalizeOpacity(rasterObject.Opacity), NormalizeOpacity(newOpacity)))
+            {
+                return true;
+            }
+
+            if (rasterObject.TransparentBackground != newTransparentBackground)
             {
                 return true;
             }
@@ -10378,8 +10451,10 @@ namespace AnonPDF
             }
         }
 
-        private static bool TryGetImageAspectRatioFromRasterObject(RasterObject rasterObject, out decimal aspectRatio)
+        private static bool TryGetRasterImageMetrics(RasterObject rasterObject, out int width, out int height, out decimal aspectRatio)
         {
+            width = 0;
+            height = 0;
             aspectRatio = 0m;
             if (!TryCreateRasterPreviewImage(rasterObject, out DrawingImage previewImage))
             {
@@ -10393,7 +10468,9 @@ namespace AnonPDF
                     return false;
                 }
 
-                aspectRatio = (decimal)previewImage.Width / previewImage.Height;
+                width = previewImage.Width;
+                height = previewImage.Height;
+                aspectRatio = (decimal)width / height;
                 return aspectRatio > 0m;
             }
         }
@@ -10412,6 +10489,7 @@ namespace AnonPDF
                 dlg.HeightValue);
             int updatedRotation = NormalizeRotation(dlg.Rotation);
             float updatedOpacity = NormalizeOpacity(dlg.RasterOpacity);
+            bool updatedTransparentBackground = dlg.TransparentBackground;
             bool updatedLockAspect = dlg.LockAspect;
             bool updatedLocked = dlg.IsLocked;
             string selectedPathToApply = dlg.ReplacementImagePath;
@@ -10434,6 +10512,7 @@ namespace AnonPDF
                     updatedBounds,
                     updatedRotation,
                     updatedOpacity,
+                    updatedTransparentBackground,
                     updatedLockAspect,
                     updatedLocked,
                     string.IsNullOrWhiteSpace(selectedPathToApply) ? rasterObject.FilePath : selectedPathToApply);
@@ -10445,6 +10524,7 @@ namespace AnonPDF
                 rasterObject.Bounds = updatedBounds;
                 rasterObject.Rotation = updatedRotation;
                 rasterObject.Opacity = updatedOpacity;
+                rasterObject.TransparentBackground = updatedTransparentBackground;
                 rasterObject.LockAspect = updatedLockAspect;
                 rasterObject.IsLocked = updatedLocked;
 
@@ -10494,12 +10574,16 @@ namespace AnonPDF
                 dlg.HeightValue = rasterObject.Bounds.Height;
                 dlg.Rotation = NormalizeRotation(rasterObject.Rotation);
                 dlg.RasterOpacity = NormalizeOpacity(rasterObject.Opacity);
+                dlg.TransparentBackground = rasterObject.TransparentBackground;
                 dlg.LockAspect = rasterObject.LockAspect;
                 dlg.IsLocked = rasterObject.IsLocked;
                 dlg.SourceType = rasterObject.SourceType;
                 dlg.FilePath = rasterObject.FilePath;
-                if (TryGetImageAspectRatioFromRasterObject(rasterObject, out decimal sourceAspectRatio))
+                dlg.ViewScaleFactor = Math.Max(0.01f, scaleFactor);
+                if (TryGetRasterImageMetrics(rasterObject, out int sourcePixelWidth, out int sourcePixelHeight, out decimal sourceAspectRatio))
                 {
+                    dlg.SourcePixelWidth = sourcePixelWidth;
+                    dlg.SourcePixelHeight = sourcePixelHeight;
                     dlg.SourceAspectRatio = sourceAspectRatio;
                 }
                 dlg.SelectReplacementImage = () =>
@@ -10789,6 +10873,66 @@ namespace AnonPDF
             return true;
         }
 
+        private static Bitmap ApplyTransparentBackgroundFromTopLeft(Bitmap source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            Bitmap working = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+            using (Graphics g = Graphics.FromImage(working))
+            {
+                g.DrawImage(source, 0, 0, source.Width, source.Height);
+            }
+
+            if (working.Width <= 0 || working.Height <= 0)
+            {
+                return working;
+            }
+
+            Rectangle rect = new Rectangle(0, 0, working.Width, working.Height);
+            BitmapData data = null;
+            try
+            {
+                data = working.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+                int stride = data.Stride;
+                int rowBytes = Math.Abs(stride);
+                int totalBytes = rowBytes * working.Height;
+                byte[] buffer = new byte[totalBytes];
+                Marshal.Copy(data.Scan0, buffer, 0, totalBytes);
+
+                int firstRowStart = stride >= 0 ? 0 : (working.Height - 1) * rowBytes;
+                byte keyB = buffer[firstRowStart];
+                byte keyG = buffer[firstRowStart + 1];
+                byte keyR = buffer[firstRowStart + 2];
+
+                for (int y = 0; y < working.Height; y++)
+                {
+                    int rowStart = stride >= 0 ? y * rowBytes : (working.Height - 1 - y) * rowBytes;
+                    for (int x = 0; x < working.Width; x++)
+                    {
+                        int idx = rowStart + (x * 4);
+                        if (buffer[idx] == keyB && buffer[idx + 1] == keyG && buffer[idx + 2] == keyR)
+                        {
+                            buffer[idx + 3] = 0;
+                        }
+                    }
+                }
+
+                Marshal.Copy(buffer, 0, data.Scan0, totalBytes);
+            }
+            finally
+            {
+                if (data != null)
+                {
+                    working.UnlockBits(data);
+                }
+            }
+
+            return working;
+        }
+
         private static bool TryCreateRasterPreviewImage(RasterObject rasterObject, out DrawingImage image)
         {
             image = null;
@@ -10804,7 +10948,12 @@ namespace AnonPDF
                     using (var ms = new MemoryStream(rasterObject.EmbeddedBytes))
                     using (var src = DrawingImage.FromStream(ms))
                     {
-                        image = new Bitmap(src);
+                        using (var baseBitmap = new Bitmap(src))
+                        {
+                            image = rasterObject.TransparentBackground
+                                ? ApplyTransparentBackgroundFromTopLeft(baseBitmap)
+                                : new Bitmap(baseBitmap);
+                        }
                         return true;
                     }
                 }
@@ -10813,7 +10962,12 @@ namespace AnonPDF
                 {
                     using (var src = DrawingImage.FromFile(rasterObject.FilePath))
                     {
-                        image = new Bitmap(src);
+                        using (var baseBitmap = new Bitmap(src))
+                        {
+                            image = rasterObject.TransparentBackground
+                                ? ApplyTransparentBackgroundFromTopLeft(baseBitmap)
+                                : new Bitmap(baseBitmap);
+                        }
                         return true;
                     }
                 }
@@ -10838,14 +10992,41 @@ namespace AnonPDF
             {
                 if (rasterObject.EmbeddedBytes != null && rasterObject.EmbeddedBytes.Length > 0)
                 {
-                    imageData = iText.IO.Image.ImageDataFactory.Create(rasterObject.EmbeddedBytes);
+                    if (!rasterObject.TransparentBackground)
+                    {
+                        imageData = iText.IO.Image.ImageDataFactory.Create(rasterObject.EmbeddedBytes);
+                        return true;
+                    }
+
+                    using (var ms = new MemoryStream(rasterObject.EmbeddedBytes))
+                    using (var src = DrawingImage.FromStream(ms))
+                    using (var baseBitmap = new Bitmap(src))
+                    using (var transformed = ApplyTransparentBackgroundFromTopLeft(baseBitmap))
+                    using (var pngStream = new MemoryStream())
+                    {
+                        transformed.Save(pngStream, ImageFormat.Png);
+                        imageData = iText.IO.Image.ImageDataFactory.Create(pngStream.ToArray());
+                    }
                     return true;
                 }
 
                 if (!string.IsNullOrWhiteSpace(rasterObject.FilePath) && File.Exists(rasterObject.FilePath))
                 {
-                    byte[] fileBytes = File.ReadAllBytes(rasterObject.FilePath);
-                    imageData = iText.IO.Image.ImageDataFactory.Create(fileBytes);
+                    if (!rasterObject.TransparentBackground)
+                    {
+                        byte[] fileBytes = File.ReadAllBytes(rasterObject.FilePath);
+                        imageData = iText.IO.Image.ImageDataFactory.Create(fileBytes);
+                        return true;
+                    }
+
+                    using (var src = DrawingImage.FromFile(rasterObject.FilePath))
+                    using (var baseBitmap = new Bitmap(src))
+                    using (var transformed = ApplyTransparentBackgroundFromTopLeft(baseBitmap))
+                    using (var pngStream = new MemoryStream())
+                    {
+                        transformed.Save(pngStream, ImageFormat.Png);
+                        imageData = iText.IO.Image.ImageDataFactory.Create(pngStream.ToArray());
+                    }
                     return true;
                 }
             }
@@ -13336,6 +13517,7 @@ namespace AnonPDF
         private GroupBox groupOptions;
         private CheckBox chkLockAspect;
         private CheckBox chkLocked;
+        private CheckBox chkTransparentBackground;
         private Label lblOpacity;
         private NumericUpDown nudOpacity;
 
@@ -13343,6 +13525,7 @@ namespace AnonPDF
         private Label lblSourceValue;
         private Button btnReplaceImage;
         private Button btnResetAspect;
+        private Button btnResetOneToOne;
 
         private Button btnOK;
         private Button btnCancel;
@@ -13350,6 +13533,7 @@ namespace AnonPDF
         private bool suppressDimensionSync;
         private bool suppressAutoApply;
         private decimal aspectRatio = 1m;
+        private decimal lockedAspectRatio = 1m;
 
         public float PositionX { get; set; }
         public float PositionY { get; set; }
@@ -13357,12 +13541,16 @@ namespace AnonPDF
         public float HeightValue { get; set; }
         public int Rotation { get; set; }
         public float RasterOpacity { get; set; }
+        public bool TransparentBackground { get; set; }
         public bool LockAspect { get; set; }
         public bool IsLocked { get; set; }
         public string SourceType { get; set; }
         public string FilePath { get; set; }
         public string ReplacementImagePath { get; private set; }
         public decimal SourceAspectRatio { get; set; }
+        public int SourcePixelWidth { get; set; }
+        public int SourcePixelHeight { get; set; }
+        public float ViewScaleFactor { get; set; } = 1f;
         public Func<string> SelectReplacementImage { get; set; }
         public Action ApplyChanges { get; set; }
 
@@ -13377,7 +13565,7 @@ namespace AnonPDF
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             Width = 430;
-            Height = 490;
+            Height = 470;
             MaximizeBox = false;
             MinimizeBox = false;
 
@@ -13480,10 +13668,17 @@ namespace AnonPDF
                 Location = new Point(190, 24),
                 AutoSize = true
             };
+            chkTransparentBackground = new CheckBox
+            {
+                Text = Resources.EditRaster_CheckTransparentBackground,
+                Location = new Point(12, 56),
+                AutoSize = true
+            };
+            chkTransparentBackground.CheckedChanged += AnyControlValueChanged;
             lblOpacity = new Label
             {
                 Text = Resources.EditRaster_LabelOpacity,
-                Location = new Point(12, 56),
+                Location = new Point(190, 56),
                 AutoSize = true
             };
             nudOpacity = new NumericUpDown
@@ -13492,7 +13687,7 @@ namespace AnonPDF
                 Maximum = 100,
                 DecimalPlaces = 0,
                 Increment = 1,
-                Location = new Point(190, 52),
+                Location = new Point(300, 52),
                 Size = new Size(70, 22),
                 ThousandsSeparator = false
             };
@@ -13500,6 +13695,7 @@ namespace AnonPDF
             chkLocked.CheckedChanged += AnyControlValueChanged;
             groupOptions.Controls.Add(chkLockAspect);
             groupOptions.Controls.Add(chkLocked);
+            groupOptions.Controls.Add(chkTransparentBackground);
             groupOptions.Controls.Add(lblOpacity);
             groupOptions.Controls.Add(nudOpacity);
 
@@ -13529,14 +13725,22 @@ namespace AnonPDF
                 Size = new Size(116, 28)
             };
             btnResetAspect.Click += BtnResetAspect_Click;
+            btnResetOneToOne = new Button
+            {
+                Text = Resources.EditRaster_ButtonResetOneToOne,
+                Location = new Point(212, 50),
+                Size = new Size(50, 28)
+            };
+            btnResetOneToOne.Click += BtnResetOneToOne_Click;
             groupSource.Controls.Add(lblSourceValue);
             groupSource.Controls.Add(btnReplaceImage);
             groupSource.Controls.Add(btnResetAspect);
+            groupSource.Controls.Add(btnResetOneToOne);
 
             btnOK = new Button
             {
                 Text = Resources.Merge_OK,
-                Location = new Point(238, 400),
+                Location = new Point(238, 386),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.OK
             };
@@ -13545,7 +13749,7 @@ namespace AnonPDF
             btnCancel = new Button
             {
                 Text = Resources.Merge_Cancel,
-                Location = new Point(324, 400),
+                Location = new Point(324, 386),
                 Size = new Size(80, 30),
                 DialogResult = DialogResult.Cancel
             };
@@ -13587,12 +13791,15 @@ namespace AnonPDF
             nudHeight.Value = ClampDecimal((decimal)Math.Max(1f, HeightValue), nudHeight.Minimum, nudHeight.Maximum);
             nudRotation.Value = NormalizeAngle(Rotation);
             nudOpacity.Value = ClampDecimal((decimal)(Math.Max(0f, Math.Min(1f, RasterOpacity)) * 100f), nudOpacity.Minimum, nudOpacity.Maximum);
+            chkTransparentBackground.Checked = TransparentBackground;
             chkLockAspect.Checked = LockAspect;
             chkLocked.Checked = IsLocked;
             ReplacementImagePath = string.Empty;
             btnResetAspect.Enabled = SourceAspectRatio > 0m;
+            btnResetOneToOne.Enabled = SourcePixelWidth > 0 && SourcePixelHeight > 0;
 
             RecalculateAspectRatio();
+            lockedAspectRatio = aspectRatio > 0m ? aspectRatio : 1m;
             UpdateSourceLabel();
 
             SyncPropertiesFromControls();
@@ -13632,6 +13839,7 @@ namespace AnonPDF
             if (chkLockAspect.Checked)
             {
                 RecalculateAspectRatio();
+                lockedAspectRatio = aspectRatio > 0m ? aspectRatio : 1m;
             }
             TryApplyChanges();
         }
@@ -13645,8 +13853,9 @@ namespace AnonPDF
 
             if (chkLockAspect.Checked && aspectRatio > 0m)
             {
+                decimal ratioToUse = lockedAspectRatio > 0m ? lockedAspectRatio : aspectRatio;
                 suppressDimensionSync = true;
-                decimal height = nudWidth.Value / aspectRatio;
+                decimal height = nudWidth.Value / ratioToUse;
                 nudHeight.Value = ClampDecimal(height, nudHeight.Minimum, nudHeight.Maximum);
                 suppressDimensionSync = false;
             }
@@ -13662,8 +13871,9 @@ namespace AnonPDF
 
             if (chkLockAspect.Checked && aspectRatio > 0m)
             {
+                decimal ratioToUse = lockedAspectRatio > 0m ? lockedAspectRatio : aspectRatio;
                 suppressDimensionSync = true;
-                decimal width = nudHeight.Value * aspectRatio;
+                decimal width = nudHeight.Value * ratioToUse;
                 nudWidth.Value = ClampDecimal(width, nudWidth.Minimum, nudWidth.Maximum);
                 suppressDimensionSync = false;
             }
@@ -13744,17 +13954,22 @@ namespace AnonPDF
             }
 
             ReplacementImagePath = selectedPath;
-            if (TryGetImageAspectRatioFromPath(selectedPath, out decimal aspectFromFile))
+            if (TryGetImageInfoFromPath(selectedPath, out int sourceWidth, out int sourceHeight, out decimal aspectFromFile))
             {
+                SourcePixelWidth = sourceWidth;
+                SourcePixelHeight = sourceHeight;
                 SourceAspectRatio = aspectFromFile;
             }
             btnResetAspect.Enabled = SourceAspectRatio > 0m;
+            btnResetOneToOne.Enabled = SourcePixelWidth > 0 && SourcePixelHeight > 0;
             UpdateSourceLabel();
             TryApplyChanges();
         }
 
-        private static bool TryGetImageAspectRatioFromPath(string filePath, out decimal aspectRatio)
+        private static bool TryGetImageInfoFromPath(string filePath, out int width, out int height, out decimal aspectRatio)
         {
+            width = 0;
+            height = 0;
             aspectRatio = 0m;
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
@@ -13770,7 +13985,9 @@ namespace AnonPDF
                         return false;
                     }
 
-                    aspectRatio = (decimal)image.Width / image.Height;
+                    width = image.Width;
+                    height = image.Height;
+                    aspectRatio = (decimal)width / height;
                     return aspectRatio > 0m;
                 }
             }
@@ -13802,6 +14019,38 @@ namespace AnonPDF
             suppressDimensionSync = false;
 
             aspectRatio = SourceAspectRatio;
+            if (chkLockAspect.Checked)
+            {
+                lockedAspectRatio = aspectRatio > 0m ? aspectRatio : lockedAspectRatio;
+            }
+            TryApplyChanges();
+        }
+
+        private void BtnResetOneToOne_Click(object sender, EventArgs e)
+        {
+            if (SourcePixelWidth <= 0 || SourcePixelHeight <= 0)
+            {
+                return;
+            }
+
+            decimal scale = (decimal)Math.Max(0.01f, ViewScaleFactor);
+            decimal centerX = nudX.Value + (nudWidth.Value / 2m);
+            decimal centerY = nudY.Value + (nudHeight.Value / 2m);
+            decimal targetWidth = ClampDecimal(SourcePixelWidth / scale, nudWidth.Minimum, nudWidth.Maximum);
+            decimal targetHeight = ClampDecimal(SourcePixelHeight / scale, nudHeight.Minimum, nudHeight.Maximum);
+
+            suppressDimensionSync = true;
+            nudWidth.Value = targetWidth;
+            nudHeight.Value = targetHeight;
+            nudX.Value = ClampDecimal(centerX - (targetWidth / 2m), nudX.Minimum, nudX.Maximum);
+            nudY.Value = ClampDecimal(centerY - (targetHeight / 2m), nudY.Minimum, nudY.Maximum);
+            suppressDimensionSync = false;
+
+            aspectRatio = SourceAspectRatio > 0m ? SourceAspectRatio : aspectRatio;
+            if (chkLockAspect.Checked)
+            {
+                lockedAspectRatio = aspectRatio > 0m ? aspectRatio : lockedAspectRatio;
+            }
             TryApplyChanges();
         }
 
@@ -13818,6 +14067,7 @@ namespace AnonPDF
             HeightValue = Math.Max(1f, (float)nudHeight.Value);
             Rotation = NormalizeAngle((int)nudRotation.Value);
             RasterOpacity = (float)(nudOpacity.Value / 100m);
+            TransparentBackground = chkTransparentBackground.Checked;
             LockAspect = chkLockAspect.Checked;
             IsLocked = chkLocked.Checked;
         }
@@ -13839,17 +14089,22 @@ namespace AnonPDF
                 nudHeight.Value = ClampDecimal((decimal)Math.Max(1f, rasterObject.Bounds.Height), nudHeight.Minimum, nudHeight.Maximum);
                 nudRotation.Value = NormalizeAngle(rasterObject.Rotation);
                 nudOpacity.Value = ClampDecimal((decimal)(Math.Max(0f, Math.Min(1f, rasterObject.Opacity)) * 100f), nudOpacity.Minimum, nudOpacity.Maximum);
+                chkTransparentBackground.Checked = rasterObject.TransparentBackground;
                 chkLockAspect.Checked = rasterObject.LockAspect;
                 chkLocked.Checked = rasterObject.IsLocked;
                 SourceType = rasterObject.SourceType;
                 FilePath = rasterObject.FilePath;
                 ReplacementImagePath = string.Empty;
-                if (TryGetImageAspectRatioFromPath(FilePath, out decimal aspectFromPath))
+                if (TryGetImageInfoFromPath(FilePath, out int sourceWidth, out int sourceHeight, out decimal aspectFromPath))
                 {
+                    SourcePixelWidth = sourceWidth;
+                    SourcePixelHeight = sourceHeight;
                     SourceAspectRatio = aspectFromPath;
                 }
                 btnResetAspect.Enabled = SourceAspectRatio > 0m;
+                btnResetOneToOne.Enabled = SourcePixelWidth > 0 && SourcePixelHeight > 0;
                 RecalculateAspectRatio();
+                lockedAspectRatio = aspectRatio > 0m ? aspectRatio : lockedAspectRatio;
                 UpdateSourceLabel();
                 SyncPropertiesFromControls();
             }
@@ -14603,6 +14858,7 @@ namespace AnonPDF
         public RectangleF InitialBounds { get; set; }
         public int Rotation { get; set; }
         public float Opacity { get; set; } = 1f;
+        public bool TransparentBackground { get; set; } = false;
         public bool LockAspect { get; set; }
         public bool IsLocked { get; set; }
         public string SourceType { get; set; }
