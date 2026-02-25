@@ -161,9 +161,9 @@
             // loadPdfButton
             // 
             this.loadPdfButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.loadPdfButton.Location = new System.Drawing.Point(17, 18);
+            this.loadPdfButton.Location = new System.Drawing.Point(15, 18);
             this.loadPdfButton.Name = "loadPdfButton";
-            this.loadPdfButton.Size = new System.Drawing.Size(128, 23);
+            this.loadPdfButton.Size = new System.Drawing.Size(154, 23);
             this.loadPdfButton.TabIndex = 0;
             this.loadPdfButton.Text = Res("UI_Button_OpenPdf");
             this.toolTip1.SetToolTip(this.loadPdfButton, Res("Tooltip_LoadPdf"));
@@ -205,7 +205,7 @@
             this.mainAppSplitContainer.Panel2.Controls.Add(this.pdfViewer);
             this.mainAppSplitContainer.Panel2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
             this.mainAppSplitContainer.Size = new System.Drawing.Size(1014, 912);
-            this.mainAppSplitContainer.SplitterDistance = 187;
+            this.mainAppSplitContainer.SplitterDistance = 213;
             this.mainAppSplitContainer.TabIndex = 0;
             this.mainAppSplitContainer.TabStop = false;
             // 
@@ -214,7 +214,7 @@
             this.setSavePassword.AutoSize = true;
             this.setSavePassword.Enabled = false;
             this.setSavePassword.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.setSavePassword.Location = new System.Drawing.Point(14, 88);
+            this.setSavePassword.Location = new System.Drawing.Point(15, 88);
             this.setSavePassword.Name = "setSavePassword";
             this.setSavePassword.Size = new System.Drawing.Size(124, 17);
             this.setSavePassword.TabIndex = 3;
@@ -227,7 +227,7 @@
             this.safeModeCheckBox.AutoSize = true;
             this.safeModeCheckBox.Enabled = false;
             this.safeModeCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.safeModeCheckBox.Location = new System.Drawing.Point(14, 65);
+            this.safeModeCheckBox.Location = new System.Drawing.Point(15, 65);
             this.safeModeCheckBox.Name = "safeModeCheckBox";
             this.safeModeCheckBox.Size = new System.Drawing.Size(106, 17);
             this.safeModeCheckBox.TabIndex = 2;
@@ -242,33 +242,33 @@
             this.groupBoxPagesToRemove.Enabled = false;
             this.groupBoxPagesToRemove.Location = new System.Drawing.Point(12, 594);
             this.groupBoxPagesToRemove.Name = "groupBoxPagesToRemove";
-            this.groupBoxPagesToRemove.Size = new System.Drawing.Size(164, 85);
+            this.groupBoxPagesToRemove.Size = new System.Drawing.Size(184, 85);
             this.groupBoxPagesToRemove.TabIndex = 6;
             this.groupBoxPagesToRemove.TabStop = false;
             this.groupBoxPagesToRemove.Text = Res("UI_Group_PagesToRemove");
             // 
             // removePageButton
             // 
-            this.removePageButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.removePageButton.Anchor = System.Windows.Forms.AnchorStyles.Top;
             this.removePageButton.BackColor = System.Drawing.SystemColors.Control;
             this.removePageButton.Enabled = false;
             this.removePageButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 18F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.removePageButton.Location = new System.Drawing.Point(87, 22);
+            this.removePageButton.Location = new System.Drawing.Point(96, 22);
             this.removePageButton.Name = "removePageButton";
             this.removePageButton.Padding = new System.Windows.Forms.Padding(3, 0, 0, 0);
-            this.removePageButton.Size = new System.Drawing.Size(42, 51);
+            this.removePageButton.Size = new System.Drawing.Size(56, 51);
             this.removePageButton.TabIndex = 35;
             this.toolTip1.SetToolTip(this.removePageButton, Res("Tooltip_RemovePage"));
             this.removePageButton.UseVisualStyleBackColor = true;
             // 
             // removePageRangeButton
             // 
-            this.removePageRangeButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.removePageRangeButton.Anchor = System.Windows.Forms.AnchorStyles.Top;
             this.removePageRangeButton.Enabled = false;
             this.removePageRangeButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 12F);
-            this.removePageRangeButton.Location = new System.Drawing.Point(30, 22);
+            this.removePageRangeButton.Location = new System.Drawing.Point(32, 22);
             this.removePageRangeButton.Name = "removePageRangeButton";
-            this.removePageRangeButton.Size = new System.Drawing.Size(42, 51);
+            this.removePageRangeButton.Size = new System.Drawing.Size(56, 51);
             this.removePageRangeButton.TabIndex = 34;
             this.toolTip1.SetToolTip(this.removePageRangeButton, Res("Tooltip_RemovePageRange"));
             this.removePageRangeButton.UseVisualStyleBackColor = true;
@@ -281,7 +281,7 @@
             this.groupBoxSignatures.Enabled = false;
             this.groupBoxSignatures.Location = new System.Drawing.Point(12, 687);
             this.groupBoxSignatures.Name = "groupBoxSignatures";
-            this.groupBoxSignatures.Size = new System.Drawing.Size(164, 99);
+            this.groupBoxSignatures.Size = new System.Drawing.Size(184, 99);
             this.groupBoxSignatures.TabIndex = 7;
             this.groupBoxSignatures.TabStop = false;
             this.groupBoxSignatures.Text = Res("UI_Group_Signatures");
@@ -290,7 +290,7 @@
             // 
             this.signaturesReportRadioButton.AutoSize = true;
             this.signaturesReportRadioButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.signaturesReportRadioButton.Location = new System.Drawing.Point(30, 65);
+            this.signaturesReportRadioButton.Location = new System.Drawing.Point(15, 65);
             this.signaturesReportRadioButton.Name = "signaturesReportRadioButton";
             this.signaturesReportRadioButton.Size = new System.Drawing.Size(63, 17);
             this.signaturesReportRadioButton.TabIndex = 39;
@@ -303,7 +303,7 @@
             // 
             this.signaturesOriginalRadioButton.AutoSize = true;
             this.signaturesOriginalRadioButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.signaturesOriginalRadioButton.Location = new System.Drawing.Point(30, 42);
+            this.signaturesOriginalRadioButton.Location = new System.Drawing.Point(15, 42);
             this.signaturesOriginalRadioButton.Name = "signaturesOriginalRadioButton";
             this.signaturesOriginalRadioButton.Size = new System.Drawing.Size(85, 17);
             this.signaturesOriginalRadioButton.TabIndex = 38;
@@ -317,7 +317,7 @@
             this.signaturesRemoveRadioButton.AutoSize = true;
             this.signaturesRemoveRadioButton.Checked = true;
             this.signaturesRemoveRadioButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.signaturesRemoveRadioButton.Location = new System.Drawing.Point(30, 19);
+            this.signaturesRemoveRadioButton.Location = new System.Drawing.Point(15, 19);
             this.signaturesRemoveRadioButton.Name = "signaturesRemoveRadioButton";
             this.signaturesRemoveRadioButton.Size = new System.Drawing.Size(75, 17);
             this.signaturesRemoveRadioButton.TabIndex = 37;
@@ -345,7 +345,7 @@
             this.groupBoxPages.ForeColor = System.Drawing.SystemColors.ControlText;
             this.groupBoxPages.Location = new System.Drawing.Point(12, 196);
             this.groupBoxPages.Name = "groupBoxPages";
-            this.groupBoxPages.Size = new System.Drawing.Size(164, 110);
+            this.groupBoxPages.Size = new System.Drawing.Size(184, 110);
             this.groupBoxPages.TabIndex = 3;
             this.groupBoxPages.TabStop = false;
             this.groupBoxPages.Text = Res("UI_Group_Pages");
@@ -353,9 +353,9 @@
             // pageNumberTextBox
             // 
             this.pageNumberTextBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this.pageNumberTextBox.Location = new System.Drawing.Point(16, 19);
+            this.pageNumberTextBox.Location = new System.Drawing.Point(15, 19);
             this.pageNumberTextBox.Name = "pageNumberTextBox";
-            this.pageNumberTextBox.Size = new System.Drawing.Size(64, 21);
+            this.pageNumberTextBox.Size = new System.Drawing.Size(70, 21);
             this.pageNumberTextBox.TabIndex = 4;
             this.pageNumberTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.toolTip1.SetToolTip(this.pageNumberTextBox, Res("Tooltip_PageNumber"));
@@ -369,7 +369,7 @@
             this.numPagesLabel.AutoSize = true;
             this.numPagesLabel.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.numPagesLabel.ImageAlign = System.Drawing.ContentAlignment.TopLeft;
-            this.numPagesLabel.Location = new System.Drawing.Point(90, 22);
+            this.numPagesLabel.Location = new System.Drawing.Point(93, 22);
             this.numPagesLabel.Name = "numPagesLabel";
             this.numPagesLabel.Size = new System.Drawing.Size(10, 15);
             this.numPagesLabel.TabIndex = 0;
@@ -381,9 +381,9 @@
             // 
             this.buttonFirst.Enabled = false;
             this.buttonFirst.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.buttonFirst.Location = new System.Drawing.Point(16, 47);
+            this.buttonFirst.Location = new System.Drawing.Point(15, 47);
             this.buttonFirst.Name = "buttonFirst";
-            this.buttonFirst.Size = new System.Drawing.Size(27, 23);
+            this.buttonFirst.Size = new System.Drawing.Size(34, 23);
             this.buttonFirst.TabIndex = 5;
             this.buttonFirst.Text = "|<";
             this.toolTip1.SetToolTip(this.buttonFirst, Res("Tooltip_FirstPage"));
@@ -394,9 +394,9 @@
             // 
             this.buttonNextPage.Enabled = false;
             this.buttonNextPage.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.buttonNextPage.Location = new System.Drawing.Point(84, 47);
+            this.buttonNextPage.Location = new System.Drawing.Point(95, 47);
             this.buttonNextPage.Name = "buttonNextPage";
-            this.buttonNextPage.Size = new System.Drawing.Size(27, 23);
+            this.buttonNextPage.Size = new System.Drawing.Size(34, 23);
             this.buttonNextPage.TabIndex = 7;
             this.buttonNextPage.Text = ">";
             this.toolTip1.SetToolTip(this.buttonNextPage, Res("Tooltip_NextPage"));
@@ -407,9 +407,9 @@
             // 
             this.buttonPrevious.Enabled = false;
             this.buttonPrevious.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.buttonPrevious.Location = new System.Drawing.Point(48, 47);
+            this.buttonPrevious.Location = new System.Drawing.Point(55, 47);
             this.buttonPrevious.Name = "buttonPrevious";
-            this.buttonPrevious.Size = new System.Drawing.Size(27, 23);
+            this.buttonPrevious.Size = new System.Drawing.Size(34, 23);
             this.buttonPrevious.TabIndex = 6;
             this.buttonPrevious.Text = "<";
             this.toolTip1.SetToolTip(this.buttonPrevious, Res("Tooltip_PrevPage"));
@@ -420,9 +420,9 @@
             // 
             this.zoomMinButton.Enabled = false;
             this.zoomMinButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 8F, System.Drawing.FontStyle.Bold);
-            this.zoomMinButton.Location = new System.Drawing.Point(16, 76);
+            this.zoomMinButton.Location = new System.Drawing.Point(15, 76);
             this.zoomMinButton.Name = "zoomMinButton";
-            this.zoomMinButton.Size = new System.Drawing.Size(27, 27);
+            this.zoomMinButton.Size = new System.Drawing.Size(34, 27);
             this.zoomMinButton.TabIndex = 9;
             this.toolTip1.SetToolTip(this.zoomMinButton, Res("Tooltip_ZoomMin"));
             this.zoomMinButton.UseVisualStyleBackColor = true;
@@ -432,10 +432,10 @@
             // 
             this.zoomMaxButton.Enabled = false;
             this.zoomMaxButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 12F, System.Drawing.FontStyle.Bold);
-            this.zoomMaxButton.Location = new System.Drawing.Point(117, 76);
+            this.zoomMaxButton.Location = new System.Drawing.Point(135, 76);
             this.zoomMaxButton.Name = "zoomMaxButton";
             this.zoomMaxButton.Padding = new System.Windows.Forms.Padding(2, 0, 0, 0);
-            this.zoomMaxButton.Size = new System.Drawing.Size(27, 27);
+            this.zoomMaxButton.Size = new System.Drawing.Size(34, 27);
             this.zoomMaxButton.TabIndex = 12;
             this.toolTip1.SetToolTip(this.zoomMaxButton, Res("Tooltip_ZoomMax"));
             this.zoomMaxButton.UseVisualStyleBackColor = true;
@@ -445,10 +445,10 @@
             // 
             this.zoomOutButton.Enabled = false;
             this.zoomOutButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.zoomOutButton.Location = new System.Drawing.Point(48, 76);
+            this.zoomOutButton.Location = new System.Drawing.Point(55, 76);
             this.zoomOutButton.Name = "zoomOutButton";
             this.zoomOutButton.Padding = new System.Windows.Forms.Padding(2, 0, 0, 0);
-            this.zoomOutButton.Size = new System.Drawing.Size(27, 27);
+            this.zoomOutButton.Size = new System.Drawing.Size(34, 27);
             this.zoomOutButton.TabIndex = 10;
             this.toolTip1.SetToolTip(this.zoomOutButton, Res("Tooltip_ZoomOut"));
             this.zoomOutButton.UseVisualStyleBackColor = true;
@@ -458,10 +458,10 @@
             // 
             this.zoomInButton.Enabled = false;
             this.zoomInButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 12F, System.Drawing.FontStyle.Bold);
-            this.zoomInButton.Location = new System.Drawing.Point(84, 76);
+            this.zoomInButton.Location = new System.Drawing.Point(95, 76);
             this.zoomInButton.Name = "zoomInButton";
             this.zoomInButton.Padding = new System.Windows.Forms.Padding(2, 0, 0, 0);
-            this.zoomInButton.Size = new System.Drawing.Size(27, 27);
+            this.zoomInButton.Size = new System.Drawing.Size(34, 27);
             this.zoomInButton.TabIndex = 11;
             this.toolTip1.SetToolTip(this.zoomInButton, Res("Tooltip_ZoomIn"));
             this.zoomInButton.UseVisualStyleBackColor = true;
@@ -471,9 +471,9 @@
             // 
             this.buttonLast.Enabled = false;
             this.buttonLast.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.buttonLast.Location = new System.Drawing.Point(117, 47);
+            this.buttonLast.Location = new System.Drawing.Point(135, 47);
             this.buttonLast.Name = "buttonLast";
-            this.buttonLast.Size = new System.Drawing.Size(27, 23);
+            this.buttonLast.Size = new System.Drawing.Size(34, 23);
             this.buttonLast.TabIndex = 8;
             this.buttonLast.Text = ">|";
             this.toolTip1.SetToolTip(this.buttonLast, Res("Tooltip_LastPage"));
@@ -496,7 +496,7 @@
             this.groupBoxSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
             this.groupBoxSearch.Location = new System.Drawing.Point(12, 314);
             this.groupBoxSearch.Name = "groupBoxSearch";
-            this.groupBoxSearch.Size = new System.Drawing.Size(164, 127);
+            this.groupBoxSearch.Size = new System.Drawing.Size(184, 127);
             this.groupBoxSearch.TabIndex = 4;
             this.groupBoxSearch.TabStop = false;
             this.groupBoxSearch.Text = Res("UI_Group_Search");
@@ -504,10 +504,10 @@
             // searchButton
             // 
             this.searchButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 12F, System.Drawing.FontStyle.Bold);
-            this.searchButton.Location = new System.Drawing.Point(117, 18);
+            this.searchButton.Location = new System.Drawing.Point(141, 18);
             this.searchButton.Name = "searchButton";
             this.searchButton.Padding = new System.Windows.Forms.Padding(2, 0, 0, 0);
-            this.searchButton.Size = new System.Drawing.Size(27, 23);
+            this.searchButton.Size = new System.Drawing.Size(28, 23);
             this.searchButton.TabIndex = 15;
             this.toolTip1.SetToolTip(this.searchButton, Res("Tooltip_Search"));
             this.searchButton.UseVisualStyleBackColor = true;
@@ -516,10 +516,10 @@
             // searchToSelectionButton
             // 
             this.searchToSelectionButton.Font = new System.Drawing.Font("Segoe MDL2 Assets", 12F, System.Drawing.FontStyle.Bold);
-            this.searchToSelectionButton.Location = new System.Drawing.Point(117, 71);
+            this.searchToSelectionButton.Location = new System.Drawing.Point(141, 71);
             this.searchToSelectionButton.Name = "searchToSelectionButton";
             this.searchToSelectionButton.Padding = new System.Windows.Forms.Padding(2, 0, 0, 0);
-            this.searchToSelectionButton.Size = new System.Drawing.Size(27, 23);
+            this.searchToSelectionButton.Size = new System.Drawing.Size(28, 23);
             this.searchToSelectionButton.TabIndex = 19;
             this.toolTip1.SetToolTip(this.searchToSelectionButton, Res("Tooltip_SearchToSelection"));
             this.searchToSelectionButton.UseVisualStyleBackColor = true;
@@ -540,9 +540,9 @@
             // SearchClearButton
             // 
             this.SearchClearButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.SearchClearButton.Location = new System.Drawing.Point(117, 45);
+            this.SearchClearButton.Location = new System.Drawing.Point(141, 45);
             this.SearchClearButton.Name = "SearchClearButton";
-            this.SearchClearButton.Size = new System.Drawing.Size(27, 23);
+            this.SearchClearButton.Size = new System.Drawing.Size(28, 23);
             this.SearchClearButton.TabIndex = 17;
             this.SearchClearButton.Text = Res("UI_SearchClearGlyph");
             this.toolTip1.SetToolTip(this.SearchClearButton, Res("Tooltip_SearchClear"));
@@ -554,7 +554,7 @@
             this.personalDataButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
             this.personalDataButton.Location = new System.Drawing.Point(15, 45);
             this.personalDataButton.Name = "personalDataButton";
-            this.personalDataButton.Size = new System.Drawing.Size(96, 23);
+            this.personalDataButton.Size = new System.Drawing.Size(120, 23);
             this.personalDataButton.TabIndex = 16;
             this.personalDataButton.Text = Res("UI_Button_PersonalData");
             this.toolTip1.SetToolTip(this.personalDataButton, Res("Tooltip_PersonalData"));
@@ -564,9 +564,9 @@
             // searchLastButton
             // 
             this.searchLastButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.searchLastButton.Location = new System.Drawing.Point(117, 97);
+            this.searchLastButton.Location = new System.Drawing.Point(135, 97);
             this.searchLastButton.Name = "searchLastButton";
-            this.searchLastButton.Size = new System.Drawing.Size(27, 23);
+            this.searchLastButton.Size = new System.Drawing.Size(34, 23);
             this.searchLastButton.TabIndex = 23;
             this.searchLastButton.Text = ">|";
             this.toolTip1.SetToolTip(this.searchLastButton, Res("Tooltip_SearchResultLast"));
@@ -576,9 +576,9 @@
             // searchNextButton
             // 
             this.searchNextButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.searchNextButton.Location = new System.Drawing.Point(84, 97);
+            this.searchNextButton.Location = new System.Drawing.Point(95, 97);
             this.searchNextButton.Name = "searchNextButton";
-            this.searchNextButton.Size = new System.Drawing.Size(27, 23);
+            this.searchNextButton.Size = new System.Drawing.Size(34, 23);
             this.searchNextButton.TabIndex = 22;
             this.searchNextButton.Text = ">";
             this.toolTip1.SetToolTip(this.searchNextButton, Res("Tooltip_SearchResultNext"));
@@ -588,9 +588,9 @@
             // searchPrevButton
             // 
             this.searchPrevButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.searchPrevButton.Location = new System.Drawing.Point(48, 97);
+            this.searchPrevButton.Location = new System.Drawing.Point(55, 97);
             this.searchPrevButton.Name = "searchPrevButton";
-            this.searchPrevButton.Size = new System.Drawing.Size(27, 23);
+            this.searchPrevButton.Size = new System.Drawing.Size(34, 23);
             this.searchPrevButton.TabIndex = 21;
             this.searchPrevButton.Text = "<";
             this.toolTip1.SetToolTip(this.searchPrevButton, Res("Tooltip_SearchResultPrev"));
@@ -602,7 +602,7 @@
             this.searchFirstButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
             this.searchFirstButton.Location = new System.Drawing.Point(15, 97);
             this.searchFirstButton.Name = "searchFirstButton";
-            this.searchFirstButton.Size = new System.Drawing.Size(27, 23);
+            this.searchFirstButton.Size = new System.Drawing.Size(34, 23);
             this.searchFirstButton.TabIndex = 20;
             this.searchFirstButton.Text = "|<";
             this.toolTip1.SetToolTip(this.searchFirstButton, Res("Tooltip_SearchResultFirst"));
@@ -614,7 +614,7 @@
             this.searchTextBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
             this.searchTextBox.Location = new System.Drawing.Point(15, 18);
             this.searchTextBox.Name = "searchTextBox";
-            this.searchTextBox.Size = new System.Drawing.Size(96, 21);
+            this.searchTextBox.Size = new System.Drawing.Size(120, 21);
             this.searchTextBox.TabIndex = 14;
             this.toolTip1.SetToolTip(this.searchTextBox, Res("Tooltip_SearchInput"));
             this.searchTextBox.Click += new System.EventHandler(this.SearchTextBox_Click);
@@ -627,7 +627,7 @@
             this.openSavedPDFCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
             this.openSavedPDFCheckBox.Enabled = false;
             this.openSavedPDFCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.openSavedPDFCheckBox.Location = new System.Drawing.Point(14, 42);
+            this.openSavedPDFCheckBox.Location = new System.Drawing.Point(15, 42);
             this.openSavedPDFCheckBox.Name = "openSavedPDFCheckBox";
             this.openSavedPDFCheckBox.Size = new System.Drawing.Size(147, 17);
             this.openSavedPDFCheckBox.TabIndex = 1;
@@ -639,9 +639,9 @@
             // 
             this.saveProjectButton.Enabled = false;
             this.saveProjectButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.saveProjectButton.Location = new System.Drawing.Point(17, 18);
+            this.saveProjectButton.Location = new System.Drawing.Point(15, 18);
             this.saveProjectButton.Name = "saveProjectButton";
-            this.saveProjectButton.Size = new System.Drawing.Size(128, 23);
+            this.saveProjectButton.Size = new System.Drawing.Size(154, 23);
             this.saveProjectButton.TabIndex = 0;
             this.saveProjectButton.Text = Res("UI_Button_SaveProject");
             this.toolTip1.SetToolTip(this.saveProjectButton, Res("Tooltip_SaveProject"));
@@ -652,9 +652,9 @@
             // 
             this.saveProjectAsButton.Enabled = false;
             this.saveProjectAsButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.saveProjectAsButton.Location = new System.Drawing.Point(17, 18);
+            this.saveProjectAsButton.Location = new System.Drawing.Point(15, 18);
             this.saveProjectAsButton.Name = "saveProjectAsButton";
-            this.saveProjectAsButton.Size = new System.Drawing.Size(128, 23);
+            this.saveProjectAsButton.Size = new System.Drawing.Size(154, 23);
             this.saveProjectAsButton.TabIndex = 0;
             this.saveProjectAsButton.Text = Res("UI_Button_SaveProjectAs");
             this.toolTip1.SetToolTip(this.saveProjectAsButton, Res("Tooltip_SaveProjectAs"));
@@ -665,9 +665,9 @@
             // openProjectButton
             // 
             this.openProjectButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.openProjectButton.Location = new System.Drawing.Point(17, 43);
+            this.openProjectButton.Location = new System.Drawing.Point(15, 43);
             this.openProjectButton.Name = "openProjectButton";
-            this.openProjectButton.Size = new System.Drawing.Size(128, 23);
+            this.openProjectButton.Size = new System.Drawing.Size(154, 23);
             this.openProjectButton.TabIndex = 1;
             this.openProjectButton.Text = Res("UI_Button_OpenProject");
             this.toolTip1.SetToolTip(this.openProjectButton, Res("Tooltip_OpenProject"));
@@ -680,7 +680,7 @@
             this.groupBoxOpen.Controls.Add(this.loadPdfButton);
             this.groupBoxOpen.Location = new System.Drawing.Point(12, 32);
             this.groupBoxOpen.Name = "groupBoxOpen";
-            this.groupBoxOpen.Size = new System.Drawing.Size(164, 74);
+            this.groupBoxOpen.Size = new System.Drawing.Size(184, 74);
             this.groupBoxOpen.TabIndex = 1;
             this.groupBoxOpen.TabStop = true;
             this.groupBoxOpen.Text = Res("UI_Group_Open");
@@ -692,7 +692,7 @@
             this.groupBoxSave.Enabled = false;
             this.groupBoxSave.Location = new System.Drawing.Point(12, 114);
             this.groupBoxSave.Name = "groupBoxSave";
-            this.groupBoxSave.Size = new System.Drawing.Size(164, 74);
+            this.groupBoxSave.Size = new System.Drawing.Size(184, 74);
             this.groupBoxSave.TabIndex = 2;
             this.groupBoxSave.TabStop = true;
             this.groupBoxSave.Text = Res("UI_Group_Save");
@@ -705,7 +705,7 @@
             this.groupBoxOptions.Controls.Add(this.colorCheckBox);
             this.groupBoxOptions.Location = new System.Drawing.Point(12, 794);
             this.groupBoxOptions.Name = "groupBoxOptions";
-            this.groupBoxOptions.Size = new System.Drawing.Size(164, 110);
+            this.groupBoxOptions.Size = new System.Drawing.Size(184, 110);
             this.groupBoxOptions.TabIndex = 8;
             this.groupBoxOptions.TabStop = true;
             this.groupBoxOptions.Text = Res("UI_Group_Options");
@@ -736,7 +736,7 @@
             this.groupBoxSelections.Enabled = false;
             this.groupBoxSelections.Location = new System.Drawing.Point(12, 449);
             this.groupBoxSelections.Name = "groupBoxSelections";
-            this.groupBoxSelections.Size = new System.Drawing.Size(164, 137);
+            this.groupBoxSelections.Size = new System.Drawing.Size(184, 137);
             this.groupBoxSelections.TabIndex = 5;
             this.groupBoxSelections.TabStop = false;
             this.groupBoxSelections.Text = Res("UI_Group_Selections");
@@ -744,9 +744,9 @@
             // selectionLastButton
             // 
             this.selectionLastButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.selectionLastButton.Location = new System.Drawing.Point(118, 44);
+            this.selectionLastButton.Location = new System.Drawing.Point(135, 44);
             this.selectionLastButton.Name = "selectionLastButton";
-            this.selectionLastButton.Size = new System.Drawing.Size(27, 23);
+            this.selectionLastButton.Size = new System.Drawing.Size(34, 23);
             this.selectionLastButton.TabIndex = 30;
             this.selectionLastButton.Text = ">|";
             this.toolTip1.SetToolTip(this.selectionLastButton, Res("Tooltip_SelectionLast"));
@@ -756,9 +756,9 @@
             // selectionNextButton
             // 
             this.selectionNextButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.selectionNextButton.Location = new System.Drawing.Point(85, 44);
+            this.selectionNextButton.Location = new System.Drawing.Point(95, 44);
             this.selectionNextButton.Name = "selectionNextButton";
-            this.selectionNextButton.Size = new System.Drawing.Size(27, 23);
+            this.selectionNextButton.Size = new System.Drawing.Size(34, 23);
             this.selectionNextButton.TabIndex = 29;
             this.selectionNextButton.Text = ">";
             this.toolTip1.SetToolTip(this.selectionNextButton, Res("Tooltip_SelectionNext"));
@@ -768,9 +768,9 @@
             // selectionPrevButton
             // 
             this.selectionPrevButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.selectionPrevButton.Location = new System.Drawing.Point(49, 44);
+            this.selectionPrevButton.Location = new System.Drawing.Point(55, 44);
             this.selectionPrevButton.Name = "selectionPrevButton";
-            this.selectionPrevButton.Size = new System.Drawing.Size(27, 23);
+            this.selectionPrevButton.Size = new System.Drawing.Size(34, 23);
             this.selectionPrevButton.TabIndex = 28;
             this.selectionPrevButton.Text = "<";
             this.toolTip1.SetToolTip(this.selectionPrevButton, Res("Tooltip_SelectionPrev"));
@@ -780,9 +780,9 @@
             // selectionFirstButton
             // 
             this.selectionFirstButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
-            this.selectionFirstButton.Location = new System.Drawing.Point(16, 44);
+            this.selectionFirstButton.Location = new System.Drawing.Point(15, 44);
             this.selectionFirstButton.Name = "selectionFirstButton";
-            this.selectionFirstButton.Size = new System.Drawing.Size(27, 23);
+            this.selectionFirstButton.Size = new System.Drawing.Size(34, 23);
             this.selectionFirstButton.TabIndex = 27;
             this.selectionFirstButton.Text = "|<";
             this.toolTip1.SetToolTip(this.selectionFirstButton, Res("Tooltip_SelectionFirst"));
@@ -794,7 +794,7 @@
             this.markerRadioButton.AutoSize = true;
             this.markerRadioButton.Checked = true;
             this.markerRadioButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.markerRadioButton.Location = new System.Drawing.Point(19, 19);
+            this.markerRadioButton.Location = new System.Drawing.Point(24, 19);
             this.markerRadioButton.Name = "markerRadioButton";
             this.markerRadioButton.Size = new System.Drawing.Size(64, 17);
             this.markerRadioButton.TabIndex = 25;
@@ -807,7 +807,7 @@
             // 
             this.boxRadioButton.AutoSize = true;
             this.boxRadioButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.boxRadioButton.Location = new System.Drawing.Point(98, 19);
+            this.boxRadioButton.Location = new System.Drawing.Point(108, 19);
             this.boxRadioButton.Name = "boxRadioButton";
             this.boxRadioButton.Size = new System.Drawing.Size(46, 17);
             this.boxRadioButton.TabIndex = 26;
@@ -819,9 +819,9 @@
             // clearPageButton
             // 
             this.clearPageButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.clearPageButton.Location = new System.Drawing.Point(16, 76);
+            this.clearPageButton.Location = new System.Drawing.Point(15, 76);
             this.clearPageButton.Name = "clearPageButton";
-            this.clearPageButton.Size = new System.Drawing.Size(129, 23);
+            this.clearPageButton.Size = new System.Drawing.Size(154, 23);
             this.clearPageButton.TabIndex = 31;
             this.clearPageButton.Text = Res("UI_ClearPage");
             this.toolTip1.SetToolTip(this.clearPageButton, Res("Tooltip_ClearPage"));
@@ -831,9 +831,9 @@
             // clearSelectionButton
             // 
             this.clearSelectionButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.clearSelectionButton.Location = new System.Drawing.Point(16, 105);
+            this.clearSelectionButton.Location = new System.Drawing.Point(15, 105);
             this.clearSelectionButton.Name = "clearSelectionButton";
-            this.clearSelectionButton.Size = new System.Drawing.Size(129, 23);
+            this.clearSelectionButton.Size = new System.Drawing.Size(154, 23);
             this.clearSelectionButton.TabIndex = 32;
             this.clearSelectionButton.Text = Res("UI_ClearAll");
             this.toolTip1.SetToolTip(this.clearSelectionButton, Res("Tooltip_ClearAll"));
@@ -844,9 +844,9 @@
             // 
             this.buttonRedactText.Enabled = false;
             this.buttonRedactText.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.buttonRedactText.Location = new System.Drawing.Point(17, 43);
+            this.buttonRedactText.Location = new System.Drawing.Point(15, 43);
             this.buttonRedactText.Name = "buttonRedactText";
-            this.buttonRedactText.Size = new System.Drawing.Size(128, 23);
+            this.buttonRedactText.Size = new System.Drawing.Size(154, 23);
             this.buttonRedactText.TabIndex = 1;
             this.buttonRedactText.Text = Res("UI_Button_SavePdf");
             this.toolTip1.SetToolTip(this.buttonRedactText, Res("Tooltip_SavePdf"));

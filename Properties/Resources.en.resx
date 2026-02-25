@@ -198,11 +198,29 @@
   <data name="Menu_RotatePage" xml:space="preserve">
     <value>Rotate page</value>
   </data>
+  <data name="Menu_Add" xml:space="preserve">
+    <value>Add</value>
+  </data>
   <data name="Menu_AddText" xml:space="preserve">
     <value>Add text</value>
   </data>
   <data name="Menu_AddRasterImage" xml:space="preserve">
     <value>Add image</value>
+  </data>
+  <data name="Menu_AddArrow" xml:space="preserve">
+    <value>Add arrow</value>
+  </data>
+  <data name="Menu_AddPolygon" xml:space="preserve">
+    <value>Add polygon</value>
+  </data>
+  <data name="Menu_AddPolyline" xml:space="preserve">
+    <value>Add polyline</value>
+  </data>
+  <data name="Menu_AddComment" xml:space="preserve">
+    <value>Add comment</value>
+  </data>
+  <data name="Menu_AddBlankPage" xml:space="preserve">
+    <value>Add blank page</value>
   </data>
   <data name="Menu_PasteObjectFromClipboard" xml:space="preserve">
     <value>Paste object from clipboard</value>

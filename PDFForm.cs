@@ -141,8 +141,14 @@ namespace AnonPDF
         private static bool revokedNotified;
         private ToolStripMenuItem checkForUpdatesToolStripMenuItem;
         private ToolStripMenuItem activateLicenseToolStripMenuItem;
+        private ToolStripMenuItem menuAddItem;
         private ToolStripMenuItem addRasterImageToolStripMenuItem;
         private ToolStripMenuItem pasteObjectFromClipboardToolStripMenuItem;
+        private ToolStripMenuItem addArrowToolStripMenuItem;
+        private ToolStripMenuItem addPolygonToolStripMenuItem;
+        private ToolStripMenuItem addPolylineToolStripMenuItem;
+        private ToolStripMenuItem addCommentToolStripMenuItem;
+        private ToolStripMenuItem addBlankPageToolStripMenuItem;
         private bool pagesListTooltipShownThisSession;
         private int busyCursorDepth;
         private bool isMiddleMousePanning;
@@ -209,7 +215,7 @@ namespace AnonPDF
 
         const int annotationsIconSize = 22;
         const int annotationsIconPadding = 4;
-        private const int LeftPanelBaseWidth = 187;
+        private const int LeftPanelBaseWidth = 213;
         private const int LeftPanelScrollbarPadding = 6;
         private readonly SplashForm splashForm;
         private bool splashClosed;
@@ -789,6 +795,11 @@ namespace AnonPDF
 
         private void InitializeRasterMenu()
         {
+            menuAddItem = new ToolStripMenuItem
+            {
+                Name = "menuAddItem"
+            };
+
             addRasterImageToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addRasterImageToolStripMenuItem",
@@ -805,21 +816,112 @@ namespace AnonPDF
             pasteObjectFromClipboardToolStripMenuItem.Enabled = false;
             pasteObjectFromClipboardToolStripMenuItem.Click += PasteObjectFromClipboardToolStripMenuItem_Click;
 
-            if (menuOptionsItem == null)
+            addArrowToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "addArrowToolStripMenuItem",
+                Enabled = false
+            };
+            addPolygonToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "addPolygonToolStripMenuItem",
+                Enabled = false
+            };
+            addPolylineToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "addPolylineToolStripMenuItem",
+                Enabled = false
+            };
+            addCommentToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "addCommentToolStripMenuItem",
+                Enabled = false
+            };
+            addBlankPageToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "addBlankPageToolStripMenuItem",
+                Enabled = false
+            };
+
+            if (menuStrip1 == null)
             {
                 return;
             }
 
-            int insertIndex = menuOptionsItem.DropDownItems.IndexOf(addTextMenuItem);
-            if (insertIndex < 0)
+            int helpIndex = menuStrip1.Items.IndexOf(menuHelpItem);
+            if (helpIndex >= 0)
             {
-                menuOptionsItem.DropDownItems.Add(addRasterImageToolStripMenuItem);
-                menuOptionsItem.DropDownItems.Add(pasteObjectFromClipboardToolStripMenuItem);
+                menuStrip1.Items.Insert(helpIndex, menuAddItem);
             }
             else
             {
-                menuOptionsItem.DropDownItems.Insert(insertIndex + 1, addRasterImageToolStripMenuItem);
-                menuOptionsItem.DropDownItems.Insert(insertIndex + 2, pasteObjectFromClipboardToolStripMenuItem);
+                menuStrip1.Items.Add(menuAddItem);
+            }
+
+            if (menuOptionsItem != null && menuOptionsItem.DropDownItems.Contains(addTextMenuItem))
+            {
+                menuOptionsItem.DropDownItems.Remove(addTextMenuItem);
+            }
+
+            if (addTextMenuItem.OwnerItem is ToolStripDropDownItem addTextOwner && addTextOwner.DropDownItems.Contains(addTextMenuItem))
+            {
+                addTextOwner.DropDownItems.Remove(addTextMenuItem);
+            }
+
+            menuAddItem.DropDownItems.Clear();
+            menuAddItem.DropDownItems.Add(addTextMenuItem);
+            menuAddItem.DropDownItems.Add(addRasterImageToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(pasteObjectFromClipboardToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(new ToolStripSeparator());
+            menuAddItem.DropDownItems.Add(addArrowToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(addPolygonToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(addPolylineToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(addCommentToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(addBlankPageToolStripMenuItem);
+        }
+
+        private void ApplyAddMenuLocalization()
+        {
+            if (menuAddItem == null)
+            {
+                return;
+            }
+
+            menuAddItem.Text = LocalizedText("Menu_Add");
+            addTextMenuItem.Text = Resources.Menu_AddText;
+
+            if (addRasterImageToolStripMenuItem != null)
+            {
+                addRasterImageToolStripMenuItem.Text = LocalizedText("Menu_AddRasterImage");
+            }
+
+            if (pasteObjectFromClipboardToolStripMenuItem != null)
+            {
+                pasteObjectFromClipboardToolStripMenuItem.Text = LocalizedText("Menu_PasteObjectFromClipboard");
+            }
+
+            if (addArrowToolStripMenuItem != null)
+            {
+                addArrowToolStripMenuItem.Text = LocalizedText("Menu_AddArrow");
+            }
+
+            if (addPolygonToolStripMenuItem != null)
+            {
+                addPolygonToolStripMenuItem.Text = LocalizedText("Menu_AddPolygon");
+            }
+
+            if (addPolylineToolStripMenuItem != null)
+            {
+                addPolylineToolStripMenuItem.Text = LocalizedText("Menu_AddPolyline");
+            }
+
+            if (addCommentToolStripMenuItem != null)
+            {
+                addCommentToolStripMenuItem.Text = LocalizedText("Menu_AddComment");
+            }
+
+            if (addBlankPageToolStripMenuItem != null)
+            {
+                addBlankPageToolStripMenuItem.Text = LocalizedText("Menu_AddBlankPage");
             }
         }
 
@@ -931,6 +1033,7 @@ namespace AnonPDF
             menuFileItem.Text = Resources.Menu_File;
             menuOptionsItem.Text = Resources.Menu_Options;
             menuHelpItem.Text = Resources.Menu_Help;
+            ApplyAddMenuLocalization();
 
             // Language submenu
             languageToolStripMenuItem.Text = Resources.Menu_Language;
@@ -961,15 +1064,6 @@ namespace AnonPDF
               mergePdfToolStripMenuItem.Text = Resources.Menu_MergePdf;
               deletePageMenuItem.Text = Resources.Menu_DeletePage;
               rotatePageMenuItem.Text = Resources.Menu_RotatePage;
-              addTextMenuItem.Text = Resources.Menu_AddText;
-              if (addRasterImageToolStripMenuItem != null)
-              {
-                  addRasterImageToolStripMenuItem.Text = LocalizedText("Menu_AddRasterImage");
-              }
-              if (pasteObjectFromClipboardToolStripMenuItem != null)
-              {
-                  pasteObjectFromClipboardToolStripMenuItem.Text = LocalizedText("Menu_PasteObjectFromClipboard");
-              }
               copyToClipboardMenuItem.Text = Resources.Menu_CopyToClipboard;
               exportGraphicsMenuItem.Text = Resources.Menu_ExportGraphics;
               selectSignaturesToRemoveMenuItem.Text = Resources.Menu_SelectSignaturesToRemove;
@@ -4634,7 +4728,7 @@ namespace AnonPDF
             renderTimer.Start();
 
             pageNumberTextBox.Text = pageNumber.ToString();
-            numPagesLabel.Text = LocalizedFormat("UI_PageCountTotalFormat", numPages);
+            numPagesLabel.Text = "/  " + numPages.ToString(CultureInfo.CurrentCulture);
             
             UpdateZoomButtons();
         }
