@@ -195,6 +195,9 @@ namespace AnonPDF
         private bool arrowInteractionChanged;
         private float rasterRotationStartAngle;
         private int rasterRotationStartValue;
+        private RectangleF rasterResizeStartBounds;
+        private PointF rasterResizeAnchorWorld;
+        private int rasterResizeStartRotation;
         private const int RasterRotateHandleSize = 14;
         private const int RasterRotateHandleOffset = 35;
         private const int RasterResizeHandleSize = 11;
@@ -268,11 +271,11 @@ namespace AnonPDF
         private IconType clickedIconType = IconType.None;
         private TextAnnotation annotationForIcon = null;  // annotation where the icon was clicked
         private bool isClickOnRasterIcon = false;
-        private enum RasterIconType { None, Edit, Lock, Duplicate, ResetSize, Delete }
+        private enum RasterIconType { None, Edit, Lock, Duplicate, Order, ResetSize, Delete }
         private RasterIconType clickedRasterIconType = RasterIconType.None;
         private RasterObject rasterObjectForIcon = null;
         private bool isClickOnArrowIcon = false;
-        private enum ArrowIconType { None, Edit, Lock, Duplicate, Delete }
+        private enum ArrowIconType { None, Edit, Lock, Duplicate, Order, Delete }
         private ArrowIconType clickedArrowIconType = ArrowIconType.None;
         private ArrowObject arrowObjectForIcon = null;
 
@@ -2486,6 +2489,116 @@ namespace AnonPDF
             UpdateCurrentPageObjectsMarker();
             pdfViewer.Invalidate();
             return true;
+        }
+
+        private bool TryReorderRasterObject(RasterObject rasterObject, Func<RasterObject, bool> reorderAction)
+        {
+            if (rasterObject == null || reorderAction == null)
+            {
+                return false;
+            }
+
+            EnsureRasterObjectId(rasterObject);
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            if (rasterObject.IsLocked)
+            {
+                MessageBox.Show(
+                    this,
+                    string.Format(LocalizedText("Msg_TextPositionInfo"), LocalizedText("Msg_TextAnnotation_Locked")),
+                    Resources.Title_Info,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return true;
+            }
+
+            if (!reorderAction(rasterObject))
+            {
+                return true;
+            }
+
+            rasterObject.UpdatedAtUtc = DateTime.UtcNow;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private bool TryReorderArrowObject(ArrowObject arrowObject, Func<ArrowObject, bool> reorderAction)
+        {
+            if (arrowObject == null || reorderAction == null)
+            {
+                return false;
+            }
+
+            EnsureArrowObjectId(arrowObject);
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            if (arrowObject.IsLocked)
+            {
+                MessageBox.Show(
+                    this,
+                    string.Format(LocalizedText("Msg_TextPositionInfo"), LocalizedText("Msg_TextAnnotation_Locked")),
+                    Resources.Title_Info,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return true;
+            }
+
+            if (!reorderAction(arrowObject))
+            {
+                return true;
+            }
+
+            arrowObject.UpdatedAtUtc = DateTime.UtcNow;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private void ShowRasterOrderMenu(RasterObject rasterObject)
+        {
+            if (rasterObject == null)
+            {
+                return;
+            }
+
+            var menu = new ContextMenuStrip();
+            menu.Items.Add(LocalizedText("Order_BringToFront"), null, (_, __) => TryReorderRasterObject(rasterObject, BringRasterObjectToFront));
+            menu.Items.Add(LocalizedText("Order_MoveForward"), null, (_, __) => TryReorderRasterObject(rasterObject, MoveRasterObjectForward));
+            menu.Items.Add(LocalizedText("Order_MoveBackward"), null, (_, __) => TryReorderRasterObject(rasterObject, MoveRasterObjectBackward));
+            menu.Items.Add(LocalizedText("Order_SendToBack"), null, (_, __) => TryReorderRasterObject(rasterObject, SendRasterObjectToBack));
+
+            Point location = pdfViewer.PointToClient(Cursor.Position);
+            menu.Show(pdfViewer, location);
+        }
+
+        private void ShowArrowOrderMenu(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return;
+            }
+
+            var menu = new ContextMenuStrip();
+            menu.Items.Add(LocalizedText("Order_BringToFront"), null, (_, __) => TryReorderArrowObject(arrowObject, BringArrowObjectToFront));
+            menu.Items.Add(LocalizedText("Order_MoveForward"), null, (_, __) => TryReorderArrowObject(arrowObject, MoveArrowObjectForward));
+            menu.Items.Add(LocalizedText("Order_MoveBackward"), null, (_, __) => TryReorderArrowObject(arrowObject, MoveArrowObjectBackward));
+            menu.Items.Add(LocalizedText("Order_SendToBack"), null, (_, __) => TryReorderArrowObject(arrowObject, SendArrowObjectToBack));
+
+            Point location = pdfViewer.PointToClient(Cursor.Position);
+            menu.Show(pdfViewer, location);
         }
 
         private bool TryDeleteActiveObjectByKeyboard()
@@ -8694,68 +8807,163 @@ namespace AnonPDF
             if (isResizingRasterObject && rasterObjectToResize != null && rasterResizeHandle != RasterResizeHandleType.None)
             {
                 this.Cursor = GetCursorForRasterResizeHandle(rasterResizeHandle, rasterObjectToResize.Rotation);
-                RectangleF bounds = rasterObjectToResize.Bounds;
-                PointF center = new PointF(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
                 PointF mousePoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
                 if (snapToGridEnabled)
                 {
                     mousePoint = SnapPointToGrid(mousePoint);
                 }
-                PointF deltaPoint = new PointF(mousePoint.X - center.X, mousePoint.Y - center.Y);
-                PointF local = RotateVector(deltaPoint, -NormalizeRotation(rasterObjectToResize.Rotation));
-
                 float minWidth = 10f;
                 float minHeight = 10f;
-                float newWidth = bounds.Width;
-                float newHeight = bounds.Height;
-
+                RectangleF bounds = rasterObjectToResize.Bounds;
                 bool cornerHandle =
                     rasterResizeHandle == RasterResizeHandleType.TopLeft ||
                     rasterResizeHandle == RasterResizeHandleType.TopRight ||
                     rasterResizeHandle == RasterResizeHandleType.BottomRight ||
                     rasterResizeHandle == RasterResizeHandleType.BottomLeft;
+                bool symmetricResize = (Control.ModifierKeys & Keys.Alt) == Keys.Alt;
 
-                switch (rasterResizeHandle)
+                if (symmetricResize)
                 {
-                    case RasterResizeHandleType.Left:
-                    case RasterResizeHandleType.Right:
-                        newWidth = Math.Max(minWidth, 2f * Math.Abs(local.X));
-                        break;
-                    case RasterResizeHandleType.Top:
-                    case RasterResizeHandleType.Bottom:
-                        newHeight = Math.Max(minHeight, 2f * Math.Abs(local.Y));
-                        break;
-                    default:
-                        newWidth = Math.Max(minWidth, 2f * Math.Abs(local.X));
-                        newHeight = Math.Max(minHeight, 2f * Math.Abs(local.Y));
-                        break;
+                    PointF center = new PointF(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
+                    PointF deltaPoint = new PointF(mousePoint.X - center.X, mousePoint.Y - center.Y);
+                    PointF local = RotateVector(deltaPoint, -NormalizeRotation(rasterObjectToResize.Rotation));
+                    float newWidth = bounds.Width;
+                    float newHeight = bounds.Height;
+
+                    switch (rasterResizeHandle)
+                    {
+                        case RasterResizeHandleType.Left:
+                        case RasterResizeHandleType.Right:
+                            newWidth = Math.Max(minWidth, 2f * Math.Abs(local.X));
+                            break;
+                        case RasterResizeHandleType.Top:
+                        case RasterResizeHandleType.Bottom:
+                            newHeight = Math.Max(minHeight, 2f * Math.Abs(local.Y));
+                            break;
+                        default:
+                            newWidth = Math.Max(minWidth, 2f * Math.Abs(local.X));
+                            newHeight = Math.Max(minHeight, 2f * Math.Abs(local.Y));
+                            break;
+                    }
+
+                    if (cornerHandle)
+                    {
+                        float aspect = bounds.Height <= 0f ? 1f : (bounds.Width / bounds.Height);
+                        if (aspect <= 0f)
+                        {
+                            aspect = 1f;
+                        }
+
+                        float widthFromHeight = newHeight * aspect;
+                        float heightFromWidth = newWidth / aspect;
+                        if (widthFromHeight > newWidth)
+                        {
+                            newWidth = widthFromHeight;
+                        }
+                        else
+                        {
+                            newHeight = heightFromWidth;
+                        }
+                    }
+
+                    rasterObjectToResize.Bounds = new RectangleF(
+                        center.X - (newWidth / 2f),
+                        center.Y - (newHeight / 2f),
+                        newWidth,
+                        newHeight);
+                }
+                else
+                {
+                    RectangleF baseBounds = HasPositiveSize(rasterResizeStartBounds) ? rasterResizeStartBounds : bounds;
+                    int baseRotation = NormalizeRotation(rasterResizeStartRotation);
+                    if (baseRotation != NormalizeRotation(rasterObjectToResize.Rotation))
+                    {
+                        baseRotation = NormalizeRotation(rasterObjectToResize.Rotation);
+                    }
+
+                    float width = baseBounds.Width;
+                    float height = baseBounds.Height;
+                    PointF sign = GetRasterResizeSign(rasterResizeHandle);
+                    PointF anchorWorld = rasterResizeAnchorWorld;
+                    if (!HasPositiveSize(rasterResizeStartBounds))
+                    {
+                        RasterResizeHandleType oppositeHandle = GetOppositeRasterResizeHandle(rasterResizeHandle);
+                        anchorWorld = GetRasterResizeHandleWorldPoint(baseBounds, baseRotation, oppositeHandle);
+                    }
+
+                    PointF anchorLocalAbs = RotateVector(anchorWorld, -baseRotation);
+                    PointF dragLocalAbs = RotateVector(mousePoint, -baseRotation);
+
+                    switch (rasterResizeHandle)
+                    {
+                        case RasterResizeHandleType.Left:
+                        case RasterResizeHandleType.Right:
+                            dragLocalAbs.Y = anchorLocalAbs.Y;
+                            width = Math.Max(minWidth, Math.Abs(dragLocalAbs.X - anchorLocalAbs.X));
+                            break;
+                        case RasterResizeHandleType.Top:
+                        case RasterResizeHandleType.Bottom:
+                            dragLocalAbs.X = anchorLocalAbs.X;
+                            height = Math.Max(minHeight, Math.Abs(dragLocalAbs.Y - anchorLocalAbs.Y));
+                            break;
+                        default:
+                            width = Math.Max(minWidth, Math.Abs(dragLocalAbs.X - anchorLocalAbs.X));
+                            height = Math.Max(minHeight, Math.Abs(dragLocalAbs.Y - anchorLocalAbs.Y));
+                            break;
+                    }
+
+                    if (cornerHandle)
+                    {
+                        float aspect = baseBounds.Height <= 0f ? 1f : (baseBounds.Width / baseBounds.Height);
+                        if (aspect <= 0f)
+                        {
+                            aspect = 1f;
+                        }
+
+                        float widthFromHeight = height * aspect;
+                        float heightFromWidth = width / aspect;
+                        if (widthFromHeight > width)
+                        {
+                            width = widthFromHeight;
+                        }
+                        else
+                        {
+                            height = heightFromWidth;
+                        }
+                    }
+
+                    float dragX = anchorLocalAbs.X;
+                    float dragY = anchorLocalAbs.Y;
+                    switch (rasterResizeHandle)
+                    {
+                        case RasterResizeHandleType.Left:
+                        case RasterResizeHandleType.Right:
+                            dragX = anchorLocalAbs.X + (sign.X * width);
+                            dragY = anchorLocalAbs.Y;
+                            break;
+                        case RasterResizeHandleType.Top:
+                        case RasterResizeHandleType.Bottom:
+                            dragX = anchorLocalAbs.X;
+                            dragY = anchorLocalAbs.Y + (sign.Y * height);
+                            break;
+                        default:
+                            dragX = anchorLocalAbs.X + (sign.X * width);
+                            dragY = anchorLocalAbs.Y + (sign.Y * height);
+                            break;
+                    }
+
+                    PointF centerLocalAbs = new PointF(
+                        (anchorLocalAbs.X + dragX) / 2f,
+                        (anchorLocalAbs.Y + dragY) / 2f);
+                    PointF centerWorld = RotateVector(centerLocalAbs, baseRotation);
+
+                    rasterObjectToResize.Bounds = new RectangleF(
+                        centerWorld.X - (width / 2f),
+                        centerWorld.Y - (height / 2f),
+                        width,
+                        height);
                 }
 
-                if (cornerHandle)
-                {
-                    float aspect = bounds.Height <= 0f ? 1f : (bounds.Width / bounds.Height);
-                    if (aspect <= 0f)
-                    {
-                        aspect = 1f;
-                    }
-
-                    float widthFromHeight = newHeight * aspect;
-                    float heightFromWidth = newWidth / aspect;
-                    if (widthFromHeight > newWidth)
-                    {
-                        newWidth = widthFromHeight;
-                    }
-                    else
-                    {
-                        newHeight = heightFromWidth;
-                    }
-                }
-
-                rasterObjectToResize.Bounds = new RectangleF(
-                    center.X - (newWidth / 2f),
-                    center.Y - (newHeight / 2f),
-                    newWidth,
-                    newHeight);
                 ConstrainRasterObjectToPage(rasterObjectToResize);
                 rasterObjectToResize.UpdatedAtUtc = DateTime.UtcNow;
                 pdfViewer.Invalidate();
@@ -8983,6 +9191,9 @@ namespace AnonPDF
                         case RasterIconType.Duplicate:
                             DuplicateRasterObject(rasterObjectForIcon);
                             break;
+                        case RasterIconType.Order:
+                            ShowRasterOrderMenu(rasterObjectForIcon);
+                            break;
                         case RasterIconType.ResetSize:
                             ResetRasterObjectSize(rasterObjectForIcon);
                             break;
@@ -9024,6 +9235,9 @@ namespace AnonPDF
                             break;
                         case ArrowIconType.Duplicate:
                             DuplicateArrowObject(arrowObjectForIcon);
+                            break;
+                        case ArrowIconType.Order:
+                            ShowArrowOrderMenu(arrowObjectForIcon);
                             break;
                         case ArrowIconType.Delete:
                             DeleteArrowObjectWithConfirmation(arrowObjectForIcon);
@@ -9369,7 +9583,7 @@ namespace AnonPDF
                             }
                         }
                         System.Drawing.Color borderColor = (isSelectedRaster && !multiSelectionActive)
-                            ? System.Drawing.Color.Red
+                            ? System.Drawing.Color.Green
                             : System.Drawing.Color.SteelBlue;
                         float borderWidth = (isSelectedRaster && !multiSelectionActive) ? 2f : 1f;
                         using (var borderPen = new Pen(borderColor, borderWidth))
@@ -9439,6 +9653,7 @@ namespace AnonPDF
                             iconRects[RasterIconType.Lock],
                             rasterObject.IsLocked ? "\uE72E" : "\uE785");
                         DrawIconButton(e.Graphics, iconRects[RasterIconType.Duplicate], "\uE8C8");
+                        DrawIconButton(e.Graphics, iconRects[RasterIconType.Order], "\u2630");
                         DrawIconButton(e.Graphics, iconRects[RasterIconType.ResetSize], "\uE777");
                         DrawIconButton(e.Graphics, iconRects[RasterIconType.Delete], "\uE74D");
                     }
@@ -9543,6 +9758,7 @@ namespace AnonPDF
                                 arrowIconRects[ArrowIconType.Lock],
                                 arrowObject.IsLocked ? "\uE72E" : "\uE785");
                             DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Duplicate], "\uE8C8");
+                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Order], "\u2630");
                             DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Delete], "\uE74D");
                         }
                     }
@@ -9654,6 +9870,12 @@ namespace AnonPDF
                     DrawIconButton(e.Graphics, annotationIconRects[IconType.Duplicate], "\uE8C8");
                     DrawIconButton(e.Graphics, annotationIconRects[IconType.Delete], "\uE74D");
                 }
+            }
+
+            if (!multiSelectionActive)
+            {
+                DrawSelectedRasterOverlayOnTop(e.Graphics);
+                DrawSelectedArrowOverlayOnTop(e.Graphics);
             }
 
             if (IsCurrentPageMarkedForDeletion())
@@ -11548,6 +11770,60 @@ namespace AnonPDF
             return index != lastIndexBeforeMove;
         }
 
+        private bool SendRasterObjectToBack(RasterObject rasterObject)
+        {
+            if (rasterObject == null)
+            {
+                return false;
+            }
+
+            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            rasterObjects.RemoveAt(index);
+            rasterObjects.Insert(0, rasterObject);
+            return index != 0;
+        }
+
+        private bool MoveRasterObjectForward(RasterObject rasterObject)
+        {
+            if (rasterObject == null)
+            {
+                return false;
+            }
+
+            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
+            if (index < 0 || index >= rasterObjects.Count - 1)
+            {
+                return false;
+            }
+
+            rasterObjects.RemoveAt(index);
+            rasterObjects.Insert(index + 1, rasterObject);
+            return true;
+        }
+
+        private bool MoveRasterObjectBackward(RasterObject rasterObject)
+        {
+            if (rasterObject == null)
+            {
+                return false;
+            }
+
+            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
+            if (index <= 0)
+            {
+                return false;
+            }
+
+            rasterObjects.RemoveAt(index);
+            rasterObjects.Insert(index - 1, rasterObject);
+            return true;
+        }
+
         private static string GetRasterMimeTypeFromPath(string filePath)
         {
             string extension = Path.GetExtension(filePath)?.ToLowerInvariant();
@@ -11585,6 +11861,9 @@ namespace AnonPDF
             rasterResizeHandle = RasterResizeHandleType.None;
             rasterMouseActionInProgress = false;
             rasterMoveMouseOffset = PointF.Empty;
+            rasterResizeStartBounds = RectangleF.Empty;
+            rasterResizeAnchorWorld = PointF.Empty;
+            rasterResizeStartRotation = 0;
         }
 
         private void ResetArrowInteractionState()
@@ -11777,12 +12056,6 @@ namespace AnonPDF
             EnsureArrowObjectId(hitArrow);
             selectedArrowObject = hitArrow;
             ClearGroupSelection();
-            if (BringArrowObjectToFront(hitArrow))
-            {
-                projectWasChangedAfterLastSave = true;
-                saveProjectButton.Enabled = true;
-                saveProjectMenuItem.Enabled = true;
-            }
 
             if (hitArrow.IsLocked)
             {
@@ -11827,6 +12100,60 @@ namespace AnonPDF
             arrowObjects.RemoveAt(index);
             arrowObjects.Add(arrowObject);
             return index != lastIndexBeforeMove;
+        }
+
+        private bool SendArrowObjectToBack(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            arrowObjects.RemoveAt(index);
+            arrowObjects.Insert(0, arrowObject);
+            return index != 0;
+        }
+
+        private bool MoveArrowObjectForward(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
+            if (index < 0 || index >= arrowObjects.Count - 1)
+            {
+                return false;
+            }
+
+            arrowObjects.RemoveAt(index);
+            arrowObjects.Insert(index + 1, arrowObject);
+            return true;
+        }
+
+        private bool MoveArrowObjectBackward(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
+            if (index <= 0)
+            {
+                return false;
+            }
+
+            arrowObjects.RemoveAt(index);
+            arrowObjects.Insert(index - 1, arrowObject);
+            return true;
         }
 
         private bool ConstrainArrowToPage(ArrowObject arrowObject)
@@ -12134,7 +12461,7 @@ namespace AnonPDF
             float minY = corners.Min(p => p.Y);
             float maxX = corners.Max(p => p.X);
 
-            const int buttonCount = 5;
+            const int buttonCount = 6;
             int totalWidth = (buttonCount * annotationsIconSize) + ((buttonCount - 1) * annotationsIconPadding);
             int top = (int)Math.Round(minY) - annotationsIconSize - annotationsIconPadding;
             int right = (int)Math.Round(maxX);
@@ -12163,9 +12490,10 @@ namespace AnonPDF
 
             iconRects = new Dictionary<RasterIconType, Rectangle>
             {
-                [RasterIconType.Edit] = BuildRectFromRight(4),
-                [RasterIconType.Lock] = BuildRectFromRight(3),
-                [RasterIconType.Duplicate] = BuildRectFromRight(2),
+                [RasterIconType.Edit] = BuildRectFromRight(5),
+                [RasterIconType.Lock] = BuildRectFromRight(4),
+                [RasterIconType.Duplicate] = BuildRectFromRight(3),
+                [RasterIconType.Order] = BuildRectFromRight(2),
                 [RasterIconType.ResetSize] = BuildRectFromRight(1),
                 [RasterIconType.Delete] = BuildRectFromRight(0)
             };
@@ -12192,7 +12520,7 @@ namespace AnonPDF
                 return false;
             }
 
-            const int buttonCount = 4;
+            const int buttonCount = 5;
             int totalWidth = (buttonCount * annotationsIconSize) + ((buttonCount - 1) * annotationsIconPadding);
             int top = (int)Math.Round(minY) - annotationsIconSize - annotationsIconPadding - 8;
             int right = (int)Math.Round(maxX);
@@ -12224,9 +12552,10 @@ namespace AnonPDF
 
             iconRects = new Dictionary<ArrowIconType, Rectangle>
             {
-                [ArrowIconType.Edit] = BuildRectFromRight(3),
-                [ArrowIconType.Lock] = BuildRectFromRight(2),
-                [ArrowIconType.Duplicate] = BuildRectFromRight(1),
+                [ArrowIconType.Edit] = BuildRectFromRight(4),
+                [ArrowIconType.Lock] = BuildRectFromRight(3),
+                [ArrowIconType.Duplicate] = BuildRectFromRight(2),
+                [ArrowIconType.Order] = BuildRectFromRight(1),
                 [ArrowIconType.Delete] = BuildRectFromRight(0)
             };
 
@@ -12248,7 +12577,15 @@ namespace AnonPDF
                 graphics.DrawRectangle(borderPen, buttonRect);
             }
 
-            using (Font iconFont = new Font("Segoe MDL2 Assets", 12.0F, FontStyle.Regular, System.Drawing.GraphicsUnit.Point))
+            bool useMdl2 =
+                !string.IsNullOrEmpty(iconCode) &&
+                iconCode.Length == 1 &&
+                iconCode[0] >= '\uE000' &&
+                iconCode[0] <= '\uF8FF';
+            string fontName = useMdl2 ? "Segoe MDL2 Assets" : "Segoe UI";
+            float fontSize = useMdl2 ? 12.0F : 8.5F;
+            FontStyle fontStyle = useMdl2 ? FontStyle.Regular : FontStyle.Bold;
+            using (Font iconFont = new Font(fontName, fontSize, fontStyle, System.Drawing.GraphicsUnit.Point))
             {
                 StringFormat iconFormat = new StringFormat
                 {
@@ -12259,12 +12596,130 @@ namespace AnonPDF
                 {
                     Rectangle shiftedRect = new Rectangle(
                         buttonRect.X + 1,
-                        buttonRect.Y + 2,
+                        buttonRect.Y + (useMdl2 ? 2 : 1),
                         buttonRect.Width,
                         buttonRect.Height
                     );
                     graphics.DrawString(iconCode, iconFont, iconBrush, shiftedRect, iconFormat);
                 }
+            }
+        }
+
+        private void DrawSelectedRasterOverlayOnTop(Graphics graphics)
+        {
+            if (graphics == null || selectedRasterObject == null || selectedRasterObject.PageNumber != currentPage || GetGroupSelectionCount() != 0)
+            {
+                return;
+            }
+
+            RectangleF frameBounds = GetRasterObjectScreenFrameBounds(selectedRasterObject);
+            if (frameBounds.Width > 0f && frameBounds.Height > 0f)
+            {
+                using (var framePen = new Pen(System.Drawing.Color.Green, 2f))
+                {
+                    graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
+                }
+            }
+
+            if (TryGetRasterRotationHandleRect(selectedRasterObject, out RectangleF handleRect, out PointF connectorPoint))
+            {
+                PointF handleCenter = new PointF(
+                    handleRect.X + (handleRect.Width / 2f),
+                    handleRect.Y + (handleRect.Height / 2f));
+                using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
+                }
+                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                {
+                    graphics.FillEllipse(handleBrush, handleRect);
+                    graphics.DrawEllipse(handlePen, handleRect);
+                }
+            }
+
+            if (TryGetRasterResizeHandleRects(selectedRasterObject, out Dictionary<RasterResizeHandleType, RectangleF> resizeHandles))
+            {
+                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    foreach (var kvp in resizeHandles)
+                    {
+                        if (kvp.Key == RasterResizeHandleType.None)
+                        {
+                            continue;
+                        }
+
+                        graphics.FillRectangle(handleBrush, kvp.Value);
+                        graphics.DrawRectangle(handlePen, kvp.Value.X, kvp.Value.Y, kvp.Value.Width, kvp.Value.Height);
+                    }
+                }
+            }
+
+            if (TryGetRasterIconRects(selectedRasterObject, out Dictionary<RasterIconType, Rectangle> iconRects))
+            {
+                DrawIconButton(graphics, iconRects[RasterIconType.Edit], "\uE70F");
+                DrawIconButton(
+                    graphics,
+                    iconRects[RasterIconType.Lock],
+                    selectedRasterObject.IsLocked ? "\uE72E" : "\uE785");
+                DrawIconButton(graphics, iconRects[RasterIconType.Duplicate], "\uE8C8");
+                DrawIconButton(graphics, iconRects[RasterIconType.Order], "\u2630");
+                DrawIconButton(graphics, iconRects[RasterIconType.ResetSize], "\uE777");
+                DrawIconButton(graphics, iconRects[RasterIconType.Delete], "\uE74D");
+            }
+        }
+
+        private void DrawSelectedArrowOverlayOnTop(Graphics graphics)
+        {
+            if (graphics == null || selectedArrowObject == null || selectedArrowObject.PageNumber != currentPage || GetGroupSelectionCount() != 0)
+            {
+                return;
+            }
+
+            PointF startScreen = GetArrowScreenPoint(selectedArrowObject.Start);
+            PointF endScreen = GetArrowScreenPoint(selectedArrowObject.End);
+            float minX = Math.Min(startScreen.X, endScreen.X);
+            float maxX = Math.Max(startScreen.X, endScreen.X);
+            float minY = Math.Min(startScreen.Y, endScreen.Y);
+            float maxY = Math.Max(startScreen.Y, endScreen.Y);
+            RectangleF arrowBounds = InflateRect(
+                new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY)),
+                4f);
+            using (var framePen = new Pen(System.Drawing.Color.Green, 2f))
+            {
+                graphics.DrawRectangle(framePen, arrowBounds.X, arrowBounds.Y, arrowBounds.Width, arrowBounds.Height);
+            }
+
+            RectangleF startHandle = new RectangleF(
+                startScreen.X - ArrowHandleRadius,
+                startScreen.Y - ArrowHandleRadius,
+                ArrowHandleRadius * 2f,
+                ArrowHandleRadius * 2f);
+            RectangleF endHandle = new RectangleF(
+                endScreen.X - ArrowHandleRadius,
+                endScreen.Y - ArrowHandleRadius,
+                ArrowHandleRadius * 2f,
+                ArrowHandleRadius * 2f);
+            using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+            using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+            {
+                graphics.FillEllipse(handleBrush, startHandle);
+                graphics.DrawEllipse(handlePen, startHandle);
+                graphics.FillEllipse(handleBrush, endHandle);
+                graphics.DrawEllipse(handlePen, endHandle);
+            }
+
+            if (TryGetArrowIconRects(selectedArrowObject, out Dictionary<ArrowIconType, Rectangle> arrowIconRects))
+            {
+                DrawIconButton(graphics, arrowIconRects[ArrowIconType.Edit], "\uE70F");
+                DrawIconButton(
+                    graphics,
+                    arrowIconRects[ArrowIconType.Lock],
+                    selectedArrowObject.IsLocked ? "\uE72E" : "\uE785");
+                DrawIconButton(graphics, arrowIconRects[ArrowIconType.Duplicate], "\uE8C8");
+                DrawIconButton(graphics, arrowIconRects[ArrowIconType.Order], "\u2630");
+                DrawIconButton(graphics, arrowIconRects[ArrowIconType.Delete], "\uE74D");
             }
         }
 
@@ -12711,6 +13166,9 @@ namespace AnonPDF
                 dlg.SourceType = rasterObject.SourceType;
                 dlg.FilePath = rasterObject.FilePath;
                 dlg.ViewScaleFactor = Math.Max(0.01f, scaleFactor);
+                var pageSize = GetPageSizeWithOffset(currentPage);
+                dlg.PageWidth = pageSize.Width;
+                dlg.PageHeight = pageSize.Height;
                 if (TryGetRasterImageMetrics(rasterObject, out int sourcePixelWidth, out int sourcePixelHeight, out decimal sourceAspectRatio))
                 {
                     dlg.SourcePixelWidth = sourcePixelWidth;
@@ -12839,6 +13297,99 @@ namespace AnonPDF
             return false;
         }
 
+        private static RasterResizeHandleType GetOppositeRasterResizeHandle(RasterResizeHandleType handle)
+        {
+            switch (handle)
+            {
+                case RasterResizeHandleType.TopLeft:
+                    return RasterResizeHandleType.BottomRight;
+                case RasterResizeHandleType.Top:
+                    return RasterResizeHandleType.Bottom;
+                case RasterResizeHandleType.TopRight:
+                    return RasterResizeHandleType.BottomLeft;
+                case RasterResizeHandleType.Right:
+                    return RasterResizeHandleType.Left;
+                case RasterResizeHandleType.BottomRight:
+                    return RasterResizeHandleType.TopLeft;
+                case RasterResizeHandleType.Bottom:
+                    return RasterResizeHandleType.Top;
+                case RasterResizeHandleType.BottomLeft:
+                    return RasterResizeHandleType.TopRight;
+                case RasterResizeHandleType.Left:
+                    return RasterResizeHandleType.Right;
+                default:
+                    return RasterResizeHandleType.None;
+            }
+        }
+
+        private static PointF GetRasterResizeHandleLocalPoint(RasterResizeHandleType handle, float halfWidth, float halfHeight)
+        {
+            switch (handle)
+            {
+                case RasterResizeHandleType.TopLeft:
+                    return new PointF(-halfWidth, -halfHeight);
+                case RasterResizeHandleType.Top:
+                    return new PointF(0f, -halfHeight);
+                case RasterResizeHandleType.TopRight:
+                    return new PointF(halfWidth, -halfHeight);
+                case RasterResizeHandleType.Right:
+                    return new PointF(halfWidth, 0f);
+                case RasterResizeHandleType.BottomRight:
+                    return new PointF(halfWidth, halfHeight);
+                case RasterResizeHandleType.Bottom:
+                    return new PointF(0f, halfHeight);
+                case RasterResizeHandleType.BottomLeft:
+                    return new PointF(-halfWidth, halfHeight);
+                case RasterResizeHandleType.Left:
+                    return new PointF(-halfWidth, 0f);
+                default:
+                    return PointF.Empty;
+            }
+        }
+
+        private static PointF GetRasterResizeSign(RasterResizeHandleType handle)
+        {
+            float sx = 0f;
+            float sy = 0f;
+            switch (handle)
+            {
+                case RasterResizeHandleType.TopLeft:
+                case RasterResizeHandleType.Left:
+                case RasterResizeHandleType.BottomLeft:
+                    sx = -1f;
+                    break;
+                case RasterResizeHandleType.TopRight:
+                case RasterResizeHandleType.Right:
+                case RasterResizeHandleType.BottomRight:
+                    sx = 1f;
+                    break;
+            }
+
+            switch (handle)
+            {
+                case RasterResizeHandleType.TopLeft:
+                case RasterResizeHandleType.Top:
+                case RasterResizeHandleType.TopRight:
+                    sy = -1f;
+                    break;
+                case RasterResizeHandleType.BottomLeft:
+                case RasterResizeHandleType.Bottom:
+                case RasterResizeHandleType.BottomRight:
+                    sy = 1f;
+                    break;
+            }
+
+            return new PointF(sx, sy);
+        }
+
+        private static PointF GetRasterResizeHandleWorldPoint(RectangleF bounds, int rotation, RasterResizeHandleType handle)
+        {
+            PointF center = new PointF(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
+            PointF localHandle = GetRasterResizeHandleLocalPoint(handle, bounds.Width / 2f, bounds.Height / 2f);
+            PointF rotatedHandle = RotateVector(localHandle, NormalizeRotation(rotation));
+            return new PointF(center.X + rotatedHandle.X, center.Y + rotatedHandle.Y);
+        }
+
         private static float NormalizeDegrees(float angle)
         {
             float normalized = angle % 360f;
@@ -12957,6 +13508,13 @@ namespace AnonPDF
                     rasterObjectToResize = selectedRasterObject;
                     isResizingRasterObject = true;
                     rasterResizeHandle = handle;
+                    rasterResizeStartBounds = selectedRasterObject.Bounds;
+                    rasterResizeStartRotation = NormalizeRotation(selectedRasterObject.Rotation);
+                    RasterResizeHandleType oppositeHandle = GetOppositeRasterResizeHandle(handle);
+                    rasterResizeAnchorWorld = GetRasterResizeHandleWorldPoint(
+                        rasterResizeStartBounds,
+                        rasterResizeStartRotation,
+                        oppositeHandle);
                     this.Cursor = GetCursorForRasterResizeHandle(handle, selectedRasterObject.Rotation);
                     return true;
                 }
@@ -12988,12 +13546,6 @@ namespace AnonPDF
             selectedRasterObject = hitObject;
             ClearGroupSelection();
             ClearRasterIconClickState();
-            if (BringRasterObjectToFront(hitObject))
-            {
-                projectWasChangedAfterLastSave = true;
-                saveProjectButton.Enabled = true;
-                saveProjectMenuItem.Enabled = true;
-            }
             if (hitObject.IsLocked)
             {
                 return true;
@@ -15703,6 +16255,8 @@ namespace AnonPDF
         public int SourcePixelWidth { get; set; }
         public int SourcePixelHeight { get; set; }
         public float ViewScaleFactor { get; set; } = 1f;
+        public float PageWidth { get; set; }
+        public float PageHeight { get; set; }
         public Func<string> SelectReplacementImage { get; set; }
         public Action ApplyChanges { get; set; }
 
@@ -16188,8 +16742,40 @@ namespace AnonPDF
             decimal scale = (decimal)Math.Max(0.01f, ViewScaleFactor);
             decimal centerX = nudX.Value + (nudWidth.Value / 2m);
             decimal centerY = nudY.Value + (nudHeight.Value / 2m);
-            decimal targetWidth = ClampDecimal(SourcePixelWidth / scale, nudWidth.Minimum, nudWidth.Maximum);
-            decimal targetHeight = ClampDecimal(SourcePixelHeight / scale, nudHeight.Minimum, nudHeight.Maximum);
+            decimal targetWidth = SourcePixelWidth / scale;
+            decimal targetHeight = SourcePixelHeight / scale;
+
+            // If 1:1 is larger than page area, scale down with a safe margin
+            // so resize handles are still easy to grab.
+            if (PageWidth > 0f && PageHeight > 0f)
+            {
+                decimal viewScale = (decimal)Math.Max(0.01f, ViewScaleFactor);
+                decimal marginInViewPixels = 28m;
+                decimal marginDoc = marginInViewPixels / viewScale;
+                decimal availableWidth = Math.Max(1m, (decimal)PageWidth - (2m * marginDoc));
+                decimal availableHeight = Math.Max(1m, (decimal)PageHeight - (2m * marginDoc));
+
+                double radians = (Math.PI / 180d) * NormalizeAngle((int)nudRotation.Value);
+                decimal absCos = (decimal)Math.Abs(Math.Cos(radians));
+                decimal absSin = (decimal)Math.Abs(Math.Sin(radians));
+                decimal extentWidth = (targetWidth * absCos) + (targetHeight * absSin);
+                decimal extentHeight = (targetWidth * absSin) + (targetHeight * absCos);
+
+                if (extentWidth > availableWidth || extentHeight > availableHeight)
+                {
+                    decimal scaleX = availableWidth / Math.Max(1m, extentWidth);
+                    decimal scaleY = availableHeight / Math.Max(1m, extentHeight);
+                    decimal fitScale = Math.Min(scaleX, scaleY);
+                    if (fitScale > 0m && fitScale < 1m)
+                    {
+                        targetWidth *= fitScale;
+                        targetHeight *= fitScale;
+                    }
+                }
+            }
+
+            targetWidth = ClampDecimal(targetWidth, nudWidth.Minimum, nudWidth.Maximum);
+            targetHeight = ClampDecimal(targetHeight, nudHeight.Minimum, nudHeight.Maximum);
 
             suppressDimensionSync = true;
             nudWidth.Value = targetWidth;

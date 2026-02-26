@@ -228,6 +228,18 @@
   <data name="Menu_AddSnapToGrid" xml:space="preserve">
     <value>Snap objects to grid</value>
   </data>
+  <data name="Order_SendToBack" xml:space="preserve">
+    <value>Send to back</value>
+  </data>
+  <data name="Order_MoveBackward" xml:space="preserve">
+    <value>Move backward</value>
+  </data>
+  <data name="Order_MoveForward" xml:space="preserve">
+    <value>Move forward</value>
+  </data>
+  <data name="Order_BringToFront" xml:space="preserve">
+    <value>Bring to front</value>
+  </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
     <value>Copy text to clipboard</value>
   </data>

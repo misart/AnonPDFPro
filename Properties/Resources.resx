@@ -228,6 +228,18 @@
   <data name="Menu_AddSnapToGrid" xml:space="preserve">
     <value>Dociagaj obiekty do siatki</value>
   </data>
+  <data name="Order_SendToBack" xml:space="preserve">
+    <value>Przesuń na spód</value>
+  </data>
+  <data name="Order_MoveBackward" xml:space="preserve">
+    <value>Przesuń do tyłu</value>
+  </data>
+  <data name="Order_MoveForward" xml:space="preserve">
+    <value>Przesuń do przodu</value>
+  </data>
+  <data name="Order_BringToFront" xml:space="preserve">
+    <value>Przesuń na wierzch</value>
+  </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
     <value>Kopiuj tekst do schowka</value>
   </data>

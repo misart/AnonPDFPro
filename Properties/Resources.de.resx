@@ -422,6 +422,18 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
   <data name="Menu_AddSnapToGrid" xml:space="preserve">
     <value>Objekte am Raster ausrichten</value>
   </data>
+  <data name="Order_SendToBack" xml:space="preserve">
+    <value>Ganz nach hinten</value>
+  </data>
+  <data name="Order_MoveBackward" xml:space="preserve">
+    <value>Eine Ebene nach hinten</value>
+  </data>
+  <data name="Order_MoveForward" xml:space="preserve">
+    <value>Eine Ebene nach vorn</value>
+  </data>
+  <data name="Order_BringToFront" xml:space="preserve">
+    <value>Ganz nach vorn</value>
+  </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
     <value>Text in Zwischenablage kopieren</value>
   </data>
