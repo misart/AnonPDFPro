@@ -56,6 +56,13 @@ namespace AnonPDF
         private static readonly string DebugLogPath = Path.Combine(Path.GetTempPath(), "AnonPDF-debug.log");
         private static readonly string MaintenanceRecoveryDirectory = Path.Combine(Path.GetTempPath(), "AnonPDFPro");
         private static readonly string MaintenanceRecoveryProjectPath = Path.Combine(MaintenanceRecoveryDirectory, "maintenance-recovery.app");
+        private static readonly (int? Number, string Label)[] DemoFootnoteOptions =
+        {
+            (null, "Brak przypisu"),
+            (1, "1. Przypis 1"),
+            (2, "2. Przypis 2"),
+            (3, "3. Przypis 3")
+        };
         private static bool diagnosticModeEnabled = false;
         private static bool DebugLogEnabled => diagnosticModeEnabled;
         private readonly string fileVersion;
@@ -146,8 +153,7 @@ namespace AnonPDF
         private ToolStripMenuItem addRasterImageToolStripMenuItem;
         private ToolStripMenuItem pasteObjectFromClipboardToolStripMenuItem;
         private ToolStripMenuItem addArrowToolStripMenuItem;
-        private ToolStripMenuItem addPolygonToolStripMenuItem;
-        private ToolStripMenuItem addPolylineToolStripMenuItem;
+        private ToolStripMenuItem addShapeToolStripMenuItem;
         private ToolStripMenuItem addCommentToolStripMenuItem;
         private ToolStripMenuItem addBlankPageToolStripMenuItem;
         private ToolStripMenuItem snapToGridToolStripMenuItem;
@@ -155,6 +161,7 @@ namespace AnonPDF
         private const float SnapGridStep = 5f;
         private static readonly System.Drawing.Color GroupSelectionColor = System.Drawing.Color.DeepSkyBlue;
         private bool pagesListTooltipShownThisSession;
+        private string lastFootnoteBadgeLayoutLogKey = string.Empty;
         private int busyCursorDepth;
         private bool isMiddleMousePanning;
         private Point middlePanStartCursorScreen;
@@ -890,14 +897,10 @@ namespace AnonPDF
                 Enabled = false
             };
             addArrowToolStripMenuItem.Click += AddArrowToolStripMenuItem_Click;
-            addPolygonToolStripMenuItem = new ToolStripMenuItem
+
+            addShapeToolStripMenuItem = new ToolStripMenuItem
             {
-                Name = "addPolygonToolStripMenuItem",
-                Enabled = false
-            };
-            addPolylineToolStripMenuItem = new ToolStripMenuItem
-            {
-                Name = "addPolylineToolStripMenuItem",
+                Name = "addShapeToolStripMenuItem",
                 Enabled = false
             };
             addCommentToolStripMenuItem = new ToolStripMenuItem
@@ -944,13 +947,13 @@ namespace AnonPDF
             }
 
             menuAddItem.DropDownItems.Clear();
+            menuAddItem.DropDownItems.Add(addArrowToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addTextMenuItem);
+            menuAddItem.DropDownItems.Add(addShapeToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addRasterImageToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(new ToolStripSeparator());
             menuAddItem.DropDownItems.Add(pasteObjectFromClipboardToolStripMenuItem);
             menuAddItem.DropDownItems.Add(new ToolStripSeparator());
-            menuAddItem.DropDownItems.Add(addArrowToolStripMenuItem);
-            menuAddItem.DropDownItems.Add(addPolygonToolStripMenuItem);
-            menuAddItem.DropDownItems.Add(addPolylineToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addCommentToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addBlankPageToolStripMenuItem);
             menuAddItem.DropDownItems.Add(new ToolStripSeparator());
@@ -987,14 +990,9 @@ namespace AnonPDF
                 addArrowToolStripMenuItem.Text = LocalizedText("Menu_AddArrow");
             }
 
-            if (addPolygonToolStripMenuItem != null)
+            if (addShapeToolStripMenuItem != null)
             {
-                addPolygonToolStripMenuItem.Text = LocalizedText("Menu_AddPolygon");
-            }
-
-            if (addPolylineToolStripMenuItem != null)
-            {
-                addPolylineToolStripMenuItem.Text = LocalizedText("Menu_AddPolyline");
+                addShapeToolStripMenuItem.Text = LocalizedText("Menu_AddShape");
             }
 
             if (addCommentToolStripMenuItem != null)
@@ -8473,7 +8471,6 @@ namespace AnonPDF
 
             if (e.Button == MouseButtons.Right)
             {
-                renderTimer.Stop();
                 isDrawing = false;
                 startPoint = e.Location;
             }
@@ -9378,42 +9375,7 @@ namespace AnonPDF
                     return;
                 }
 
-                renderTimer.Stop();
-                var blockToRemove = redactionBlocks.FirstOrDefault(block => block.PageNumber == currentPage && block.Bounds.Contains((startPoint.X / scaleFactor), (startPoint.Y / scaleFactor)));
-
-                if (blockToRemove != null)
-                {
-                    redactionBlocks.Remove(blockToRemove);
-
-                    RedactionBlock blocksByPage = redactionBlocks.FirstOrDefault(block => block.PageNumber == currentPage);
-                    if (blocksByPage == null)
-                    {
-                        
-
-                        status.HasSelections = false;
-
-                        if ((string)filterComboBox.SelectedItem == allComboItem)
-                        {
-                            ListViewItem currentItem = pagesListView.Items[currentPage - 1];
-                            UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
-                            pagesListView.Invalidate(currentItem.Bounds);
-                        }
-                        else
-                        {
-                            // rebuild list according to filter
-                            ApplyFilter((string)filterComboBox.SelectedItem);
-                        }
-
-                        
-                    }
-
-                    projectWasChangedAfterLastSave = true;
-                    saveProjectButton.Enabled = true;
-                    saveProjectMenuItem.Enabled = true;
-                    UpdateSelectionNavigationButtons();
-                    renderTimer.Stop();
-                    renderTimer.Start();
-                }
+                TryShowRedactionContextMenu(startPoint);
             }
             isDrawing = false;
             currentSelection = System.Drawing.Rectangle.Empty;
@@ -9431,6 +9393,136 @@ namespace AnonPDF
                 arrowMouseActionInProgress = false;
             }
 
+        }
+
+        private bool TryShowRedactionContextMenu(Point location)
+        {
+            if (pdf == null)
+            {
+                return false;
+            }
+
+            float docX = location.X / scaleFactor;
+            float docY = location.Y / scaleFactor;
+            var block = redactionBlocks
+                .Where(b => b.PageNumber == currentPage && b.Bounds.Contains(docX, docY))
+                .LastOrDefault();
+            if (block == null)
+            {
+                return false;
+            }
+
+            var menu = new ContextMenuStrip();
+            menu.Items.Add(LocalizedText("Menu_Context_Delete"), null, (_, __) => RemoveRedactionBlock(block));
+            menu.Items.Add(new ToolStripSeparator());
+            foreach (var option in DemoFootnoteOptions)
+            {
+                int? selectedNumber = option.Number;
+                var footnoteItem = new ToolStripMenuItem(option.Label)
+                {
+                    Checked = block.FootnoteNumber == selectedNumber
+                };
+                footnoteItem.Click += (_, __) => SetRedactionBlockFootnote(block, selectedNumber);
+                menu.Items.Add(footnoteItem);
+            }
+
+            menu.Show(pdfViewer, location);
+            return true;
+        }
+
+        private void SetRedactionBlockFootnote(RedactionBlock block, int? footnoteNumber)
+        {
+            if (block == null)
+            {
+                return;
+            }
+
+            int? normalized = (footnoteNumber.HasValue && footnoteNumber.Value > 0) ? footnoteNumber.Value : (int?)null;
+            if (block.FootnoteNumber == normalized)
+            {
+                return;
+            }
+
+            block.FootnoteNumber = normalized;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+        }
+
+        private void RemoveRedactionBlock(RedactionBlock blockToRemove)
+        {
+            if (blockToRemove == null)
+            {
+                return;
+            }
+
+            renderTimer.Stop();
+            if (!redactionBlocks.Remove(blockToRemove))
+            {
+                return;
+            }
+
+            PageItemStatus status = allPageStatuses[currentPage - 1];
+            RedactionBlock blocksByPage = redactionBlocks.FirstOrDefault(block => block.PageNumber == currentPage);
+            if (blocksByPage == null)
+            {
+                status.HasSelections = false;
+
+                if ((string)filterComboBox.SelectedItem == allComboItem)
+                {
+                    ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                    pagesListView.Invalidate(currentItem.Bounds);
+                }
+                else
+                {
+                    // Rebuild list according to active filter.
+                    ApplyFilter((string)filterComboBox.SelectedItem);
+                }
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateSelectionNavigationButtons();
+            renderTimer.Stop();
+            renderTimer.Start();
+            pdfViewer.Invalidate();
+        }
+
+        private void LogFootnoteBadgeLayoutIfNeeded(RedactionBlock block, RectangleF selectionRect, RectangleF badgeRect, int rotationOffset, float rotationCompensation)
+        {
+            if (!DebugLogEnabled || block == null || !block.FootnoteNumber.HasValue)
+            {
+                return;
+            }
+
+            if (rotationOffset != 90 && rotationOffset != 270)
+            {
+                return;
+            }
+
+            float topDelta = badgeRect.Top - selectionRect.Top;
+            string key = string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}|{1}|{2}|{3}|{4}",
+                block.PageNumber,
+                block.FootnoteNumber.Value,
+                rotationOffset,
+                FormatRectFInvariant(selectionRect),
+                FormatRectFInvariant(badgeRect));
+
+            if (string.Equals(lastFootnoteBadgeLayoutLogKey, key, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            lastFootnoteBadgeLayoutLogKey = key;
+            LogDebug(
+                $"FootnoteBadge page={block.PageNumber} footnote={block.FootnoteNumber.Value} rot={rotationOffset} " +
+                $"selection={FormatRectFInvariant(selectionRect)} badge={FormatRectFInvariant(badgeRect)} " +
+                $"topDelta={topDelta.ToString("0.###", CultureInfo.InvariantCulture)} comp={rotationCompensation.ToString("0.###", CultureInfo.InvariantCulture)} scale={scaleFactor.ToString("0.###", CultureInfo.InvariantCulture)}");
         }
 
         private void OnPaint(object sender, PaintEventArgs e)
@@ -9451,6 +9543,107 @@ namespace AnonPDF
                 {
                     System.Drawing.RectangleF rect = new System.Drawing.RectangleF((block.Bounds.X * scaleFactor), (block.Bounds.Y * scaleFactor), (block.Bounds.Width * scaleFactor), (block.Bounds.Height * scaleFactor));
                     e.Graphics.FillRectangle(brush, rect);
+
+                    if (block.FootnoteNumber.HasValue && block.FootnoteNumber.Value > 0)
+                    {
+                        string badgeText = $"[{block.FootnoteNumber.Value}]";
+                        float badgeFontSize = Math.Max(8f, this.Font.SizeInPoints - 1f);
+                        using (Font badgeFont = new Font(this.Font.FontFamily, badgeFontSize, FontStyle.Bold))
+                        {
+                            SizeF textSize = e.Graphics.MeasureString(badgeText, badgeFont);
+                            float badgePaddingX = 4f;
+                            float badgePaddingY = 2f;
+                            float badgeWidth = textSize.Width + (badgePaddingX * 2f);
+                            float badgeHeight = textSize.Height + (badgePaddingY * 2f);
+                            float margin = 2f;
+                            int rotationOffset = NormalizeRotation(GetRotationOffset(block.PageNumber));
+                            float rotationCompensation = Math.Max(0f, (badgeWidth - badgeHeight) / 2f);
+
+                            float badgeX;
+                            float badgeY;
+                            switch (rotationOffset)
+                            {
+                                case 90:
+                                    badgeX = rect.Right - badgeWidth;
+                                    badgeY = rect.Bottom + margin + rotationCompensation;
+                                    break;
+                                case 180:
+                                    badgeX = rect.Left - badgeWidth - margin;
+                                    badgeY = rect.Bottom - badgeHeight;
+                                    break;
+                                case 270:
+                                    badgeX = rect.Left;
+                                    badgeY = rect.Top - badgeHeight - margin - rotationCompensation;
+                                    break;
+                                default:
+                                    badgeX = rect.Right + margin;
+                                    badgeY = rect.Top;
+                                    break;
+                            }
+
+                            const float rotatedBadgeTopNudge = 2f;
+                            if (rotationOffset == 90 || rotationOffset == 270)
+                            {
+                                badgeY -= rotatedBadgeTopNudge;
+                            }
+
+                            if (badgeX + badgeWidth > pdfViewer.ClientSize.Width)
+                            {
+                                badgeX = Math.Max(0f, rect.Right - badgeWidth - 2f);
+                            }
+                            if (badgeX < 0f)
+                            {
+                                badgeX = 0f;
+                            }
+                            if (badgeY < 0f)
+                            {
+                                badgeY = 0f;
+                            }
+                            if (badgeY + badgeHeight > pdfViewer.ClientSize.Height)
+                            {
+                                badgeY = Math.Max(0f, pdfViewer.ClientSize.Height - badgeHeight);
+                            }
+
+                            RectangleF badgeRect = new RectangleF(badgeX, badgeY, badgeWidth, badgeHeight);
+                            LogFootnoteBadgeLayoutIfNeeded(block, rect, badgeRect, rotationOffset, rotationCompensation);
+                            using (SolidBrush badgeBackground = new SolidBrush(System.Drawing.Color.FromArgb(235, 255, 255, 255)))
+                            using (Pen badgeBorder = new Pen(System.Drawing.Color.FromArgb(200, 170, 0, 0), 1f))
+                            using (SolidBrush badgeTextBrush = new SolidBrush(System.Drawing.Color.FromArgb(220, 120, 0, 0)))
+                            {
+                                if (rotationOffset == 0)
+                                {
+                                    e.Graphics.FillRectangle(badgeBackground, badgeRect);
+                                    e.Graphics.DrawRectangle(badgeBorder, badgeRect.X, badgeRect.Y, badgeRect.Width, badgeRect.Height);
+                                    e.Graphics.DrawString(
+                                        badgeText,
+                                        badgeFont,
+                                        badgeTextBrush,
+                                        badgeRect.X + badgePaddingX,
+                                        badgeRect.Y + badgePaddingY - 1f);
+                                }
+                                else
+                                {
+                                    var state = e.Graphics.Save();
+                                    float centerX = badgeRect.X + (badgeRect.Width / 2f);
+                                    float centerY = badgeRect.Y + (badgeRect.Height / 2f);
+                                    e.Graphics.TranslateTransform(centerX, centerY);
+                                    e.Graphics.RotateTransform(rotationOffset);
+                                    e.Graphics.TranslateTransform(-centerX, -centerY);
+
+                                    e.Graphics.FillRectangle(badgeBackground, badgeRect);
+                                    e.Graphics.DrawRectangle(badgeBorder, badgeRect.X, badgeRect.Y, badgeRect.Width, badgeRect.Height);
+                                    e.Graphics.DrawString(
+                                        badgeText,
+                                        badgeFont,
+                                        badgeTextBrush,
+                                        badgeRect.X + badgePaddingX,
+                                        badgeRect.Y + badgePaddingY - 1f);
+
+                                    e.Graphics.Restore(state);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -17645,11 +17838,13 @@ namespace AnonPDF
     {
         public System.Drawing.RectangleF Bounds { get; set; }
         public int PageNumber { get; set; }
+        public int? FootnoteNumber { get; set; }
 
         public RedactionBlock(System.Drawing.RectangleF bounds, int pageNumber)
         {
             Bounds = bounds;
             PageNumber = pageNumber;
+            FootnoteNumber = null;
         }
     }
 

@@ -404,6 +404,9 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
   <data name="Menu_AddArrow" xml:space="preserve">
     <value>Pfeil hinzufuegen</value>
   </data>
+  <data name="Menu_AddShape" xml:space="preserve">
+    <value>Form hinzufuegen</value>
+  </data>
   <data name="Menu_AddPolygon" xml:space="preserve">
     <value>Polygon hinzufuegen</value>
   </data>
@@ -421,6 +424,9 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
   </data>
   <data name="Menu_AddSnapToGrid" xml:space="preserve">
     <value>Objekte am Raster ausrichten</value>
+  </data>
+  <data name="Menu_Context_Delete" xml:space="preserve">
+    <value>Loeschen</value>
   </data>
   <data name="Order_SendToBack" xml:space="preserve">
     <value>Ganz nach hinten</value>
@@ -570,13 +576,13 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Zum LĂ¶schen markiert</value>
   </data>
   <data name="Tooltip_LoadPdf" xml:space="preserve">
-    <value>PDF-Datei zur Anonymisierung Ă¶ffnen.</value>
+    <value>PDF-Datei zur Anonymisierung Ă¶ffnen. STRG + N.</value>
   </data>
   <data name="Tooltip_SetPassword" xml:space="preserve">
     <value>Wenn aktiviert, wird die PDF-Datei mit einem Passwort geschĂĽtzt.</value>
   </data>
   <data name="Tooltip_RemovePage" xml:space="preserve">
-    <value>Aktuelle Seite zum LĂ¶schen markieren.</value>
+    <value>Aktuelle Seite zum LĂ¶schen markieren. ENTF.</value>
   </data>
   <data name="Tooltip_RemovePageRange" xml:space="preserve">
     <value>Seitenbereich zum LĂ¶schen auswĂ¤hlen oder LĂ¶schung aufheben.</value>
@@ -594,16 +600,16 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Seitennummer eingeben und Enter drĂĽcken.</value>
   </data>
   <data name="Tooltip_FirstPage" xml:space="preserve">
-    <value>Erste Seite.</value>
+    <value>Erste Seite. POS1.</value>
   </data>
   <data name="Tooltip_NextPage" xml:space="preserve">
-    <value>NĂ¤chste Seite.</value>
+    <value>NĂ¤chste Seite. BILD AB.</value>
   </data>
   <data name="Tooltip_PrevPage" xml:space="preserve">
-    <value>Vorherige Seite.</value>
+    <value>Vorherige Seite. BILD AUF.</value>
   </data>
   <data name="Tooltip_LastPage" xml:space="preserve">
-    <value>Letzte Seite.</value>
+    <value>Letzte Seite. ENDE.</value>
   </data>
   <data name="Tooltip_ZoomMin" xml:space="preserve">
     <value>Auf Minimum verkleinern. STRG + Mausrad nach unten.</value>
@@ -634,13 +640,13 @@ Nochmal klicken, um Markierungen zu entfernen.</value>
     <value>Gespeicherte PDF nach dem Speichern Ă¶ffnen.</value>
   </data>
   <data name="Tooltip_SaveProject" xml:space="preserve">
-    <value>Projekt mit Markierungen unter dem bisherigen Namen speichern.</value>
+    <value>Projekt mit Markierungen unter dem bisherigen Namen speichern. STRG + S.</value>
   </data>
   <data name="Tooltip_SaveProjectAs" xml:space="preserve">
     <value>Projekt mit Markierungen unter einem gewĂ¤hlten Namen speichern.</value>
   </data>
   <data name="Tooltip_OpenProject" xml:space="preserve">
-    <value>Projekt mit Markierungen zur Anonymisierung Ă¶ffnen.</value>
+    <value>Projekt mit Markierungen zur Anonymisierung Ă¶ffnen. STRG + O.</value>
   </data>
   <data name="Tooltip_HighlightColor" xml:space="preserve">
     <value>Markierungen werden in der gespeicherten Datei farbig dargestellt.</value>
@@ -658,7 +664,7 @@ Nochmal klicken, um Markierungen zu entfernen.</value>
     <value>Letzte Seite mit Markierungen.</value>
   </data>
   <data name="Tooltip_Marker" xml:space="preserve">
-    <value>Marker-Modus â€” mit Strichen markieren.</value>
+    <value>Marker-Modus â€” mit Strichen markieren. STRG - Box-Modus.</value>
   </data>
   <data name="Tooltip_Box" xml:space="preserve">
     <value>Box-Modus â€” Rechteck zeichnen.</value>
@@ -670,7 +676,7 @@ Nochmal klicken, um Markierungen zu entfernen.</value>
     <value>Alle Markierungen aus dem Dokument entfernen.</value>
   </data>
   <data name="Tooltip_SavePdf" xml:space="preserve">
-    <value>Anonymisierte PDF unter einem gewĂ¤hlten Namen speichern.</value>
+    <value>Anonymisierte PDF unter einem gewĂ¤hlten Namen speichern. STRG + UMSCHALT + S.</value>
   </data>
   <data name="Tooltip_PagesList" xml:space="preserve">
     <value>Ein Element anklicken, um die Seite anzuzeigen.</value>

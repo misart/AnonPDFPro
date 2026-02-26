@@ -210,6 +210,9 @@
   <data name="Menu_AddArrow" xml:space="preserve">
     <value>Add arrow</value>
   </data>
+  <data name="Menu_AddShape" xml:space="preserve">
+    <value>Add shape</value>
+  </data>
   <data name="Menu_AddPolygon" xml:space="preserve">
     <value>Add polygon</value>
   </data>
@@ -227,6 +230,9 @@
   </data>
   <data name="Menu_AddSnapToGrid" xml:space="preserve">
     <value>Snap objects to grid</value>
+  </data>
+  <data name="Menu_Context_Delete" xml:space="preserve">
+    <value>Delete</value>
   </data>
   <data name="Order_SendToBack" xml:space="preserve">
     <value>Send to back</value>
@@ -460,7 +466,7 @@
     <value>Please select an existing PDF file.</value>
   </data>
   <data name="Tooltip_LoadPdf" xml:space="preserve">
-    <value>Open a PDF file for anonymization.</value>
+    <value>Open a PDF file for anonymization. CTRL + N.</value>
   </data>
   <data name="Tooltip_SetPassword" xml:space="preserve">
     <value>When checked — the PDF will be protected with a password.</value>
@@ -473,7 +479,7 @@
 EDITING IS LOCKED</value>
   </data>
   <data name="Tooltip_RemovePage" xml:space="preserve">
-    <value>Mark current page for deletion.</value>
+    <value>Mark current page for deletion. DELETE.</value>
   </data>
   <data name="Tooltip_RemovePageRange" xml:space="preserve">
     <value>Select a page range to delete or to cancel deletion.</value>
@@ -491,16 +497,16 @@ EDITING IS LOCKED</value>
     <value>Enter a page number and press Enter.</value>
   </data>
   <data name="Tooltip_FirstPage" xml:space="preserve">
-    <value>First page.</value>
+    <value>First page. HOME.</value>
   </data>
   <data name="Tooltip_NextPage" xml:space="preserve">
-    <value>Next page.</value>
+    <value>Next page. PAGE DOWN.</value>
   </data>
   <data name="Tooltip_PrevPage" xml:space="preserve">
-    <value>Previous page.</value>
+    <value>Previous page. PAGE UP.</value>
   </data>
   <data name="Tooltip_LastPage" xml:space="preserve">
-    <value>Last page.</value>
+    <value>Last page. END.</value>
   </data>
   <data name="Tooltip_ZoomMin" xml:space="preserve">
     <value>Zoom out to minimum. CTRL + wheel down.</value>
@@ -531,13 +537,13 @@ Click again to remove marks.</value>
     <value>Open saved PDF after saving.</value>
   </data>
   <data name="Tooltip_SaveProject" xml:space="preserve">
-    <value>Save project with marks under previous name.</value>
+    <value>Save project with marks under previous name. CTRL + S.</value>
   </data>
   <data name="Tooltip_SaveProjectAs" xml:space="preserve">
     <value>Save project with marks under a chosen name.</value>
   </data>
   <data name="Tooltip_OpenProject" xml:space="preserve">
-    <value>Open a project with marks for anonymization.</value>
+    <value>Open a project with marks for anonymization. CTRL + O.</value>
   </data>
   <data name="Tooltip_HighlightColor" xml:space="preserve">
     <value>Highlights will be colored in the saved file.</value>
@@ -555,7 +561,7 @@ Click again to remove marks.</value>
     <value>Last page with selections.</value>
   </data>
   <data name="Tooltip_Marker" xml:space="preserve">
-    <value>Marker mode — paint with strokes.</value>
+    <value>Marker mode — paint with strokes. CTRL - box mode.</value>
   </data>
   <data name="Tooltip_Box" xml:space="preserve">
     <value>Box mode — draw a rectangle.</value>
@@ -567,7 +573,7 @@ Click again to remove marks.</value>
     <value>Remove all selections from the document.</value>
   </data>
   <data name="Tooltip_SavePdf" xml:space="preserve">
-    <value>Save anonymized PDF under a chosen name.</value>
+    <value>Save anonymized PDF under a chosen name. CTRL + SHIFT + S.</value>
   </data>
   <data name="Tooltip_PagesList" xml:space="preserve">
     <value>Click an item to display the page.</value>

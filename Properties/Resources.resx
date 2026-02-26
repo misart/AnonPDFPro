@@ -210,6 +210,9 @@
   <data name="Menu_AddArrow" xml:space="preserve">
     <value>Dodaj strzałkę</value>
   </data>
+  <data name="Menu_AddShape" xml:space="preserve">
+    <value>Dodaj kształt</value>
+  </data>
   <data name="Menu_AddPolygon" xml:space="preserve">
     <value>Dodaj poligon</value>
   </data>
@@ -227,6 +230,9 @@
   </data>
   <data name="Menu_AddSnapToGrid" xml:space="preserve">
     <value>Dociagaj obiekty do siatki</value>
+  </data>
+  <data name="Menu_Context_Delete" xml:space="preserve">
+    <value>Usuń</value>
   </data>
   <data name="Order_SendToBack" xml:space="preserve">
     <value>Przesuń na spód</value>
@@ -460,7 +466,7 @@
     <value>Proszę wybrać istniejący plik PDF.</value>
   </data>
   <data name="Tooltip_LoadPdf" xml:space="preserve">
-    <value>Otwórz plik PDF do anonimizacji.</value>
+    <value>Otwórz plik PDF do anonimizacji. CTRL + N.</value>
   </data>
   <data name="Tooltip_SetPassword" xml:space="preserve">
     <value>Gdy zaznaczone — plik PDF zostanie zabezpieczony hasłem.</value>
@@ -473,7 +479,7 @@
 EDYCJA ZABLOKOWANA</value>
   </data>
   <data name="Tooltip_RemovePage" xml:space="preserve">
-    <value>Zaznacz stronę do usunięcia.</value>
+    <value>Zaznacz stronę do usunięcia. DELETE.</value>
   </data>
   <data name="Tooltip_RemovePageRange" xml:space="preserve">
     <value>Wybierz zakres stron do usunięcia lub do anulowania usunięcia.</value>
@@ -491,16 +497,16 @@ EDYCJA ZABLOKOWANA</value>
     <value>Wprowadź numer strony i naciśnij Enter.</value>
   </data>
   <data name="Tooltip_FirstPage" xml:space="preserve">
-    <value>Pierwsza strona.</value>
+    <value>Pierwsza strona. HOME.</value>
   </data>
   <data name="Tooltip_NextPage" xml:space="preserve">
-    <value>Następna strona.</value>
+    <value>Następna strona. PAGE DOWN.</value>
   </data>
   <data name="Tooltip_PrevPage" xml:space="preserve">
-    <value>Poprzednia strona.</value>
+    <value>Poprzednia strona. PAGE UP.</value>
   </data>
   <data name="Tooltip_LastPage" xml:space="preserve">
-    <value>Ostatnia strona.</value>
+    <value>Ostatnia strona. END.</value>
   </data>
   <data name="Tooltip_ZoomMin" xml:space="preserve">
     <value>Zmniejsz do minimum. CTRL + rolka w dół.</value>
@@ -531,13 +537,13 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
     <value>Pokaż zapisany plik PDF po zakończeniu.</value>
   </data>
   <data name="Tooltip_SaveProject" xml:space="preserve">
-    <value>Zapisz projekt z oznaczeniami pod wcześniejszą nazwą.</value>
+    <value>Zapisz projekt z oznaczeniami pod wcześniejszą nazwą. CTRL + S.</value>
   </data>
   <data name="Tooltip_SaveProjectAs" xml:space="preserve">
     <value>Zapisz projekt z oznaczeniami pod wybraną nazwą.</value>
   </data>
   <data name="Tooltip_OpenProject" xml:space="preserve">
-    <value>Otwórz projekt z oznaczeniami do anonimizacji.</value>
+    <value>Otwórz projekt z oznaczeniami do anonimizacji. CTRL + O.</value>
   </data>
   <data name="Tooltip_HighlightColor" xml:space="preserve">
     <value>W zapisie zaznaczenia będą wyróżnione kolorem.</value>
@@ -555,7 +561,7 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
     <value>Ostatnia strona z zaznaczeniami.</value>
   </data>
   <data name="Tooltip_Marker" xml:space="preserve">
-    <value>Tryb marker — maluj pociągnięciami.</value>
+    <value>Tryb marker — maluj pociągnięciami. CTRL - tryb box.</value>
   </data>
   <data name="Tooltip_Box" xml:space="preserve">
     <value>Tryb box — zaznacz prostokątem.</value>
@@ -567,7 +573,7 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
     <value>Usuń wszystkie zaznaczenia z dokumentu.</value>
   </data>
   <data name="Tooltip_SavePdf" xml:space="preserve">
-    <value>Zapisz zanonimizowany plik PDF pod wybraną nazwą.</value>
+    <value>Zapisz zanonimizowany plik PDF pod wybraną nazwą. CTRL + SHIFT + S.</value>
   </data>
   <data name="Tooltip_PagesList" xml:space="preserve">
     <value>Kliknij pozycję, aby wyświetlić stronę.</value>
