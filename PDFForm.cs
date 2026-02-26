@@ -59,10 +59,27 @@ namespace AnonPDF
         private static readonly (int? Number, string Label)[] DemoFootnoteOptions =
         {
             (null, "Brak przypisu"),
-            (1, "1. Przypis 1"),
-            (2, "2. Przypis 2"),
-            (3, "3. Przypis 3")
+            (1, "1. Ochrona innych tajemnic"),
+            (2, "2. Ochrona danych osobowych"),
+            (3, "3. Ochrona prywatności")
         };
+        private static readonly Dictionary<int, string> DemoFootnoteDetails = new Dictionary<int, string>
+        {
+            {
+                1,
+                "Ochrona innych tajemnic ustawowo chronionych - poufność informacji i dokumentacji (dot. FEdKiP; kontrola systemowa w IP w 2025 roku) - art. 5 ust. 1 ustawy z dnia 6 września 2001 r. o dostępie do informacji publicznej (Dz.U. z 2022 r. poz. 902) w związku z art. 48 ustawy z dnia 28 kwietnia 2022 r. o zasadach realizacji zadań finansowanych ze środków europejskich w perspektywie finansowej 2021-2027 (Dz.U. poz. 1079) oraz postanowieniami Instrukcji wykonawczej instytucji pośredniczącej (ZIT BydOF)."
+            },
+            {
+                2,
+                "Ochrona danych osobowych - art. 5 ust. 2 ustawy z dnia 6 września 2001 r. o dostępie do informacji publicznej (Dz.U. z 2022 r. poz. 902) w związku z art. 6 ust. 1 lit. c i e oraz art. 86 Rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 (RODO)."
+            },
+            {
+                3,
+                "Ochrona prywatności osób fizycznych - art. 5 ust. 2 ustawy z dnia 6 września 2001 r. o dostępie do informacji publicznej (Dz.U. z 2022 r. poz. 902) w związku z art. 23 i 24 ustawy z dnia 23 kwietnia 1964 r. Kodeks cywilny (Dz.U. z 2024 r. poz. 1061)."
+            }
+        };
+        private const string FootnoteSummaryTitle = "Przypisy wyłączenia jawności:";
+        private const string FootnoteSummaryAuthorityLine = "Organ, który dokonał wyłączenia: Gmina Miasto Stare Czarnowo";
         private static bool diagnosticModeEnabled = false;
         private static bool DebugLogEnabled => diagnosticModeEnabled;
         private readonly string fileVersion;
@@ -6805,6 +6822,16 @@ namespace AnonPDF
                     pdfCanvas.RestoreState();
                 }
 
+                List<RedactionBlock> footnoteBlocksForExport = redactionBlocks
+                    .Where(block =>
+                        block != null &&
+                        block.FootnoteNumber.HasValue &&
+                        block.FootnoteNumber.Value > 0 &&
+                        !pagesToRemove.Contains(block.PageNumber))
+                    .ToList();
+
+                RenderFootnoteMarkersToPdf(pdfDoc, pagesWithBakedRotation, footnoteBlocksForExport);
+
                 if (pagesToRemove.Count > 0)
                 {
                     var pagesToRemoveSorted = pagesToRemove.OrderByDescending(p => p);
@@ -6816,6 +6843,8 @@ namespace AnonPDF
                         }
                     }
                 }
+
+                AppendFootnotesSummaryPageIfNeeded(pdfDoc, footnoteBlocksForExport);
 
                 var info = pdfDoc.GetDocumentInfo();
 
@@ -9448,6 +9477,227 @@ namespace AnonPDF
             saveProjectButton.Enabled = true;
             saveProjectMenuItem.Enabled = true;
             pdfViewer.Invalidate();
+        }
+
+        private static string GetFootnoteDetailText(int footnoteNumber)
+        {
+            return DemoFootnoteDetails.TryGetValue(footnoteNumber, out string detail) && !string.IsNullOrWhiteSpace(detail)
+                ? detail
+                : "Brak opisu podstawy prawnej.";
+        }
+
+        private RectangleF CalculateFootnoteBadgeRect(
+            RectangleF selectionRect,
+            float badgeWidth,
+            float badgeHeight,
+            int rotationOffset,
+            float margin,
+            bool clampToViewer,
+            out float rotationCompensation)
+        {
+            rotationOffset = NormalizeRotation(rotationOffset);
+            rotationCompensation = (badgeWidth - badgeHeight) / 2f;
+
+            float badgeX;
+            float badgeY;
+            switch (rotationOffset)
+            {
+                case 90:
+                    badgeX = selectionRect.Right - badgeWidth;
+                    badgeY = selectionRect.Bottom + margin;
+                    break;
+                case 180:
+                    badgeX = selectionRect.Left - badgeWidth - margin;
+                    badgeY = selectionRect.Bottom - badgeHeight;
+                    break;
+                case 270:
+                    badgeX = selectionRect.Left;
+                    badgeY = selectionRect.Top - badgeHeight - margin;
+                    break;
+                default:
+                    badgeX = selectionRect.Right + margin;
+                    badgeY = selectionRect.Top;
+                    break;
+            }
+
+            if (rotationOffset == 90)
+            {
+                badgeX += rotationCompensation;
+                badgeY += rotationCompensation;
+            }
+            else if (rotationOffset == 270)
+            {
+                badgeX -= rotationCompensation;
+                badgeY -= rotationCompensation;
+            }
+
+            if (clampToViewer)
+            {
+                if (badgeX + badgeWidth > pdfViewer.ClientSize.Width)
+                {
+                    badgeX = Math.Max(0f, selectionRect.Right - badgeWidth - 2f);
+                }
+                if (badgeX < 0f)
+                {
+                    badgeX = 0f;
+                }
+                if (badgeY < 0f)
+                {
+                    badgeY = 0f;
+                }
+                if (badgeY + badgeHeight > pdfViewer.ClientSize.Height)
+                {
+                    badgeY = Math.Max(0f, pdfViewer.ClientSize.Height - badgeHeight);
+                }
+            }
+
+            return new RectangleF(badgeX, badgeY, badgeWidth, badgeHeight);
+        }
+
+        private void RenderFootnoteMarkersToPdf(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            ISet<int> pagesWithBakedRotation,
+            IList<RedactionBlock> blocksWithFootnotes)
+        {
+            if (pdfDoc == null || blocksWithFootnotes == null || blocksWithFootnotes.Count == 0)
+            {
+                return;
+            }
+
+            PdfFont markerFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA, "Cp1250");
+            const float markerFontSize = 6f;
+            const float markerMargin = 2f;
+
+            foreach (var block in blocksWithFootnotes)
+            {
+                if (block == null || !block.FootnoteNumber.HasValue || block.FootnoteNumber.Value <= 0)
+                {
+                    continue;
+                }
+
+                int pageNumber = block.PageNumber;
+                if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
+                {
+                    continue;
+                }
+
+                bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
+                int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
+                string markerText = $"[{block.FootnoteNumber.Value}]";
+                float markerWidth = Math.Max(8f, markerFont.GetWidth(markerText, markerFontSize));
+                float markerHeight = markerFontSize + 1f;
+                RectangleF badgeRect = CalculateFootnoteBadgeRect(
+                    block.Bounds,
+                    markerWidth,
+                    markerHeight,
+                    rotation,
+                    markerMargin,
+                    false,
+                    out float rotationCompensation);
+
+                PointF markerViewPoint = new PointF(badgeRect.X, badgeRect.Bottom);
+                PointF markerPdfPoint = ConvertPointToPdfCoordinates(
+                    markerViewPoint,
+                    pageNumber,
+                    rotation,
+                    includeBaseRotation: !baseRotationBaked);
+
+                if (DebugLogEnabled)
+                {
+                    LogDebug(
+                        $"FootnoteExport page={pageNumber} footnote={block.FootnoteNumber.Value} rot={NormalizeRotation(rotation)} " +
+                        $"selection={FormatRectFInvariant(block.Bounds)} badge={FormatRectFInvariant(badgeRect)} comp={rotationCompensation.ToString("0.###", CultureInfo.InvariantCulture)}");
+                }
+
+                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(pdfDoc.GetPage(pageNumber));
+                pdfCanvas.BeginText();
+                pdfCanvas.SetFontAndSize(markerFont, markerFontSize);
+                pdfCanvas.SetFillColor(new DeviceRgb(0, 0, 0));
+                pdfCanvas.MoveText(markerPdfPoint.X, markerPdfPoint.Y);
+                pdfCanvas.ShowText(markerText);
+                pdfCanvas.EndText();
+            }
+        }
+
+        private void AppendFootnotesSummaryPageIfNeeded(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            IList<RedactionBlock> blocksWithFootnotes)
+        {
+            if (pdfDoc == null || blocksWithFootnotes == null || blocksWithFootnotes.Count == 0)
+            {
+                return;
+            }
+
+            List<int> usedNumbers = blocksWithFootnotes
+                .Where(block => block != null && block.FootnoteNumber.HasValue && block.FootnoteNumber.Value > 0)
+                .Select(block => block.FootnoteNumber.Value)
+                .Distinct()
+                .OrderBy(number => number)
+                .ToList();
+
+            if (usedNumbers.Count == 0)
+            {
+                return;
+            }
+
+            PdfFont titleFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD, "Cp1250");
+            PdfFont bodyFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA, "Cp1250");
+            PdfFont italicFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA_OBLIQUE, "Cp1250");
+
+            iText.Kernel.Pdf.PdfPage page = pdfDoc.AddNewPage(iText.Kernel.Geom.PageSize.A4);
+            var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+            float left = 50f;
+            float top = page.GetPageSize().GetTop() - 56f;
+            float maxTextWidth = page.GetPageSize().GetWidth() - (left * 2f);
+            const float titleFontSize = 15f;
+            const float bodyFontSize = 11f;
+            const float lineHeight = 16f;
+            float currentY = top;
+
+            pdfCanvas.BeginText();
+            pdfCanvas.SetFontAndSize(titleFont, titleFontSize);
+            pdfCanvas.MoveText(left, currentY);
+            pdfCanvas.ShowText(FootnoteSummaryTitle);
+            pdfCanvas.EndText();
+
+            currentY -= lineHeight * 1.5f;
+
+            pdfCanvas.BeginText();
+            pdfCanvas.SetFontAndSize(italicFont, bodyFontSize);
+            pdfCanvas.MoveText(left, currentY);
+            pdfCanvas.ShowText(FootnoteSummaryAuthorityLine);
+            pdfCanvas.EndText();
+
+            currentY -= lineHeight * 2f;
+
+            foreach (int footnoteNumber in usedNumbers)
+            {
+                string line = $"[{footnoteNumber}] {GetFootnoteDetailText(footnoteNumber)}";
+                var wrappedLines = WrapTextToWidth(bodyFont, line, bodyFontSize, maxTextWidth);
+                if (wrappedLines.Count == 0)
+                {
+                    wrappedLines.Add(line);
+                }
+
+                foreach (string wrappedLine in wrappedLines)
+                {
+                    if (currentY < 50f)
+                    {
+                        page = pdfDoc.AddNewPage(iText.Kernel.Geom.PageSize.A4);
+                        pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+                        currentY = page.GetPageSize().GetTop() - 56f;
+                    }
+
+                    pdfCanvas.BeginText();
+                    pdfCanvas.SetFontAndSize(bodyFont, bodyFontSize);
+                    pdfCanvas.MoveText(left, currentY);
+                    pdfCanvas.ShowText(wrappedLine);
+                    pdfCanvas.EndText();
+                    currentY -= lineHeight;
+                }
+
+                currentY -= 6f;
+            }
         }
 
         private void RemoveRedactionBlock(RedactionBlock blockToRemove)
