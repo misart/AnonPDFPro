@@ -106,6 +106,7 @@ namespace AnonPDF
         private bool suppressSignatureModeChange;
         private List<TextAnnotation> textAnnotations = new List<TextAnnotation>();
         private List<RasterObject> rasterObjects = new List<RasterObject>();
+        private List<ArrowObject> arrowObjects = new List<ArrowObject>();
         private int oldScrollValue = 0;
         private int wheelResistanceCurentValue = 0;
         private readonly int wheelResistanceMaxValue = 5;
@@ -149,6 +150,10 @@ namespace AnonPDF
         private ToolStripMenuItem addPolylineToolStripMenuItem;
         private ToolStripMenuItem addCommentToolStripMenuItem;
         private ToolStripMenuItem addBlankPageToolStripMenuItem;
+        private ToolStripMenuItem snapToGridToolStripMenuItem;
+        private bool snapToGridEnabled = true;
+        private const float SnapGridStep = 5f;
+        private static readonly System.Drawing.Color GroupSelectionColor = System.Drawing.Color.DeepSkyBlue;
         private bool pagesListTooltipShownThisSession;
         private int busyCursorDepth;
         private bool isMiddleMousePanning;
@@ -157,18 +162,48 @@ namespace AnonPDF
         private int middlePanStartScrollY;
         private Cursor middlePanPreviousCursor;
         private RasterObject selectedRasterObject;
+        private ArrowObject selectedArrowObject;
         private RasterObject rasterObjectToMove;
         private RasterObject rasterObjectToRotate;
         private RasterObject rasterObjectToResize;
+        private ArrowObject arrowObjectToMove;
+        private ArrowObject arrowObjectToAdjust;
+        private PointF textMoveMouseOffset;
+        private PointF rasterMoveMouseOffset;
+        private PointF arrowMoveStartMouseDoc;
+        private PointF arrowMoveInitialStart;
+        private PointF arrowMoveInitialEnd;
+        private readonly HashSet<TextAnnotation> selectedTextAnnotations = new HashSet<TextAnnotation>();
+        private readonly HashSet<string> selectedRasterObjectIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> selectedArrowObjectIds = new HashSet<string>(StringComparer.Ordinal);
+        private bool isMovingObjectGroup;
+        private bool groupMoveChanged;
+        private PointF groupMoveStartMouseDoc;
+        private RectangleF groupMoveInitialBounds = RectangleF.Empty;
+        private float groupMoveMinDx;
+        private float groupMoveMaxDx;
+        private float groupMoveMinDy;
+        private float groupMoveMaxDy;
+        private readonly List<GroupMoveEntry> groupMoveEntries = new List<GroupMoveEntry>();
         private bool isMovingRasterObject;
         private bool isRotatingRasterObject;
         private bool isResizingRasterObject;
+        private bool isMovingArrowObject;
+        private bool isAdjustingArrowHandle;
         private bool rasterMouseActionInProgress;
+        private bool arrowMouseActionInProgress;
+        private bool arrowInteractionChanged;
         private float rasterRotationStartAngle;
         private int rasterRotationStartValue;
         private const int RasterRotateHandleSize = 14;
         private const int RasterRotateHandleOffset = 35;
         private const int RasterResizeHandleSize = 11;
+        private const int ArrowHandleRadius = 6;
+        private const float ArrowLineSelectionTolerance = 8f;
+        private const float DefaultArrowThickness = 3f;
+        private const float DefaultArrowHeadLength = 18f;
+        private const float DefaultArrowHeadWidth = 12f;
+        private readonly System.Drawing.Color DefaultArrowColor = System.Drawing.Color.Red;
 
         private enum RasterResizeHandleType
         {
@@ -183,7 +218,33 @@ namespace AnonPDF
             Left
         }
 
+        private enum ArrowHandleType
+        {
+            None,
+            Start,
+            End
+        }
+
+        private enum GroupMoveObjectType
+        {
+            Text,
+            Raster,
+            Arrow
+        }
+
+        private sealed class GroupMoveEntry
+        {
+            public GroupMoveObjectType Type { get; set; }
+            public TextAnnotation Text { get; set; }
+            public RasterObject Raster { get; set; }
+            public ArrowObject Arrow { get; set; }
+            public RectangleF Bounds { get; set; }
+            public PointF Start { get; set; }
+            public PointF End { get; set; }
+        }
+
         private RasterResizeHandleType rasterResizeHandle = RasterResizeHandleType.None;
+        private ArrowHandleType arrowHandleType = ArrowHandleType.None;
 
         // Target scale (result of the last mouse wheel step)
         private float pendingScaleFactor;
@@ -210,6 +271,10 @@ namespace AnonPDF
         private enum RasterIconType { None, Edit, Lock, Duplicate, ResetSize, Delete }
         private RasterIconType clickedRasterIconType = RasterIconType.None;
         private RasterObject rasterObjectForIcon = null;
+        private bool isClickOnArrowIcon = false;
+        private enum ArrowIconType { None, Edit, Lock, Duplicate, Delete }
+        private ArrowIconType clickedArrowIconType = ArrowIconType.None;
+        private ArrowObject arrowObjectForIcon = null;
 
         private MergeFilesForm mergeForm;
 
@@ -821,6 +886,7 @@ namespace AnonPDF
                 Name = "addArrowToolStripMenuItem",
                 Enabled = false
             };
+            addArrowToolStripMenuItem.Click += AddArrowToolStripMenuItem_Click;
             addPolygonToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addPolygonToolStripMenuItem",
@@ -841,6 +907,13 @@ namespace AnonPDF
                 Name = "addBlankPageToolStripMenuItem",
                 Enabled = false
             };
+            snapToGridToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "snapToGridToolStripMenuItem",
+                CheckOnClick = true,
+                Checked = snapToGridEnabled
+            };
+            snapToGridToolStripMenuItem.CheckedChanged += SnapToGridToolStripMenuItem_CheckedChanged;
 
             if (menuStrip1 == null)
             {
@@ -877,6 +950,8 @@ namespace AnonPDF
             menuAddItem.DropDownItems.Add(addPolylineToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addCommentToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addBlankPageToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(new ToolStripSeparator());
+            menuAddItem.DropDownItems.Add(snapToGridToolStripMenuItem);
         }
 
         private void ApplyAddMenuLocalization()
@@ -897,6 +972,11 @@ namespace AnonPDF
             if (pasteObjectFromClipboardToolStripMenuItem != null)
             {
                 pasteObjectFromClipboardToolStripMenuItem.Text = LocalizedText("Menu_PasteObjectFromClipboard");
+            }
+
+            if (snapToGridToolStripMenuItem != null)
+            {
+                snapToGridToolStripMenuItem.Text = LocalizedText("Menu_AddSnapToGrid");
             }
 
             if (addArrowToolStripMenuItem != null)
@@ -923,6 +1003,460 @@ namespace AnonPDF
             {
                 addBlankPageToolStripMenuItem.Text = LocalizedText("Menu_AddBlankPage");
             }
+        }
+
+        private void SnapToGridToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            if (snapToGridToolStripMenuItem == null)
+            {
+                return;
+            }
+
+            snapToGridEnabled = snapToGridToolStripMenuItem.Checked;
+        }
+
+        private static float SnapValueToGrid(float value, float step)
+        {
+            if (step <= 0f)
+            {
+                return value;
+            }
+
+            return (float)(Math.Round(value / step, MidpointRounding.AwayFromZero) * step);
+        }
+
+        private PointF SnapPointToGrid(PointF point)
+        {
+            if (!snapToGridEnabled)
+            {
+                return point;
+            }
+
+            return new PointF(
+                SnapValueToGrid(point.X, SnapGridStep),
+                SnapValueToGrid(point.Y, SnapGridStep));
+        }
+
+        private bool IsTextAnnotationSelected(TextAnnotation annotation)
+        {
+            return annotation != null &&
+                   (ReferenceEquals(selectedTextAnnotation, annotation) || selectedTextAnnotations.Contains(annotation));
+        }
+
+        private bool IsRasterObjectSelected(RasterObject rasterObject)
+        {
+            return rasterObject != null &&
+                   ((selectedRasterObject != null && selectedRasterObject.Id == rasterObject.Id) ||
+                    (!string.IsNullOrWhiteSpace(rasterObject.Id) && selectedRasterObjectIds.Contains(rasterObject.Id)));
+        }
+
+        private bool IsArrowObjectSelected(ArrowObject arrowObject)
+        {
+            return arrowObject != null &&
+                   ((selectedArrowObject != null && selectedArrowObject.Id == arrowObject.Id) ||
+                    (!string.IsNullOrWhiteSpace(arrowObject.Id) && selectedArrowObjectIds.Contains(arrowObject.Id)));
+        }
+
+        private int GetGroupSelectionCount()
+        {
+            return selectedTextAnnotations.Count + selectedRasterObjectIds.Count + selectedArrowObjectIds.Count;
+        }
+
+        private static void EnsureRasterObjectId(RasterObject rasterObject)
+        {
+            if (rasterObject == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(rasterObject.Id))
+            {
+                rasterObject.Id = Guid.NewGuid().ToString("N");
+            }
+        }
+
+        private static void EnsureArrowObjectId(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(arrowObject.Id))
+            {
+                arrowObject.Id = Guid.NewGuid().ToString("N");
+            }
+        }
+
+        private int GetTotalSelectedObjectsCount()
+        {
+            var selectedObjects = new HashSet<object>();
+
+            foreach (TextAnnotation text in selectedTextAnnotations.Where(t => t != null && t.PageNumber == currentPage))
+            {
+                selectedObjects.Add(text);
+            }
+
+            if (selectedTextAnnotation != null && selectedTextAnnotation.PageNumber == currentPage)
+            {
+                selectedObjects.Add(selectedTextAnnotation);
+            }
+
+            foreach (string rasterId in selectedRasterObjectIds)
+            {
+                RasterObject raster = rasterObjects.FirstOrDefault(r => r != null && r.PageNumber == currentPage && r.Id == rasterId);
+                if (raster != null)
+                {
+                    selectedObjects.Add(raster);
+                }
+            }
+
+            if (selectedRasterObject != null && selectedRasterObject.PageNumber == currentPage)
+            {
+                selectedObjects.Add(selectedRasterObject);
+            }
+
+            foreach (string arrowId in selectedArrowObjectIds)
+            {
+                ArrowObject arrow = arrowObjects.FirstOrDefault(a => a != null && a.PageNumber == currentPage && a.Id == arrowId);
+                if (arrow != null)
+                {
+                    selectedObjects.Add(arrow);
+                }
+            }
+
+            if (selectedArrowObject != null && selectedArrowObject.PageNumber == currentPage)
+            {
+                selectedObjects.Add(selectedArrowObject);
+            }
+
+            return selectedObjects.Count;
+        }
+
+        private void ClearGroupSelection()
+        {
+            selectedTextAnnotations.Clear();
+            selectedRasterObjectIds.Clear();
+            selectedArrowObjectIds.Clear();
+        }
+
+        private void ResetGroupMoveState()
+        {
+            isMovingObjectGroup = false;
+            groupMoveChanged = false;
+            groupMoveEntries.Clear();
+            groupMoveStartMouseDoc = PointF.Empty;
+            groupMoveInitialBounds = RectangleF.Empty;
+            groupMoveMinDx = 0f;
+            groupMoveMaxDx = 0f;
+            groupMoveMinDy = 0f;
+            groupMoveMaxDy = 0f;
+        }
+
+        private void PromoteSingleSelectionsToGroup()
+        {
+            if (selectedTextAnnotation != null && selectedTextAnnotation.PageNumber == currentPage)
+            {
+                selectedTextAnnotations.Add(selectedTextAnnotation);
+            }
+
+            if (selectedRasterObject != null && selectedRasterObject.PageNumber == currentPage && !string.IsNullOrWhiteSpace(selectedRasterObject.Id))
+            {
+                selectedRasterObjectIds.Add(selectedRasterObject.Id);
+            }
+
+            if (selectedArrowObject != null && selectedArrowObject.PageNumber == currentPage && !string.IsNullOrWhiteSpace(selectedArrowObject.Id))
+            {
+                selectedArrowObjectIds.Add(selectedArrowObject.Id);
+            }
+
+            selectedTextAnnotation = null;
+            selectedRasterObject = null;
+            selectedArrowObject = null;
+        }
+
+        private void CollapseGroupSelectionToSingleIfNeeded()
+        {
+            if (GetGroupSelectionCount() != 1)
+            {
+                return;
+            }
+
+            TextAnnotation onlyText = selectedTextAnnotations.FirstOrDefault();
+            if (onlyText != null)
+            {
+                selectedTextAnnotation = onlyText;
+                selectedRasterObject = null;
+                selectedArrowObject = null;
+                ClearGroupSelection();
+                return;
+            }
+
+            string rasterId = selectedRasterObjectIds.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(rasterId))
+            {
+                selectedRasterObject = rasterObjects.FirstOrDefault(r => r != null && r.Id == rasterId);
+                selectedTextAnnotation = null;
+                selectedArrowObject = null;
+                ClearGroupSelection();
+                return;
+            }
+
+            string arrowId = selectedArrowObjectIds.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(arrowId))
+            {
+                selectedArrowObject = arrowObjects.FirstOrDefault(a => a != null && a.Id == arrowId);
+                selectedTextAnnotation = null;
+                selectedRasterObject = null;
+                ClearGroupSelection();
+            }
+        }
+
+        private bool TryGetHitArrowAtPoint(Point location, out ArrowObject hitArrow)
+        {
+            hitArrow = arrowObjects
+                .Where(obj => obj != null && obj.PageNumber == currentPage)
+                .Reverse()
+                .FirstOrDefault(obj => IsPointNearArrowLine(obj, location) || TryGetArrowHandleAtPoint(obj, location, out _));
+            return hitArrow != null;
+        }
+
+        private bool TryGetHitRasterAtPoint(Point location, out RasterObject hitRaster)
+        {
+            hitRaster = rasterObjects
+                .Where(obj => obj != null && obj.PageNumber == currentPage)
+                .Reverse()
+                .FirstOrDefault(obj => IsPointInsideRasterObject(obj, location));
+            return hitRaster != null;
+        }
+
+        private bool TryGetHitTextAtPoint(Point location, float dpiX, float dpiY, out TextAnnotation hitText)
+        {
+            hitText = textAnnotations
+                .Where(a => a != null && a.PageNumber == currentPage)
+                .Reverse()
+                .FirstOrDefault(a => GetAnnotationScreenRect(a, dpiX, dpiY).Contains(location));
+            return hitText != null;
+        }
+
+        private bool TryToggleGroupSelectionAtPoint(Point location, float dpiX, float dpiY)
+        {
+            if (TryGetHitArrowAtPoint(location, out ArrowObject hitArrow))
+            {
+                EnsureArrowObjectId(hitArrow);
+                PromoteSingleSelectionsToGroup();
+                if (!string.IsNullOrWhiteSpace(hitArrow.Id) && !selectedArrowObjectIds.Add(hitArrow.Id))
+                {
+                    selectedArrowObjectIds.Remove(hitArrow.Id);
+                }
+                CollapseGroupSelectionToSingleIfNeeded();
+                return true;
+            }
+
+            if (TryGetHitRasterAtPoint(location, out RasterObject hitRaster))
+            {
+                EnsureRasterObjectId(hitRaster);
+                PromoteSingleSelectionsToGroup();
+                if (!string.IsNullOrWhiteSpace(hitRaster.Id) && !selectedRasterObjectIds.Add(hitRaster.Id))
+                {
+                    selectedRasterObjectIds.Remove(hitRaster.Id);
+                }
+                CollapseGroupSelectionToSingleIfNeeded();
+                return true;
+            }
+
+            if (TryGetHitTextAtPoint(location, dpiX, dpiY, out TextAnnotation hitText))
+            {
+                PromoteSingleSelectionsToGroup();
+                if (!selectedTextAnnotations.Add(hitText))
+                {
+                    selectedTextAnnotations.Remove(hitText);
+                }
+                CollapseGroupSelectionToSingleIfNeeded();
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryBeginGroupMove(Point location, float dpiX, float dpiY)
+        {
+            if (GetGroupSelectionCount() < 2)
+            {
+                return false;
+            }
+
+            bool hitSelected = false;
+            if (TryGetHitArrowAtPoint(location, out ArrowObject hitArrow) &&
+                hitArrow != null &&
+                !string.IsNullOrWhiteSpace(hitArrow.Id) &&
+                selectedArrowObjectIds.Contains(hitArrow.Id))
+            {
+                hitSelected = true;
+            }
+            else if (TryGetHitRasterAtPoint(location, out RasterObject hitRaster) &&
+                hitRaster != null &&
+                !string.IsNullOrWhiteSpace(hitRaster.Id) &&
+                selectedRasterObjectIds.Contains(hitRaster.Id))
+            {
+                hitSelected = true;
+            }
+            else if (TryGetHitTextAtPoint(location, dpiX, dpiY, out TextAnnotation hitText) &&
+                hitText != null &&
+                selectedTextAnnotations.Contains(hitText))
+            {
+                hitSelected = true;
+            }
+
+            if (!hitSelected)
+            {
+                return false;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            bool hasLockedSelection =
+                selectedTextAnnotations.Any(t => t != null && t.PageNumber == currentPage && t.AnnotationIsLocked) ||
+                selectedRasterObjectIds.Any(id => rasterObjects.Any(r => r != null && r.PageNumber == currentPage && r.Id == id && r.IsLocked)) ||
+                selectedArrowObjectIds.Any(id => arrowObjects.Any(a => a != null && a.PageNumber == currentPage && a.Id == id && a.IsLocked));
+
+            if (hasLockedSelection)
+            {
+                MessageBox.Show(
+                    this,
+                    string.Format(LocalizedText("Msg_TextPositionInfo"), LocalizedText("Msg_TextAnnotation_Locked")),
+                    Resources.Title_Info,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return true;
+            }
+
+            groupMoveEntries.Clear();
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+
+            foreach (var text in selectedTextAnnotations.Where(t => t != null && t.PageNumber == currentPage && !t.AnnotationIsLocked))
+            {
+                RectangleF bounds = text.AnnotationBounds;
+                groupMoveEntries.Add(new GroupMoveEntry
+                {
+                    Type = GroupMoveObjectType.Text,
+                    Text = text,
+                    Bounds = bounds
+                });
+
+                minX = Math.Min(minX, bounds.Left);
+                minY = Math.Min(minY, bounds.Top);
+                maxX = Math.Max(maxX, bounds.Right);
+                maxY = Math.Max(maxY, bounds.Bottom);
+            }
+
+            foreach (var rasterId in selectedRasterObjectIds)
+            {
+                RasterObject raster = rasterObjects.FirstOrDefault(r => r != null && r.PageNumber == currentPage && r.Id == rasterId && !r.IsLocked);
+                if (raster == null)
+                {
+                    continue;
+                }
+
+                RectangleF bounds = raster.Bounds;
+                groupMoveEntries.Add(new GroupMoveEntry
+                {
+                    Type = GroupMoveObjectType.Raster,
+                    Raster = raster,
+                    Bounds = bounds
+                });
+
+                minX = Math.Min(minX, bounds.Left);
+                minY = Math.Min(minY, bounds.Top);
+                maxX = Math.Max(maxX, bounds.Right);
+                maxY = Math.Max(maxY, bounds.Bottom);
+            }
+
+            foreach (var arrowId in selectedArrowObjectIds)
+            {
+                ArrowObject arrow = arrowObjects.FirstOrDefault(a => a != null && a.PageNumber == currentPage && a.Id == arrowId && !a.IsLocked);
+                if (arrow == null)
+                {
+                    continue;
+                }
+
+                groupMoveEntries.Add(new GroupMoveEntry
+                {
+                    Type = GroupMoveObjectType.Arrow,
+                    Arrow = arrow,
+                    Start = arrow.Start,
+                    End = arrow.End
+                });
+
+                float arrowMinX = Math.Min(arrow.Start.X, arrow.End.X);
+                float arrowMaxX = Math.Max(arrow.Start.X, arrow.End.X);
+                float arrowMinY = Math.Min(arrow.Start.Y, arrow.End.Y);
+                float arrowMaxY = Math.Max(arrow.Start.Y, arrow.End.Y);
+                minX = Math.Min(minX, arrowMinX);
+                minY = Math.Min(minY, arrowMinY);
+                maxX = Math.Max(maxX, arrowMaxX);
+                maxY = Math.Max(maxY, arrowMaxY);
+            }
+
+            if (groupMoveEntries.Count == 0 || minX == float.MaxValue || minY == float.MaxValue)
+            {
+                return true;
+            }
+
+            groupMoveInitialBounds = RectangleF.FromLTRB(minX, minY, maxX, maxY);
+            groupMoveMinDx = float.NegativeInfinity;
+            groupMoveMaxDx = float.PositiveInfinity;
+            groupMoveMinDy = float.NegativeInfinity;
+            groupMoveMaxDy = float.PositiveInfinity;
+
+            float clientWidth = pdfViewer.ClientSize.Width;
+            float clientHeight = pdfViewer.ClientSize.Height;
+            var pageSize = GetPageSizeWithOffset(currentPage);
+
+            foreach (GroupMoveEntry entry in groupMoveEntries)
+            {
+                switch (entry.Type)
+                {
+                    case GroupMoveObjectType.Text:
+                        float textMinX = -(entry.Bounds.Width * 72f / dpiX / 2f);
+                        float textMaxX = (clientWidth / scaleFactor) - (entry.Bounds.Width * 72f / dpiX / 2f);
+                        float textMinY = -(entry.Bounds.Height * 72f / dpiX / 2f);
+                        float textMaxY = (clientHeight / scaleFactor) - (entry.Bounds.Height * 72f / dpiX / 2f);
+                        groupMoveMinDx = Math.Max(groupMoveMinDx, textMinX - entry.Bounds.X);
+                        groupMoveMaxDx = Math.Min(groupMoveMaxDx, textMaxX - entry.Bounds.X);
+                        groupMoveMinDy = Math.Max(groupMoveMinDy, textMinY - entry.Bounds.Y);
+                        groupMoveMaxDy = Math.Min(groupMoveMaxDy, textMaxY - entry.Bounds.Y);
+                        break;
+                    case GroupMoveObjectType.Raster:
+                        groupMoveMinDx = Math.Max(groupMoveMinDx, -entry.Bounds.Left);
+                        groupMoveMaxDx = Math.Min(groupMoveMaxDx, pageSize.Width - entry.Bounds.Right);
+                        groupMoveMinDy = Math.Max(groupMoveMinDy, -entry.Bounds.Top);
+                        groupMoveMaxDy = Math.Min(groupMoveMaxDy, pageSize.Height - entry.Bounds.Bottom);
+                        break;
+                    case GroupMoveObjectType.Arrow:
+                        float arrowMinX = Math.Min(entry.Start.X, entry.End.X);
+                        float arrowMaxX = Math.Max(entry.Start.X, entry.End.X);
+                        float arrowMinY = Math.Min(entry.Start.Y, entry.End.Y);
+                        float arrowMaxY = Math.Max(entry.Start.Y, entry.End.Y);
+                        groupMoveMinDx = Math.Max(groupMoveMinDx, -arrowMinX);
+                        groupMoveMaxDx = Math.Min(groupMoveMaxDx, pageSize.Width - arrowMaxX);
+                        groupMoveMinDy = Math.Max(groupMoveMinDy, -arrowMinY);
+                        groupMoveMaxDy = Math.Min(groupMoveMaxDy, pageSize.Height - arrowMaxY);
+                        break;
+                }
+            }
+
+            groupMoveStartMouseDoc = new PointF(location.X / scaleFactor, location.Y / scaleFactor);
+            isMovingObjectGroup = true;
+            groupMoveChanged = false;
+            this.Cursor = Cursors.SizeAll;
+            return true;
         }
 
         public void OpenPdfFromSplash()
@@ -1728,7 +2262,10 @@ namespace AnonPDF
                 return;
             }
 
-            SizeF textSize = GetAnnotationSize(source.AnnotationText, source.AnnotationFont, source.AnnotationRotation);
+            RectangleF copyBounds = source.AnnotationBounds;
+            copyBounds.Offset(12f, 12f);
+            copyBounds = ConstrainAnnotationBoundsToViewer(copyBounds);
+
             TextAnnotation copy = new TextAnnotation
             {
                 PageNumber = currentPage,
@@ -1738,12 +2275,14 @@ namespace AnonPDF
                 AnnotationAlignment = source.AnnotationAlignment,
                 AnnotationRotation = source.AnnotationRotation,
                 AnnotationIsLocked = source.AnnotationIsLocked,
-                AnnotationBounds = GetCenteredAnnotationBounds(textSize.Width, textSize.Height)
+                AnnotationBounds = copyBounds
             };
 
             textAnnotations.Add(copy);
+            ClearGroupSelection();
             selectedTextAnnotation = copy;
             selectedRasterObject = null;
+            selectedArrowObject = null;
 
             PageItemStatus status = allPageStatuses[currentPage - 1];
             status.HasObjects = true;
@@ -1763,6 +2302,38 @@ namespace AnonPDF
             projectWasChangedAfterLastSave = true;
             saveProjectButton.Enabled = true;
             saveProjectMenuItem.Enabled = true;
+        }
+
+        private RectangleF ConstrainAnnotationBoundsToViewer(RectangleF bounds)
+        {
+            if (pdfViewer == null || scaleFactor <= 0f)
+            {
+                return bounds;
+            }
+
+            float dpiX;
+            using (Graphics g = pdfViewer.CreateGraphics())
+            {
+                dpiX = g.DpiX;
+            }
+
+            float clientWidth = pdfViewer.ClientSize.Width;
+            float clientHeight = pdfViewer.ClientSize.Height;
+
+            float minX = -(bounds.Width * 72f / dpiX / 2f);
+            float maxX = (clientWidth / scaleFactor) - (bounds.Width * 72f / dpiX / 2f);
+            float minY = -(bounds.Height * 72f / dpiX / 2f);
+            float maxY = (clientHeight / scaleFactor) - (bounds.Height * 72f / dpiX / 2f);
+
+            float x = bounds.X;
+            float y = bounds.Y;
+
+            if (x < minX) x = minX;
+            if (x > maxX) x = maxX;
+            if (y < minY) y = minY;
+            if (y > maxY) y = maxY;
+
+            return new RectangleF(x, y, bounds.Width, bounds.Height);
         }
 
         private void UpdateCurrentPageObjectsMarker()
@@ -1817,6 +2388,7 @@ namespace AnonPDF
             {
                 selectedTextAnnotation = null;
             }
+            selectedTextAnnotations.Remove(annotation);
 
             projectWasChangedAfterLastSave = true;
             saveProjectButton.Enabled = true;
@@ -1832,6 +2404,8 @@ namespace AnonPDF
             {
                 return false;
             }
+
+            EnsureRasterObjectId(rasterObject);
 
             if (!EnsureCurrentPageEditable(true))
             {
@@ -1856,6 +2430,55 @@ namespace AnonPDF
             {
                 selectedRasterObject = null;
             }
+            if (!string.IsNullOrWhiteSpace(rasterObject.Id))
+            {
+                selectedRasterObjectIds.Remove(rasterObject.Id);
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateCurrentPageObjectsMarker();
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private bool DeleteArrowObjectWithConfirmation(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            EnsureArrowObjectId(arrowObject);
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            DialogResult deleteResult = MessageBox.Show(
+                this,
+                LocalizedText("Msg_Confirm_DeleteRasterObject"),
+                Resources.Title_Confirmation,
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Exclamation,
+                MessageBoxDefaultButton.Button2);
+
+            if (deleteResult != DialogResult.Yes)
+            {
+                return true;
+            }
+
+            arrowObjects.RemoveAll(obj => obj != null && obj.Id == arrowObject.Id);
+            if (selectedArrowObject != null && selectedArrowObject.Id == arrowObject.Id)
+            {
+                selectedArrowObject = null;
+            }
+            if (!string.IsNullOrWhiteSpace(arrowObject.Id))
+            {
+                selectedArrowObjectIds.Remove(arrowObject.Id);
+            }
 
             projectWasChangedAfterLastSave = true;
             saveProjectButton.Enabled = true;
@@ -1867,6 +2490,17 @@ namespace AnonPDF
 
         private bool TryDeleteActiveObjectByKeyboard()
         {
+            int selectedCount = GetTotalSelectedObjectsCount();
+            if (selectedCount > 1)
+            {
+                return DeleteSelectedGroupObjectsWithConfirmation();
+            }
+
+            if (selectedArrowObject != null && selectedArrowObject.PageNumber == currentPage)
+            {
+                return DeleteArrowObjectWithConfirmation(selectedArrowObject);
+            }
+
             if (selectedRasterObject != null && selectedRasterObject.PageNumber == currentPage)
             {
                 return DeleteRasterObjectWithConfirmation(selectedRasterObject);
@@ -1877,7 +2511,110 @@ namespace AnonPDF
                 return DeleteTextObjectWithConfirmation(selectedTextAnnotation);
             }
 
+            if (GetGroupSelectionCount() > 0)
+            {
+                return DeleteSelectedGroupObjectsWithConfirmation();
+            }
+
             return false;
+        }
+
+        private bool DeleteSelectedGroupObjectsWithConfirmation()
+        {
+            var textToDelete = new HashSet<TextAnnotation>(
+                selectedTextAnnotations.Where(a => a != null && a.PageNumber == currentPage));
+            if (selectedTextAnnotation != null && selectedTextAnnotation.PageNumber == currentPage)
+            {
+                textToDelete.Add(selectedTextAnnotation);
+            }
+
+            var rasterIdsToDelete = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string id in selectedRasterObjectIds)
+            {
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    rasterIdsToDelete.Add(id);
+                }
+            }
+            if (selectedRasterObject != null && selectedRasterObject.PageNumber == currentPage)
+            {
+                EnsureRasterObjectId(selectedRasterObject);
+                rasterIdsToDelete.Add(selectedRasterObject.Id);
+            }
+
+            var arrowIdsToDelete = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string id in selectedArrowObjectIds)
+            {
+                if (!string.IsNullOrWhiteSpace(id))
+                {
+                    arrowIdsToDelete.Add(id);
+                }
+            }
+            if (selectedArrowObject != null && selectedArrowObject.PageNumber == currentPage)
+            {
+                EnsureArrowObjectId(selectedArrowObject);
+                arrowIdsToDelete.Add(selectedArrowObject.Id);
+            }
+
+            int totalToDelete = textToDelete.Count + rasterIdsToDelete.Count + arrowIdsToDelete.Count;
+            if (totalToDelete <= 0)
+            {
+                return false;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            string confirmMessage;
+            if (totalToDelete > 1)
+            {
+                confirmMessage = LocalizedText("Msg_Confirm_DeleteMultipleObjects");
+            }
+            else if (textToDelete.Count == 1)
+            {
+                confirmMessage = LocalizedText("Msg_Confirm_DeleteTextAnnotation");
+            }
+            else
+            {
+                confirmMessage = LocalizedText("Msg_Confirm_DeleteRasterObject");
+            }
+
+            DialogResult deleteResult = MessageBox.Show(
+                this,
+                confirmMessage,
+                Resources.Title_Confirmation,
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Exclamation,
+                MessageBoxDefaultButton.Button2);
+
+            if (deleteResult != DialogResult.Yes)
+            {
+                return true;
+            }
+
+            int removed = 0;
+            removed += textAnnotations.RemoveAll(a => a != null && textToDelete.Contains(a));
+            removed += rasterObjects.RemoveAll(r => r != null && r.PageNumber == currentPage && !string.IsNullOrWhiteSpace(r.Id) && rasterIdsToDelete.Contains(r.Id));
+            removed += arrowObjects.RemoveAll(a => a != null && a.PageNumber == currentPage && !string.IsNullOrWhiteSpace(a.Id) && arrowIdsToDelete.Contains(a.Id));
+
+            selectedTextAnnotation = null;
+            selectedRasterObject = null;
+            selectedArrowObject = null;
+            ClearGroupSelection();
+            ResetGroupMoveState();
+
+            if (removed > 0)
+            {
+                projectWasChangedAfterLastSave = true;
+                saveProjectButton.Enabled = true;
+                saveProjectMenuItem.Enabled = true;
+                UpdateCurrentPageObjectsMarker();
+                pdfViewer.Invalidate();
+            }
+
+            return true;
         }
 
         public bool PageHasVectorDrawing(iText.Kernel.Pdf.PdfPage page)
@@ -2503,6 +3240,7 @@ namespace AnonPDF
                     PagesToRemove = pagesToRemove ?? new HashSet<int>(),
                     TextAnnotations = textAnnotations ?? new List<TextAnnotation>(),
                     RasterObjects = rasterObjects ?? new List<RasterObject>(),
+                    ArrowObjects = arrowObjects ?? new List<ArrowObject>(),
                     PageRotationOffsets = pageRotationOffsets == null
                         ? new Dictionary<int, int>()
                         : new Dictionary<int, int>(pageRotationOffsets),
@@ -4414,6 +5152,44 @@ namespace AnonPDF
             return new PointF(pdfRect.X, pdfRect.Y);
         }
 
+        private RectangleF ConvertPdfToViewCoordinates(RectangleF pdfRect, int pageNumber, int rotation, bool includeBaseRotation = true)
+        {
+            if (pdf == null || pageNumber < 1 || pageNumber > pdf.Pages.Count)
+            {
+                return pdfRect;
+            }
+
+            var page = pdf.Pages[pageNumber - 1];
+            float pageW = (float)page.Width;
+            float pageH = (float)page.Height;
+            int baseRotation = includeBaseRotation ? GetBaseRotationDegrees(pageNumber) : 0;
+            if (baseRotation == 90 || baseRotation == 270)
+            {
+                float tmp = pageW;
+                pageW = pageH;
+                pageH = tmp;
+            }
+
+            float x = pdfRect.X;
+            float y = pdfRect.Y;
+            float w = pdfRect.Width;
+            float h = pdfRect.Height;
+
+            rotation = NormalizeRotation(rotation);
+            switch (rotation)
+            {
+                case 90:
+                    return new RectangleF(y, x, h, w);
+                case 180:
+                    return new RectangleF(pageW - x - w, y, w, h);
+                case 270:
+                    return new RectangleF(pageH - y - h, pageW - x - w, h, w);
+                case 0:
+                default:
+                    return new RectangleF(x, pageH - y - h, w, h);
+            }
+        }
+
         private void ApplyRotationOffsetsToDocument(iText.Kernel.Pdf.PdfDocument pdfDoc, ISet<int> pagesWithBakedRotation = null)
         {
             if (pdf == null)
@@ -5857,6 +6633,67 @@ namespace AnonPDF
                     }
                 }
 
+                // Render arrow objects
+                foreach (var arrowObject in arrowObjects)
+                {
+                    if (arrowObject == null)
+                    {
+                        continue;
+                    }
+
+                    int pageNumber = arrowObject.PageNumber;
+                    if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
+                    {
+                        continue;
+                    }
+
+                    bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
+                    int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
+                    var page = pdfDoc.GetPage(pageNumber);
+                    var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+                    PointF startView = arrowObject.Start;
+                    PointF endView = arrowObject.End;
+                    PointF startPdf = ConvertPointToPdfCoordinates(startView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+                    PointF endPdf = ConvertPointToPdfCoordinates(endView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+
+                    float thickness = NormalizeArrowThickness(arrowObject.Thickness);
+                    float headLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
+                    float headWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+                    System.Drawing.Color lineColor = GetArrowColor(arrowObject);
+                    var deviceColor = new DeviceRgb(lineColor.R, lineColor.G, lineColor.B);
+
+                    pdfCanvas.SaveState();
+                    pdfCanvas.SetLineWidth(thickness);
+                    pdfCanvas.SetLineCapStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineCapStyle.ROUND);
+                    pdfCanvas.SetLineJoinStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineJoinStyle.ROUND);
+                    pdfCanvas.SetStrokeColor(deviceColor);
+                    pdfCanvas.SetFillColor(deviceColor);
+
+                    if (TryBuildArrowHead(startView, endView, headLength, headWidth, out PointF leftView, out PointF rightView, out PointF lineEndView))
+                    {
+                        PointF lineEndPdf = ConvertPointToPdfCoordinates(lineEndView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+                        PointF leftPdf = ConvertPointToPdfCoordinates(leftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+                        PointF rightPdf = ConvertPointToPdfCoordinates(rightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+
+                        pdfCanvas.MoveTo(startPdf.X, startPdf.Y);
+                        pdfCanvas.LineTo(lineEndPdf.X, lineEndPdf.Y);
+                        pdfCanvas.Stroke();
+
+                        pdfCanvas.MoveTo(endPdf.X, endPdf.Y);
+                        pdfCanvas.LineTo(leftPdf.X, leftPdf.Y);
+                        pdfCanvas.LineTo(rightPdf.X, rightPdf.Y);
+                        pdfCanvas.Fill();
+                    }
+                    else
+                    {
+                        pdfCanvas.MoveTo(startPdf.X, startPdf.Y);
+                        pdfCanvas.LineTo(endPdf.X, endPdf.Y);
+                        pdfCanvas.Stroke();
+                    }
+
+                    pdfCanvas.RestoreState();
+                }
+
                 if (pagesToRemove.Count > 0)
                 {
                     var pagesToRemoveSorted = pagesToRemove.OrderByDescending(p => p);
@@ -6108,6 +6945,8 @@ namespace AnonPDF
         {
             textAnnotations.Clear();
             selectedTextAnnotation = null;
+            selectedTextAnnotations.Clear();
+            ResetGroupMoveState();
             pdfViewer.Invalidate();
         }
 
@@ -6115,8 +6954,21 @@ namespace AnonPDF
         {
             rasterObjects.Clear();
             selectedRasterObject = null;
+            selectedRasterObjectIds.Clear();
             ResetRasterInteractionState();
+            ResetGroupMoveState();
             ClearRasterIconClickState();
+            pdfViewer.Invalidate();
+        }
+
+        private void ClearArrowObjects()
+        {
+            arrowObjects.Clear();
+            selectedArrowObject = null;
+            selectedArrowObjectIds.Clear();
+            ResetArrowInteractionState();
+            ResetGroupMoveState();
+            ClearArrowIconClickState();
             pdfViewer.Invalidate();
         }
 
@@ -6262,6 +7114,7 @@ namespace AnonPDF
             ClearPagesToRemove();
             ClearTextAnnotations();
             ClearRasterObjects();
+            ClearArrowObjects();
             PdfTextSearcher.ClearCache();
             signaturesToRemove.Clear();
             hasCustomSignatureSelection = false;
@@ -6344,6 +7197,10 @@ namespace AnonPDF
             if (pasteObjectFromClipboardToolStripMenuItem != null)
             {
                 pasteObjectFromClipboardToolStripMenuItem.Enabled = true;
+            }
+            if (addArrowToolStripMenuItem != null)
+            {
+                addArrowToolStripMenuItem.Enabled = true;
             }
             deletePageMenuItem.Enabled = true;
             rotatePageMenuItem.Enabled = true;
@@ -6468,6 +7325,7 @@ namespace AnonPDF
             return redactionBlocks.Count > 0
                 || textAnnotations.Count > 0
                 || rasterObjects.Count > 0
+                || arrowObjects.Count > 0
                 || pagesToRemove.Count > 0
                 || pageRotationOffsets.Count > 0
                 || hasCustomSignatureSelection;
@@ -6476,7 +7334,8 @@ namespace AnonPDF
         private bool HasAnyObjectsOnPage(int pageNumber)
         {
             return textAnnotations.Any(a => a.PageNumber == pageNumber)
-                || rasterObjects.Any(r => r.PageNumber == pageNumber);
+                || rasterObjects.Any(r => r.PageNumber == pageNumber)
+                || arrowObjects.Any(a => a.PageNumber == pageNumber);
         }
 
         private void OpenPdfFromPath(string filePath)
@@ -6534,6 +7393,7 @@ namespace AnonPDF
             ClearPagesToRemove();
             ClearTextAnnotations();
             ClearRasterObjects();
+            ClearArrowObjects();
             PdfTextSearcher.ClearCache();
             signaturesToRemove.Clear();
             hasCustomSignatureSelection = false;
@@ -6583,6 +7443,10 @@ namespace AnonPDF
             if (pasteObjectFromClipboardToolStripMenuItem != null)
             {
                 pasteObjectFromClipboardToolStripMenuItem.Enabled = false;
+            }
+            if (addArrowToolStripMenuItem != null)
+            {
+                addArrowToolStripMenuItem.Enabled = false;
             }
             deletePageMenuItem.Enabled = false;
             rotatePageMenuItem.Enabled = false;
@@ -6658,6 +7522,10 @@ namespace AnonPDF
             {
                 pasteObjectFromClipboardToolStripMenuItem.Enabled = canEditCurrentPage;
             }
+            if (addArrowToolStripMenuItem != null)
+            {
+                addArrowToolStripMenuItem.Enabled = canEditCurrentPage;
+            }
             rotatePageMenuItem.Enabled = canEditCurrentPage;
             searchToSelectionButton.Enabled = canEditCurrentPage && groupBoxSearch.Enabled;
 
@@ -6669,7 +7537,10 @@ namespace AnonPDF
                 isDrawing = false;
                 isMoving = false;
                 annotationToMove = null;
+                textMoveMouseOffset = PointF.Empty;
                 currentSelection = RectangleF.Empty;
+                ResetArrowInteractionState();
+                ResetRasterInteractionState();
                 this.Cursor = Cursors.Default;
             }
 
@@ -6703,6 +7574,8 @@ namespace AnonPDF
             var pageSize = GetPageSizeWithOffset(currentPage);
             if (pageSize.Width <= 0 || pageSize.Height <= 0)
                 return;
+            int currentOffset = GetRotationOffset(currentPage);
+            int rotatedOffset = NormalizeRotation(currentOffset + 90);
 
             float dpiX;
             float dpiY;
@@ -6741,6 +7614,10 @@ namespace AnonPDF
                 annotation.AnnotationRotation = NormalizeRotation(annotation.AnnotationRotation + 90);
             }
 
+            // Update page rotation offset before object constraints.
+            // Objects are transformed using pre-rotation page size above, but clamped against post-rotation page size.
+            SetRotationOffset(currentPage, rotatedOffset);
+
             foreach (var rasterObject in rasterObjects.Where(r => r.PageNumber == currentPage))
             {
                 RectangleF bounds = rasterObject.Bounds;
@@ -6760,8 +7637,22 @@ namespace AnonPDF
                 rasterObject.UpdatedAtUtc = DateTime.UtcNow;
             }
 
-            int offset = GetRotationOffset(currentPage);
-            SetRotationOffset(currentPage, NormalizeRotation(offset + 90));
+            foreach (var arrowObject in arrowObjects.Where(a => a.PageNumber == currentPage))
+            {
+                PointF start = arrowObject.Start;
+                PointF end = arrowObject.End;
+                arrowObject.Start = new PointF(pageSize.Height - start.Y, start.X);
+                arrowObject.End = new PointF(pageSize.Height - end.Y, end.X);
+                ConstrainArrowToPage(arrowObject);
+                arrowObject.Thickness = NormalizeArrowThickness(arrowObject.Thickness);
+                arrowObject.HeadLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
+                arrowObject.HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+                if (!IsArrowColorValid(arrowObject))
+                {
+                    arrowObject.LineColorArgb = DefaultArrowColor.ToArgb();
+                }
+                arrowObject.UpdatedAtUtc = DateTime.UtcNow;
+            }
 
             currentSelection = RectangleF.Empty;
 
@@ -7110,6 +8001,7 @@ namespace AnonPDF
                 PagesToRemove = pagesToRemove ?? new HashSet<int>(),
                 TextAnnotations = textAnnotations ?? new List<TextAnnotation>(),
                 RasterObjects = rasterObjects ?? new List<RasterObject>(),
+                ArrowObjects = arrowObjects ?? new List<ArrowObject>(),
                 PageRotationOffsets = pageRotationOffsets == null
                     ? new Dictionary<int, int>()
                     : new Dictionary<int, int>(pageRotationOffsets),
@@ -7434,12 +8326,16 @@ namespace AnonPDF
                 isDrawing = false;
                 isMoving = false;
                 annotationToMove = null;
+                textMoveMouseOffset = PointF.Empty;
                 ResetRasterInteractionState();
+                ResetArrowInteractionState();
+                ResetGroupMoveState();
                 currentSelection = RectangleF.Empty;
                 isClickOnIcon = false;
                 clickedIconType = IconType.None;
                 annotationForIcon = null;
                 ClearRasterIconClickState();
+                ClearArrowIconClickState();
                 TryBeginMiddleMousePan();
                 return;
             }
@@ -7449,10 +8345,16 @@ namespace AnonPDF
             clickedIconType = IconType.None;
             annotationForIcon = null;
             ClearRasterIconClickState();
+            ClearArrowIconClickState();
             rasterMouseActionInProgress = false;
+            arrowMouseActionInProgress = false;
             if (IsCurrentPageMarkedForDeletion() && (e.Button == MouseButtons.Left || e.Button == MouseButtons.Right))
             {
+                textMoveMouseOffset = PointF.Empty;
                 ResetRasterInteractionState();
+                ResetArrowInteractionState();
+                ResetGroupMoveState();
+                ClearArrowIconClickState();
                 return;
             }
 
@@ -7466,8 +8368,81 @@ namespace AnonPDF
             {
                 startPoint = e.Location;
 
+                float dpiX;
+                float dpiY;
+                using (Graphics g = pdfViewer.CreateGraphics())
+                {
+                    dpiX = g.DpiX;
+                    dpiY = g.DpiY;
+                }
+
+                bool additiveSelection = (Control.ModifierKeys & Keys.Control) == Keys.Control;
+                if (additiveSelection)
+                {
+                    if (TryToggleGroupSelectionAtPoint(e.Location, dpiX, dpiY))
+                    {
+                        ResetRasterInteractionState();
+                        ResetArrowInteractionState();
+                        ResetGroupMoveState();
+                        isDrawing = false;
+                        isMoving = false;
+                        annotationToMove = null;
+                        textMoveMouseOffset = PointF.Empty;
+                        this.Cursor = Cursors.Default;
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+                }
+                else if (GetGroupSelectionCount() > 0)
+                {
+                    if (TryBeginGroupMove(e.Location, dpiX, dpiY))
+                    {
+                        ResetRasterInteractionState();
+                        ResetArrowInteractionState();
+                        isDrawing = false;
+                        isMoving = false;
+                        annotationToMove = null;
+                        textMoveMouseOffset = PointF.Empty;
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
+                    ClearGroupSelection();
+                    ResetGroupMoveState();
+                }
+
+                if (TryHandleArrowIconMouseDown(e.Location))
+                {
+                    selectedTextAnnotation = null;
+                    selectedRasterObject = null;
+                    ResetRasterInteractionState();
+                    isDrawing = false;
+                    isMoving = false;
+                    annotationToMove = null;
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (TryHandleArrowMouseDown(e.Location))
+                {
+                    selectedTextAnnotation = null;
+                    selectedRasterObject = null;
+                    ResetRasterInteractionState();
+                    ClearArrowIconClickState();
+                    arrowMouseActionInProgress = true;
+                    arrowInteractionChanged = false;
+                    isDrawing = false;
+                    isMoving = false;
+                    annotationToMove = null;
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
                 if (TryHandleRasterIconMouseDown(e.Location))
                 {
+                    selectedArrowObject = null;
+                    ResetArrowInteractionState();
+                    ClearArrowIconClickState();
                     selectedTextAnnotation = null;
                     isDrawing = false;
                     isMoving = false;
@@ -7478,6 +8453,9 @@ namespace AnonPDF
 
                 if (TryHandleRasterMouseDown(e.Location))
                 {
+                    selectedArrowObject = null;
+                    ResetArrowInteractionState();
+                    ClearArrowIconClickState();
                     selectedTextAnnotation = null;
                     rasterMouseActionInProgress = true;
                     isDrawing = false;
@@ -7487,15 +8465,11 @@ namespace AnonPDF
                     return;
                 }
 
-                float dpiX, dpiY;
-                using (Graphics g = pdfViewer.CreateGraphics())
-                {
-                    dpiX = g.DpiX;
-                    dpiY = g.DpiY;
-                }
-
                 if (TryHandleAnnotationIconMouseDown(e.Location, dpiX, dpiY))
                 {
+                    selectedArrowObject = null;
+                    ResetArrowInteractionState();
+                    ClearArrowIconClickState();
                     isDrawing = false;
                     isMoving = false;
                     annotationToMove = null;
@@ -7510,8 +8484,12 @@ namespace AnonPDF
 
                 if (hitAnnotation != null)
                 {
+                    selectedArrowObject = null;
+                    ResetArrowInteractionState();
+                    ClearArrowIconClickState();
                     selectedRasterObject = null;
                     ResetRasterInteractionState();
+                    ClearGroupSelection();
                     selectedTextAnnotation = hitAnnotation;
                     isDrawing = false;
 
@@ -7519,20 +8497,29 @@ namespace AnonPDF
                     {
                         annotationToMove = hitAnnotation;
                         isMoving = true;
+                        PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                        textMoveMouseOffset = new PointF(
+                            mouseDoc.X - hitAnnotation.AnnotationBounds.X,
+                            mouseDoc.Y - hitAnnotation.AnnotationBounds.Y);
                         this.Cursor = Cursors.SizeAll;
                     }
                     else
                     {
                         annotationToMove = null;
                         isMoving = false;
+                        textMoveMouseOffset = PointF.Empty;
                         this.Cursor = Cursors.Default;
                     }
                 }
                 else
                 {
+                    selectedArrowObject = null;
+                    ResetArrowInteractionState();
+                    ClearArrowIconClickState();
                     selectedTextAnnotation = null;
                     annotationToMove = null;
                     isMoving = false;
+                    textMoveMouseOffset = PointF.Empty;
                     isDrawing = true;
                     currentSelection = new System.Drawing.RectangleF(startPoint, Size.Empty);
                 }
@@ -7559,6 +8546,136 @@ namespace AnonPDF
                 isMoving = false;
                 annotationToMove = null;
                 ResetRasterInteractionState();
+                ResetArrowInteractionState();
+                ResetGroupMoveState();
+                return;
+            }
+
+            if (isMovingObjectGroup)
+            {
+                PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                float dx = mouseDoc.X - groupMoveStartMouseDoc.X;
+                float dy = mouseDoc.Y - groupMoveStartMouseDoc.Y;
+
+                if (snapToGridEnabled)
+                {
+                    float snappedLeft = SnapValueToGrid(groupMoveInitialBounds.X + dx, SnapGridStep);
+                    float snappedTop = SnapValueToGrid(groupMoveInitialBounds.Y + dy, SnapGridStep);
+                    dx = snappedLeft - groupMoveInitialBounds.X;
+                    dy = snappedTop - groupMoveInitialBounds.Y;
+                }
+
+                dx = Math.Max(groupMoveMinDx, Math.Min(groupMoveMaxDx, dx));
+                dy = Math.Max(groupMoveMinDy, Math.Min(groupMoveMaxDy, dy));
+                if (Math.Abs(dx) > 0.001f || Math.Abs(dy) > 0.001f)
+                {
+                    groupMoveChanged = true;
+                }
+
+                foreach (GroupMoveEntry entry in groupMoveEntries)
+                {
+                    switch (entry.Type)
+                    {
+                        case GroupMoveObjectType.Text:
+                            if (entry.Text != null)
+                            {
+                                entry.Text.AnnotationBounds = new RectangleF(
+                                    entry.Bounds.X + dx,
+                                    entry.Bounds.Y + dy,
+                                    entry.Bounds.Width,
+                                    entry.Bounds.Height);
+                            }
+                            break;
+                        case GroupMoveObjectType.Raster:
+                            if (entry.Raster != null)
+                            {
+                                entry.Raster.Bounds = new RectangleF(
+                                    entry.Bounds.X + dx,
+                                    entry.Bounds.Y + dy,
+                                    entry.Bounds.Width,
+                                    entry.Bounds.Height);
+                                entry.Raster.UpdatedAtUtc = DateTime.UtcNow;
+                            }
+                            break;
+                        case GroupMoveObjectType.Arrow:
+                            if (entry.Arrow != null)
+                            {
+                                entry.Arrow.Start = new PointF(entry.Start.X + dx, entry.Start.Y + dy);
+                                entry.Arrow.End = new PointF(entry.End.X + dx, entry.End.Y + dy);
+                                entry.Arrow.UpdatedAtUtc = DateTime.UtcNow;
+                            }
+                            break;
+                    }
+                }
+
+                this.Cursor = Cursors.SizeAll;
+                pdfViewer.Invalidate();
+                return;
+            }
+
+            if (isAdjustingArrowHandle && arrowObjectToAdjust != null && arrowHandleType != ArrowHandleType.None)
+            {
+                PointF mousePoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                mousePoint = SnapPointToGrid(mousePoint);
+                if (arrowHandleType == ArrowHandleType.Start)
+                {
+                    arrowObjectToAdjust.Start = mousePoint;
+                }
+                else if (arrowHandleType == ArrowHandleType.End)
+                {
+                    arrowObjectToAdjust.End = mousePoint;
+                }
+
+                ConstrainArrowToPage(arrowObjectToAdjust);
+                arrowObjectToAdjust.Thickness = NormalizeArrowThickness(arrowObjectToAdjust.Thickness);
+                arrowObjectToAdjust.HeadLength = NormalizeArrowHeadLength(arrowObjectToAdjust.HeadLength);
+                arrowObjectToAdjust.HeadWidth = NormalizeArrowHeadWidth(arrowObjectToAdjust.HeadWidth);
+                arrowObjectToAdjust.UpdatedAtUtc = DateTime.UtcNow;
+                arrowInteractionChanged = true;
+                this.Cursor = Cursors.Hand;
+                pdfViewer.Invalidate();
+                return;
+            }
+
+            if (isMovingArrowObject && arrowObjectToMove != null)
+            {
+                PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                float dx = mouseDoc.X - arrowMoveStartMouseDoc.X;
+                float dy = mouseDoc.Y - arrowMoveStartMouseDoc.Y;
+
+                if (snapToGridEnabled)
+                {
+                    float snappedStartX = SnapValueToGrid(arrowMoveInitialStart.X + dx, SnapGridStep);
+                    float snappedStartY = SnapValueToGrid(arrowMoveInitialStart.Y + dy, SnapGridStep);
+                    dx = snappedStartX - arrowMoveInitialStart.X;
+                    dy = snappedStartY - arrowMoveInitialStart.Y;
+                }
+
+                var pageSize = GetPageSizeWithOffset(arrowObjectToMove.PageNumber);
+                if (pageSize.Width > 0f && pageSize.Height > 0f)
+                {
+                    float minBaseX = Math.Min(arrowMoveInitialStart.X, arrowMoveInitialEnd.X);
+                    float maxBaseX = Math.Max(arrowMoveInitialStart.X, arrowMoveInitialEnd.X);
+                    float minBaseY = Math.Min(arrowMoveInitialStart.Y, arrowMoveInitialEnd.Y);
+                    float maxBaseY = Math.Max(arrowMoveInitialStart.Y, arrowMoveInitialEnd.Y);
+
+                    float minDx = -minBaseX;
+                    float maxDx = pageSize.Width - maxBaseX;
+                    float minDy = -minBaseY;
+                    float maxDy = pageSize.Height - maxBaseY;
+
+                    dx = Math.Max(minDx, Math.Min(maxDx, dx));
+                    dy = Math.Max(minDy, Math.Min(maxDy, dy));
+                }
+
+                PointF nextStart = new PointF(arrowMoveInitialStart.X + dx, arrowMoveInitialStart.Y + dy);
+                PointF nextEnd = new PointF(arrowMoveInitialEnd.X + dx, arrowMoveInitialEnd.Y + dy);
+                arrowObjectToMove.Start = nextStart;
+                arrowObjectToMove.End = nextEnd;
+                arrowObjectToMove.UpdatedAtUtc = DateTime.UtcNow;
+                arrowInteractionChanged = true;
+                this.Cursor = Cursors.SizeAll;
+                pdfViewer.Invalidate();
                 return;
             }
 
@@ -7580,6 +8697,10 @@ namespace AnonPDF
                 RectangleF bounds = rasterObjectToResize.Bounds;
                 PointF center = new PointF(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
                 PointF mousePoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                if (snapToGridEnabled)
+                {
+                    mousePoint = SnapPointToGrid(mousePoint);
+                }
                 PointF deltaPoint = new PointF(mousePoint.X - center.X, mousePoint.Y - center.Y);
                 PointF local = RotateVector(deltaPoint, -NormalizeRotation(rasterObjectToResize.Rotation));
 
@@ -7643,13 +8764,15 @@ namespace AnonPDF
 
             if (isMovingRasterObject && rasterObjectToMove != null)
             {
-                float dx = e.X - startPoint.X;
-                float dy = e.Y - startPoint.Y;
-                startPoint = e.Location;
-
                 RectangleF bounds = rasterObjectToMove.Bounds;
-                float newX = bounds.X + (dx / scaleFactor);
-                float newY = bounds.Y + (dy / scaleFactor);
+                PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                float newX = mouseDoc.X - rasterMoveMouseOffset.X;
+                float newY = mouseDoc.Y - rasterMoveMouseOffset.Y;
+                if (snapToGridEnabled)
+                {
+                    newX = SnapValueToGrid(newX, SnapGridStep);
+                    newY = SnapValueToGrid(newY, SnapGridStep);
+                }
                 rasterObjectToMove.Bounds = new RectangleF(newX, newY, bounds.Width, bounds.Height);
                 ConstrainRasterObjectToPage(rasterObjectToMove);
                 rasterObjectToMove.UpdatedAtUtc = DateTime.UtcNow;
@@ -7659,7 +8782,7 @@ namespace AnonPDF
 
             if (Control.MouseButtons == MouseButtons.None)
             {
-                if (!TryUpdateRasterHoverCursor(e.Location))
+                if (!TryUpdateArrowHoverCursor(e.Location) && !TryUpdateRasterHoverCursor(e.Location))
                 {
                     this.Cursor = Cursors.Default;
                 }
@@ -7695,17 +8818,18 @@ namespace AnonPDF
             {
                 if (annotationToMove != null && !annotationToMove.AnnotationIsLocked)
                 {
-                    // Calculate mouse offset
-                    float dx = e.X - startPoint.X;
-                    float dy = e.Y - startPoint.Y;
-                    startPoint = e.Location;
-
                     // Get current annotation Bounds (in "scaled" units, i.e. independent of zoom)
                     RectangleF bounds = annotationToMove.AnnotationBounds;
 
                     // Calculate new position in units before scaling (e.g. PDF points)
-                    float newX = bounds.X + dx / scaleFactor;
-                    float newY = bounds.Y + dy / scaleFactor;
+                    PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                    float newX = mouseDoc.X - textMoveMouseOffset.X;
+                    float newY = mouseDoc.Y - textMoveMouseOffset.Y;
+                    if (snapToGridEnabled)
+                    {
+                        newX = SnapValueToGrid(newX, SnapGridStep);
+                        newY = SnapValueToGrid(newY, SnapGridStep);
+                    }
 
                     // Pobierz DPI z pdfViewer
                     float dpiX, dpiY;
@@ -7769,7 +8893,10 @@ namespace AnonPDF
                 isDrawing = false;
                 isMoving = false;
                 annotationToMove = null;
+                textMoveMouseOffset = PointF.Empty;
                 ResetRasterInteractionState();
+                ResetArrowInteractionState();
+                ResetGroupMoveState();
                 currentSelection = RectangleF.Empty;
                 isClickOnIcon = false;
                 clickedIconType = IconType.None;
@@ -7782,6 +8909,36 @@ namespace AnonPDF
 
             if (e.Button == MouseButtons.Left)
             {
+                if (isMovingObjectGroup)
+                {
+                    bool changed = groupMoveChanged;
+                    ResetGroupMoveState();
+                    this.Cursor = Cursors.Default;
+                    if (changed)
+                    {
+                        projectWasChangedAfterLastSave = true;
+                        saveProjectButton.Enabled = true;
+                        saveProjectMenuItem.Enabled = true;
+                    }
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (arrowMouseActionInProgress)
+                {
+                    bool changed = arrowInteractionChanged;
+                    ResetArrowInteractionState();
+                    this.Cursor = Cursors.Default;
+                    if (changed)
+                    {
+                        projectWasChangedAfterLastSave = true;
+                        saveProjectButton.Enabled = true;
+                        saveProjectMenuItem.Enabled = true;
+                    }
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
                 if (rasterMouseActionInProgress)
                 {
                     bool changed = isMovingRasterObject || isRotatingRasterObject || isResizingRasterObject;
@@ -7839,6 +8996,45 @@ namespace AnonPDF
                     return;
                 }
 
+                if (isClickOnArrowIcon && arrowObjectForIcon != null)
+                {
+                    switch (clickedArrowIconType)
+                    {
+                        case ArrowIconType.Edit:
+                            EditArrowObject(arrowObjectForIcon);
+                            break;
+                        case ArrowIconType.Lock:
+                            if (EnsureCurrentPageEditable(true))
+                            {
+                                arrowObjectForIcon.IsLocked = !arrowObjectForIcon.IsLocked;
+                                arrowObjectForIcon.UpdatedAtUtc = DateTime.UtcNow;
+                                projectWasChangedAfterLastSave = true;
+                                saveProjectButton.Enabled = true;
+                                saveProjectMenuItem.Enabled = true;
+                                string msg = arrowObjectForIcon.IsLocked
+                                    ? LocalizedText("Msg_TextAnnotation_Locked")
+                                    : LocalizedText("Msg_TextAnnotation_Unlocked");
+                                MessageBox.Show(
+                                    this,
+                                    string.Format(LocalizedText("Msg_TextPositionInfo"), msg),
+                                    Resources.Title_Info,
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information);
+                            }
+                            break;
+                        case ArrowIconType.Duplicate:
+                            DuplicateArrowObject(arrowObjectForIcon);
+                            break;
+                        case ArrowIconType.Delete:
+                            DeleteArrowObjectWithConfirmation(arrowObjectForIcon);
+                            break;
+                    }
+
+                    ClearArrowIconClickState();
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
                 // If user clicked in icon button area
                 if (isClickOnIcon && annotationForIcon != null)
                 {
@@ -7882,6 +9078,7 @@ namespace AnonPDF
                     if (isMoving)
                     {
                         isMoving = false;
+                        textMoveMouseOffset = PointF.Empty;
                         this.Cursor = Cursors.Default;
                         projectWasChangedAfterLastSave = true;
                         saveProjectButton.Enabled = true;
@@ -7958,6 +9155,15 @@ namespace AnonPDF
             }
             else if (e.Button == MouseButtons.Right)
             {
+                if (selectedArrowObject != null &&
+                    selectedArrowObject.PageNumber == currentPage &&
+                    (IsPointNearArrowLine(selectedArrowObject, startPoint) || TryGetArrowHandleAtPoint(selectedArrowObject, startPoint, out _)))
+                {
+                    EditArrowObject(selectedArrowObject);
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
                 renderTimer.Stop();
                 var blockToRemove = redactionBlocks.FirstOrDefault(block => block.PageNumber == currentPage && block.Bounds.Contains((startPoint.X / scaleFactor), (startPoint.Y / scaleFactor)));
 
@@ -8005,6 +9211,11 @@ namespace AnonPDF
             clickedIconType = IconType.None;
             annotationForIcon = null;
             ClearRasterIconClickState();
+            ClearArrowIconClickState();
+            if (!isMovingArrowObject && !isAdjustingArrowHandle)
+            {
+                arrowMouseActionInProgress = false;
+            }
 
         }
 
@@ -8029,6 +9240,13 @@ namespace AnonPDF
                 }
             }
 
+            TextLocation selectedSearchLocation = null;
+            if (currentLocationIndex >= 0 && currentLocationIndex < searchLocations.Count)
+            {
+                selectedSearchLocation = searchLocations[currentLocationIndex];
+            }
+            bool multiSelectionActive = GetTotalSelectedObjectsCount() > 1;
+
             // Drawing saved search results
             foreach (var location in searchLocations)
             {
@@ -8041,7 +9259,7 @@ namespace AnonPDF
                     int rotation = GetEffectiveRotationDegrees(location.PageNumber);
 
                     RectangleF rectF = new RectangleF(x, y, w, h);
-                    var pdfCoordinates = ConvertToPdfCoordinates(rectF, currentPage, rotation);
+                    var pdfCoordinates = ConvertPdfToViewCoordinates(rectF, currentPage, rotation);
 
                     // Default highlight – e.g. yellow
                     System.Drawing.Color highlightColor = System.Drawing.Color.FromArgb(128, 255, 215, 0);
@@ -8051,22 +9269,43 @@ namespace AnonPDF
                     float sc_y = pdfCoordinates.Y * scaleFactor;
                     float sc_w = pdfCoordinates.Width * scaleFactor;
                     float sc_h = pdfCoordinates.Height * scaleFactor;
+                    float highlightPad = Math.Max(2f, Math.Min(sc_w, sc_h) * 0.35f);
+                    RectangleF primaryHighlightRect = new RectangleF(
+                        sc_x - highlightPad,
+                        sc_y - highlightPad,
+                        sc_w + (highlightPad * 2f),
+                        sc_h + (highlightPad * 2f));
 
                     using (Pen pen = new Pen(highlightColor, 3))
                     {
-                        e.Graphics.DrawRectangle(pen, sc_x - sc_h * 0.2f, sc_y - sc_h * 0.4f, sc_w + sc_h * 0.4f, sc_h + sc_h * 0.8f);
+                        e.Graphics.DrawRectangle(pen, primaryHighlightRect.X, primaryHighlightRect.Y, primaryHighlightRect.Width, primaryHighlightRect.Height);
                     }
 
-                    if (searchLocations.IndexOf(location) == currentLocationIndex)
+                    bool isSelectedSearchLocation = ReferenceEquals(location, selectedSearchLocation);
+                    if (isSelectedSearchLocation)
                     {
                         // If this is currently selected location, change color to gray
                         highlightColor = System.Drawing.Color.FromArgb(255, 128, 128, 128);
+                        float selectedPad = highlightPad * 2f;
+                        RectangleF selectedHighlightRect = new RectangleF(
+                            sc_x - selectedPad,
+                            sc_y - selectedPad,
+                            sc_w + (selectedPad * 2f),
+                            sc_h + (selectedPad * 2f));
 
                         using (Pen pen = new Pen(highlightColor, 3))
                         {
-                            e.Graphics.DrawRectangle(pen, sc_x - sc_h * 0.4f, sc_y - sc_h * 0.6f, sc_w + sc_h * 0.8f, sc_h + sc_h * 1.2f);
+                            e.Graphics.DrawRectangle(pen, selectedHighlightRect.X, selectedHighlightRect.Y, selectedHighlightRect.Width, selectedHighlightRect.Height);
                         }
 
+                        if (DebugLogEnabled && (rotation == 90 || rotation == 270))
+                        {
+                            RectangleF scaledRect = new RectangleF(sc_x, sc_y, sc_w, sc_h);
+                            LogDebug(
+                                $"SearchHighlight page={location.PageNumber} idx={currentLocationIndex} pageRot={rotation} lineRot={NormalizeRotation(location.PageRotation)} " +
+                                $"pdfRect={FormatRectFInvariant(rectF)} viewRect={FormatRectFInvariant(pdfCoordinates)} scaledRect={FormatRectFInvariant(scaledRect)} " +
+                                $"drawPrimary={FormatRectFInvariant(primaryHighlightRect)} drawSelected={FormatRectFInvariant(selectedHighlightRect)}");
+                        }
                     }
                 }
             }
@@ -8081,7 +9320,10 @@ namespace AnonPDF
 
                 using (previewImage)
                 {
-                    bool isSelectedRaster = selectedRasterObject != null && selectedRasterObject.Id == rasterObject.Id;
+                    bool isSelectedRaster = IsRasterObjectSelected(rasterObject);
+                    bool showRasterTools = selectedRasterObject != null &&
+                                           selectedRasterObject.Id == rasterObject.Id &&
+                                           GetGroupSelectionCount() == 0;
                     RectangleF scaledBounds = new RectangleF(
                         rasterObject.Bounds.X * scaleFactor,
                         rasterObject.Bounds.Y * scaleFactor,
@@ -8126,7 +9368,11 @@ namespace AnonPDF
                                     imageAttributes);
                             }
                         }
-                        using (var borderPen = new Pen(isSelectedRaster ? System.Drawing.Color.Red : System.Drawing.Color.SteelBlue, isSelectedRaster ? 2f : 1f))
+                        System.Drawing.Color borderColor = (isSelectedRaster && !multiSelectionActive)
+                            ? System.Drawing.Color.Red
+                            : System.Drawing.Color.SteelBlue;
+                        float borderWidth = (isSelectedRaster && !multiSelectionActive) ? 2f : 1f;
+                        using (var borderPen = new Pen(borderColor, borderWidth))
                         {
                             e.Graphics.DrawRectangle(borderPen, 0f, 0f, scaledBounds.Width, scaledBounds.Height);
                         }
@@ -8143,9 +9389,14 @@ namespace AnonPDF
                         {
                             e.Graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
                         }
+
+                        if (multiSelectionActive && isSelectedRaster)
+                        {
+                            DrawGroupSelectionOutline(e.Graphics, frameBounds);
+                        }
                     }
 
-                    if (isSelectedRaster && TryGetRasterRotationHandleRect(rasterObject, out RectangleF handleRect, out PointF connectorPoint))
+                    if (showRasterTools && TryGetRasterRotationHandleRect(rasterObject, out RectangleF handleRect, out PointF connectorPoint))
                     {
                         PointF handleCenter = new PointF(
                             handleRect.X + (handleRect.Width / 2f),
@@ -8162,7 +9413,7 @@ namespace AnonPDF
                         }
                     }
 
-                    if (isSelectedRaster && TryGetRasterResizeHandleRects(rasterObject, out Dictionary<RasterResizeHandleType, RectangleF> resizeHandles))
+                    if (showRasterTools && TryGetRasterResizeHandleRects(rasterObject, out Dictionary<RasterResizeHandleType, RectangleF> resizeHandles))
                     {
                         using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
                         using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
@@ -8180,7 +9431,7 @@ namespace AnonPDF
                         }
                     }
 
-                    if (isSelectedRaster && TryGetRasterIconRects(rasterObject, out Dictionary<RasterIconType, Rectangle> iconRects))
+                    if (showRasterTools && TryGetRasterIconRects(rasterObject, out Dictionary<RasterIconType, Rectangle> iconRects))
                     {
                         DrawIconButton(e.Graphics, iconRects[RasterIconType.Edit], "\uE70F");
                         DrawIconButton(
@@ -8191,6 +9442,114 @@ namespace AnonPDF
                         DrawIconButton(e.Graphics, iconRects[RasterIconType.ResetSize], "\uE777");
                         DrawIconButton(e.Graphics, iconRects[RasterIconType.Delete], "\uE74D");
                     }
+                }
+            }
+
+            // Drawing arrow objects for current page
+            foreach (var arrowObject in arrowObjects.Where(obj => obj.PageNumber == currentPage))
+            {
+                if (arrowObject == null)
+                {
+                    continue;
+                }
+
+                arrowObject.Thickness = NormalizeArrowThickness(arrowObject.Thickness);
+                arrowObject.HeadLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
+                arrowObject.HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+                if (!IsArrowColorValid(arrowObject))
+                {
+                    arrowObject.LineColorArgb = DefaultArrowColor.ToArgb();
+                }
+
+                bool isSelectedArrow = IsArrowObjectSelected(arrowObject);
+                bool showArrowTools = selectedArrowObject != null &&
+                                      selectedArrowObject.Id == arrowObject.Id &&
+                                      GetGroupSelectionCount() == 0;
+                System.Drawing.Color baseColor = (isSelectedArrow && !multiSelectionActive)
+                    ? System.Drawing.Color.Red
+                    : GetArrowColor(arrowObject);
+                PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
+                PointF endScreen = GetArrowScreenPoint(arrowObject.End);
+                float thicknessPx = Math.Max(1f, arrowObject.Thickness * scaleFactor);
+                float headLengthPx = Math.Max(4f, arrowObject.HeadLength * scaleFactor);
+                float headWidthPx = Math.Max(4f, arrowObject.HeadWidth * scaleFactor);
+
+                var state = e.Graphics.Save();
+                try
+                {
+                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    if (TryBuildArrowHead(startScreen, endScreen, headLengthPx, headWidthPx, out PointF leftPoint, out PointF rightPoint, out PointF lineEndPoint))
+                    {
+                        using (var pen = new Pen(baseColor, thicknessPx))
+                        {
+                            pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                            pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                            pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
+                            e.Graphics.DrawLine(pen, startScreen, lineEndPoint);
+                        }
+
+                        using (var brush = new SolidBrush(baseColor))
+                        {
+                            e.Graphics.FillPolygon(brush, new[] { endScreen, leftPoint, rightPoint });
+                        }
+                    }
+                    else
+                    {
+                        using (var pen = new Pen(baseColor, thicknessPx))
+                        {
+                            pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                            pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                            pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
+                            e.Graphics.DrawLine(pen, startScreen, endScreen);
+                        }
+                    }
+
+                    if (multiSelectionActive && isSelectedArrow)
+                    {
+                        float minX = Math.Min(startScreen.X, endScreen.X);
+                        float maxX = Math.Max(startScreen.X, endScreen.X);
+                        float minY = Math.Min(startScreen.Y, endScreen.Y);
+                        float maxY = Math.Max(startScreen.Y, endScreen.Y);
+                        RectangleF arrowBounds = new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY));
+                        DrawGroupSelectionOutline(e.Graphics, arrowBounds);
+                    }
+
+                    if (showArrowTools)
+                    {
+                        RectangleF startHandle = new RectangleF(
+                            startScreen.X - ArrowHandleRadius,
+                            startScreen.Y - ArrowHandleRadius,
+                            ArrowHandleRadius * 2f,
+                            ArrowHandleRadius * 2f);
+                        RectangleF endHandle = new RectangleF(
+                            endScreen.X - ArrowHandleRadius,
+                            endScreen.Y - ArrowHandleRadius,
+                            ArrowHandleRadius * 2f,
+                            ArrowHandleRadius * 2f);
+                        using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                        using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                        {
+                            e.Graphics.FillEllipse(handleBrush, startHandle);
+                            e.Graphics.DrawEllipse(handlePen, startHandle);
+                            e.Graphics.FillEllipse(handleBrush, endHandle);
+                            e.Graphics.DrawEllipse(handlePen, endHandle);
+                        }
+
+                        if (TryGetArrowIconRects(arrowObject, out Dictionary<ArrowIconType, Rectangle> arrowIconRects))
+                        {
+                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Edit], "\uE70F");
+                            DrawIconButton(
+                                e.Graphics,
+                                arrowIconRects[ArrowIconType.Lock],
+                                arrowObject.IsLocked ? "\uE72E" : "\uE785");
+                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Duplicate], "\uE8C8");
+                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Delete], "\uE74D");
+                        }
+                    }
+                }
+                finally
+                {
+                    e.Graphics.Restore(state);
                 }
             }
 
@@ -8205,7 +9564,10 @@ namespace AnonPDF
                     (int)(annotation.AnnotationBounds.Height * scaleFactor * 72f / e.Graphics.DpiY)
                 );
 
-                bool isSelectedAnnotation = selectedTextAnnotation != null && ReferenceEquals(selectedTextAnnotation, annotation);
+                bool isSelectedAnnotation = IsTextAnnotationSelected(annotation);
+                bool showTextTools = selectedTextAnnotation != null &&
+                                     ReferenceEquals(selectedTextAnnotation, annotation) &&
+                                     GetGroupSelectionCount() == 0;
 
                 // Draw annotation border
                 using (Pen pen = new Pen(System.Drawing.Color.Green, 1f))
@@ -8249,7 +9611,7 @@ namespace AnonPDF
                 float layoutHeight = baseSize.Height * scaleFactor * 72f / e.Graphics.DpiY;
 
                 // Render text with scaled font
-                using (SolidBrush brush = new SolidBrush(isSelectedAnnotation ? System.Drawing.Color.Red : annotation.AnnotationColor))
+                using (SolidBrush brush = new SolidBrush((isSelectedAnnotation && !multiSelectionActive) ? System.Drawing.Color.Red : annotation.AnnotationColor))
                 {
                     float scaledFontSize = annotation.AnnotationFont.Size * scaleFactor * dpiCorrection;
                     using (Font scaledFont = new Font(annotation.AnnotationFont.FontFamily, scaledFontSize, annotation.AnnotationFont.Style))
@@ -8277,7 +9639,12 @@ namespace AnonPDF
                     }
                 }
 
-                if (isSelectedAnnotation && TryGetAnnotationIconRects(annotation, e.Graphics.DpiX, e.Graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
+                if (multiSelectionActive && isSelectedAnnotation)
+                {
+                    DrawGroupSelectionOutline(e.Graphics, rect);
+                }
+
+                if (showTextTools && TryGetAnnotationIconRects(annotation, e.Graphics.DpiX, e.Graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
                 {
                     DrawIconButton(e.Graphics, annotationIconRects[IconType.Edit], "\uE70F");
                     DrawIconButton(
@@ -8681,6 +10048,9 @@ namespace AnonPDF
                     List<RasterObject> rasterObjectsJson = (projectData.RasterObjects ?? new List<RasterObject>())
                         .Where(obj => obj != null && obj.PageNumber >= 1 && obj.PageNumber <= numPages)
                         .ToList();
+                    List<ArrowObject> arrowObjectsJson = (projectData.ArrowObjects ?? new List<ArrowObject>())
+                        .Where(obj => obj != null && obj.PageNumber >= 1 && obj.PageNumber <= numPages)
+                        .ToList();
                     Dictionary<int, int> rotationOffsetsJson = projectData.PageRotationOffsets ?? new Dictionary<int, int>();
                     List<string> signaturesToRemoveJson = projectData.SignaturesToRemove;
                     string signaturesMode = projectData.SignaturesMode;
@@ -8712,6 +10082,26 @@ namespace AnonPDF
                         rasterObject.Opacity = NormalizeOpacity(rasterObject.Opacity);
                         GetResolvedRasterInitialBounds(rasterObject);
                         ConstrainRasterObjectToPage(rasterObject);
+                    }
+
+                    ClearArrowObjects();
+                    arrowObjects = arrowObjectsJson;
+                    foreach (var arrowObject in arrowObjects)
+                    {
+                        if (string.IsNullOrWhiteSpace(arrowObject.Id))
+                        {
+                            arrowObject.Id = Guid.NewGuid().ToString("N");
+                        }
+
+                        if (!IsArrowColorValid(arrowObject))
+                        {
+                            arrowObject.LineColorArgb = DefaultArrowColor.ToArgb();
+                        }
+
+                        arrowObject.Thickness = NormalizeArrowThickness(arrowObject.Thickness);
+                        arrowObject.HeadLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
+                        arrowObject.HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+                        ConstrainArrowToPage(arrowObject);
                     }
 
                     pageRotationOffsets = rotationOffsetsJson
@@ -8795,6 +10185,15 @@ namespace AnonPDF
                         var item = pagesListView.Items[rasterObject.PageNumber - 1];
                         status.HasObjects = true;
                         UpdateItemTag(item, rasterObject.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                        pagesListView.Invalidate(item.Bounds);
+                    }
+
+                    foreach (var arrowObject in arrowObjects)
+                    {
+                        status = allPageStatuses[arrowObject.PageNumber - 1];
+                        var item = pagesListView.Items[arrowObject.PageNumber - 1];
+                        status.HasObjects = true;
+                        UpdateItemTag(item, arrowObject.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -8922,6 +10321,7 @@ namespace AnonPDF
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
                             RasterObjects = rasterObjects,
+                            ArrowObjects = arrowObjects,
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
                             CurrentPage = currentPage,
@@ -9353,6 +10753,7 @@ namespace AnonPDF
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
                             RasterObjects = rasterObjects,
+                            ArrowObjects = arrowObjects,
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
                             CurrentPage = currentPage,
@@ -9836,8 +11237,10 @@ namespace AnonPDF
             ConstrainRasterObjectToPage(rasterObject);
             rasterObject.InitialBounds = rasterObject.Bounds;
             rasterObjects.Add(rasterObject);
+            ClearGroupSelection();
             selectedRasterObject = rasterObject;
             selectedTextAnnotation = null;
+            selectedArrowObject = null;
             if (currentPage >= 1 && currentPage <= allPageStatuses.Count)
             {
                 PageItemStatus status = allPageStatuses[currentPage - 1];
@@ -9859,6 +11262,148 @@ namespace AnonPDF
             pdfViewer.Invalidate();
             renderTimer.Stop();
             renderTimer.Start();
+        }
+
+        private void AddArrowObject()
+        {
+            if (pdf == null || numPages <= 0)
+            {
+                ShowInfoMessage(Resources.Msg_OpenPdfFirst);
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            var pageSize = GetPageSizeWithOffset(currentPage);
+            if (pageSize.Width <= 0f || pageSize.Height <= 0f)
+            {
+                return;
+            }
+
+            float defaultLength = Math.Max(60f, Math.Min(pageSize.Width, pageSize.Height) * 0.18f);
+            var center = new PointF(pageSize.Width / 2f, pageSize.Height / 2f);
+            var start = new PointF(center.X - (defaultLength / 2f), center.Y);
+            var end = new PointF(center.X + (defaultLength / 2f), center.Y);
+
+            var now = DateTime.UtcNow;
+            var arrow = new ArrowObject
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                PageNumber = currentPage,
+                Start = start,
+                End = end,
+                LineColorArgb = DefaultArrowColor.ToArgb(),
+                Thickness = DefaultArrowThickness,
+                HeadLength = DefaultArrowHeadLength,
+                HeadWidth = DefaultArrowHeadWidth,
+                IsLocked = false,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            };
+
+            ConstrainArrowToPage(arrow);
+            arrowObjects.Add(arrow);
+            ClearGroupSelection();
+            selectedArrowObject = arrow;
+            selectedRasterObject = null;
+            selectedTextAnnotation = null;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateCurrentPageObjectsMarker();
+            pdfViewer.Invalidate();
+        }
+
+        private static bool IsArrowColorValid(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var color = System.Drawing.Color.FromArgb(arrowObject.LineColorArgb);
+                return color.A > 0 || color.R > 0 || color.G > 0 || color.B > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void EditArrowObject(ArrowObject arrowObject)
+        {
+            if (arrowObject == null || arrowObject.PageNumber != currentPage)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            using (var dlg = new EditArrowDialog())
+            {
+                dlg.ArrowColor = GetArrowColor(arrowObject);
+                dlg.ThicknessValue = NormalizeArrowThickness(arrowObject.Thickness);
+                dlg.HeadLengthValue = NormalizeArrowHeadLength(arrowObject.HeadLength);
+                dlg.HeadWidthValue = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+                dlg.IsLocked = arrowObject.IsLocked;
+                dlg.ApplyChanges = () =>
+                {
+                    ApplyArrowObjectDialogChanges(arrowObject, dlg);
+                };
+
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+
+                ApplyArrowObjectDialogChanges(arrowObject, dlg);
+            }
+        }
+
+        private bool ApplyArrowObjectDialogChanges(ArrowObject arrowObject, EditArrowDialog dlg)
+        {
+            if (arrowObject == null || dlg == null)
+            {
+                return false;
+            }
+
+            int newColorArgb = dlg.ArrowColor.ToArgb();
+            float newThickness = NormalizeArrowThickness(dlg.ThicknessValue);
+            float newHeadLength = NormalizeArrowHeadLength(dlg.HeadLengthValue);
+            float newHeadWidth = NormalizeArrowHeadWidth(dlg.HeadWidthValue);
+            bool newIsLocked = dlg.IsLocked;
+
+            bool changed =
+                arrowObject.LineColorArgb != newColorArgb ||
+                !AreSameFloat(NormalizeArrowThickness(arrowObject.Thickness), newThickness) ||
+                !AreSameFloat(NormalizeArrowHeadLength(arrowObject.HeadLength), newHeadLength) ||
+                !AreSameFloat(NormalizeArrowHeadWidth(arrowObject.HeadWidth), newHeadWidth) ||
+                arrowObject.IsLocked != newIsLocked;
+
+            if (!changed)
+            {
+                return false;
+            }
+
+            arrowObject.LineColorArgb = newColorArgb;
+            arrowObject.Thickness = newThickness;
+            arrowObject.HeadLength = newHeadLength;
+            arrowObject.HeadWidth = newHeadWidth;
+            arrowObject.IsLocked = newIsLocked;
+            arrowObject.UpdatedAtUtc = DateTime.UtcNow;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
         }
 
         private RectangleF GetInitialRasterBounds(int sourceWidth, int sourceHeight)
@@ -10039,6 +11584,323 @@ namespace AnonPDF
             isResizingRasterObject = false;
             rasterResizeHandle = RasterResizeHandleType.None;
             rasterMouseActionInProgress = false;
+            rasterMoveMouseOffset = PointF.Empty;
+        }
+
+        private void ResetArrowInteractionState()
+        {
+            if (isMovingArrowObject || isAdjustingArrowHandle)
+            {
+                this.Cursor = Cursors.Default;
+            }
+
+            arrowObjectToMove = null;
+            arrowObjectToAdjust = null;
+            isMovingArrowObject = false;
+            isAdjustingArrowHandle = false;
+            arrowHandleType = ArrowHandleType.None;
+            arrowMouseActionInProgress = false;
+            arrowInteractionChanged = false;
+            arrowMoveStartMouseDoc = PointF.Empty;
+            arrowMoveInitialStart = PointF.Empty;
+            arrowMoveInitialEnd = PointF.Empty;
+        }
+
+        private static float NormalizeArrowThickness(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return DefaultArrowThickness;
+            }
+            return Math.Max(1f, Math.Min(24f, value));
+        }
+
+        private static float NormalizeArrowHeadLength(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return DefaultArrowHeadLength;
+            }
+            return Math.Max(4f, Math.Min(120f, value));
+        }
+
+        private static float NormalizeArrowHeadWidth(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return DefaultArrowHeadWidth;
+            }
+            return Math.Max(4f, Math.Min(120f, value));
+        }
+
+        private static System.Drawing.Color GetArrowColor(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return System.Drawing.Color.Red;
+            }
+
+            try
+            {
+                return System.Drawing.Color.FromArgb(arrowObject.LineColorArgb);
+            }
+            catch
+            {
+                return System.Drawing.Color.Red;
+            }
+        }
+
+        private PointF GetArrowScreenPoint(PointF viewPoint)
+        {
+            return new PointF(viewPoint.X * scaleFactor, viewPoint.Y * scaleFactor);
+        }
+
+        private bool TryGetArrowHandleAtPoint(ArrowObject arrowObject, Point location, out ArrowHandleType handleType)
+        {
+            handleType = ArrowHandleType.None;
+            if (arrowObject == null || arrowObject.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
+            PointF endScreen = GetArrowScreenPoint(arrowObject.End);
+            float radius = ArrowHandleRadius + 2f;
+            float radiusSq = radius * radius;
+
+            float dxStart = location.X - startScreen.X;
+            float dyStart = location.Y - startScreen.Y;
+            if ((dxStart * dxStart) + (dyStart * dyStart) <= radiusSq)
+            {
+                handleType = ArrowHandleType.Start;
+                return true;
+            }
+
+            float dxEnd = location.X - endScreen.X;
+            float dyEnd = location.Y - endScreen.Y;
+            if ((dxEnd * dxEnd) + (dyEnd * dyEnd) <= radiusSq)
+            {
+                handleType = ArrowHandleType.End;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static float DistancePointToSegment(PointF point, PointF segmentStart, PointF segmentEnd)
+        {
+            float vx = segmentEnd.X - segmentStart.X;
+            float vy = segmentEnd.Y - segmentStart.Y;
+            float wx = point.X - segmentStart.X;
+            float wy = point.Y - segmentStart.Y;
+            float segmentLengthSq = (vx * vx) + (vy * vy);
+            if (segmentLengthSq <= 0.0001f)
+            {
+                float dx = point.X - segmentStart.X;
+                float dy = point.Y - segmentStart.Y;
+                return (float)Math.Sqrt((dx * dx) + (dy * dy));
+            }
+
+            float t = ((wx * vx) + (wy * vy)) / segmentLengthSq;
+            t = Math.Max(0f, Math.Min(1f, t));
+            float projX = segmentStart.X + (t * vx);
+            float projY = segmentStart.Y + (t * vy);
+            float px = point.X - projX;
+            float py = point.Y - projY;
+            return (float)Math.Sqrt((px * px) + (py * py));
+        }
+
+        private bool IsPointNearArrowLine(ArrowObject arrowObject, Point location)
+        {
+            if (arrowObject == null || arrowObject.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
+            PointF endScreen = GetArrowScreenPoint(arrowObject.End);
+            float tolerance = Math.Max(ArrowLineSelectionTolerance, NormalizeArrowThickness(arrowObject.Thickness) * scaleFactor * 0.6f + 3f);
+            float distance = DistancePointToSegment(location, startScreen, endScreen);
+            return distance <= tolerance;
+        }
+
+        private bool TryUpdateArrowHoverCursor(Point location)
+        {
+            if (selectedArrowObject == null || selectedArrowObject.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            if (!selectedArrowObject.IsLocked && TryGetArrowHandleAtPoint(selectedArrowObject, location, out _))
+            {
+                this.Cursor = Cursors.Hand;
+                return true;
+            }
+
+            if (IsPointNearArrowLine(selectedArrowObject, location))
+            {
+                this.Cursor = selectedArrowObject.IsLocked ? Cursors.Default : Cursors.SizeAll;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryHandleArrowMouseDown(Point location)
+        {
+            if (selectedArrowObject != null && selectedArrowObject.PageNumber == currentPage && !selectedArrowObject.IsLocked)
+            {
+                if (TryGetArrowHandleAtPoint(selectedArrowObject, location, out ArrowHandleType selectedHandle) &&
+                    selectedHandle != ArrowHandleType.None)
+                {
+                    arrowObjectToAdjust = selectedArrowObject;
+                    isAdjustingArrowHandle = true;
+                    arrowHandleType = selectedHandle;
+                    arrowInteractionChanged = false;
+                    this.Cursor = Cursors.Hand;
+                    return true;
+                }
+            }
+
+            ArrowObject hitArrow = arrowObjects
+                .Where(obj => obj != null && obj.PageNumber == currentPage)
+                .Reverse()
+                .FirstOrDefault(obj => IsPointNearArrowLine(obj, location) || TryGetArrowHandleAtPoint(obj, location, out _));
+
+            if (hitArrow == null)
+            {
+                selectedArrowObject = null;
+                ClearArrowIconClickState();
+                return false;
+            }
+
+            EnsureArrowObjectId(hitArrow);
+            selectedArrowObject = hitArrow;
+            ClearGroupSelection();
+            if (BringArrowObjectToFront(hitArrow))
+            {
+                projectWasChangedAfterLastSave = true;
+                saveProjectButton.Enabled = true;
+                saveProjectMenuItem.Enabled = true;
+            }
+
+            if (hitArrow.IsLocked)
+            {
+                return true;
+            }
+
+            if (TryGetArrowHandleAtPoint(hitArrow, location, out ArrowHandleType handleType) && handleType != ArrowHandleType.None)
+            {
+                arrowObjectToAdjust = hitArrow;
+                isAdjustingArrowHandle = true;
+                arrowHandleType = handleType;
+                arrowInteractionChanged = false;
+                this.Cursor = Cursors.Hand;
+                return true;
+            }
+
+            arrowObjectToMove = hitArrow;
+            isMovingArrowObject = true;
+            arrowInteractionChanged = false;
+            startPoint = location;
+            arrowMoveStartMouseDoc = new PointF(location.X / scaleFactor, location.Y / scaleFactor);
+            arrowMoveInitialStart = hitArrow.Start;
+            arrowMoveInitialEnd = hitArrow.End;
+            this.Cursor = Cursors.SizeAll;
+            return true;
+        }
+
+        private bool BringArrowObjectToFront(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            int lastIndexBeforeMove = arrowObjects.Count - 1;
+            arrowObjects.RemoveAt(index);
+            arrowObjects.Add(arrowObject);
+            return index != lastIndexBeforeMove;
+        }
+
+        private bool ConstrainArrowToPage(ArrowObject arrowObject)
+        {
+            if (arrowObject == null)
+            {
+                return false;
+            }
+
+            var pageSize = GetPageSizeWithOffset(arrowObject.PageNumber);
+            if (pageSize.Width <= 0f || pageSize.Height <= 0f)
+            {
+                return false;
+            }
+
+            PointF start = arrowObject.Start;
+            PointF end = arrowObject.End;
+            PointF clampedStart = new PointF(
+                Math.Max(0f, Math.Min(pageSize.Width, start.X)),
+                Math.Max(0f, Math.Min(pageSize.Height, start.Y)));
+            PointF clampedEnd = new PointF(
+                Math.Max(0f, Math.Min(pageSize.Width, end.X)),
+                Math.Max(0f, Math.Min(pageSize.Height, end.Y)));
+
+            bool changed =
+                Math.Abs(clampedStart.X - start.X) > 0.001f ||
+                Math.Abs(clampedStart.Y - start.Y) > 0.001f ||
+                Math.Abs(clampedEnd.X - end.X) > 0.001f ||
+                Math.Abs(clampedEnd.Y - end.Y) > 0.001f;
+
+            if (changed)
+            {
+                arrowObject.Start = clampedStart;
+                arrowObject.End = clampedEnd;
+            }
+
+            return changed;
+        }
+
+        private static bool TryBuildArrowHead(
+            PointF startPoint,
+            PointF endPoint,
+            float headLength,
+            float headWidth,
+            out PointF leftPoint,
+            out PointF rightPoint,
+            out PointF lineEndPoint)
+        {
+            leftPoint = PointF.Empty;
+            rightPoint = PointF.Empty;
+            lineEndPoint = endPoint;
+
+            float dx = endPoint.X - startPoint.X;
+            float dy = endPoint.Y - startPoint.Y;
+            float length = (float)Math.Sqrt((dx * dx) + (dy * dy));
+            if (length <= 0.001f)
+            {
+                return false;
+            }
+
+            float ux = dx / length;
+            float uy = dy / length;
+            float actualHeadLength = Math.Min(headLength, length * 0.9f);
+            float halfWidth = headWidth / 2f;
+            PointF basePoint = new PointF(
+                endPoint.X - (ux * actualHeadLength),
+                endPoint.Y - (uy * actualHeadLength));
+            PointF perp = new PointF(-uy * halfWidth, ux * halfWidth);
+            leftPoint = new PointF(basePoint.X + perp.X, basePoint.Y + perp.Y);
+            rightPoint = new PointF(basePoint.X - perp.X, basePoint.Y - perp.Y);
+            lineEndPoint = new PointF(
+                endPoint.X - (ux * actualHeadLength * 0.85f),
+                endPoint.Y - (uy * actualHeadLength * 0.85f));
+            return true;
         }
 
         private static float NormalizeAngleDelta(float value)
@@ -10062,6 +11924,17 @@ namespace AnonPDF
             return new PointF(
                 (vector.X * cos) - (vector.Y * sin),
                 (vector.X * sin) + (vector.Y * cos));
+        }
+
+        private static string FormatRectFInvariant(RectangleF rect)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{{X={0:0.###},Y={1:0.###},W={2:0.###},H={3:0.###}}}",
+                rect.X,
+                rect.Y,
+                rect.Width,
+                rect.Height);
         }
 
         private RectangleF GetRasterObjectScreenBounds(RasterObject rasterObject)
@@ -10158,6 +12031,30 @@ namespace AnonPDF
             return rect.Width > 0f && rect.Height > 0f;
         }
 
+        private static RectangleF InflateRect(RectangleF rect, float padding)
+        {
+            return new RectangleF(
+                rect.X - padding,
+                rect.Y - padding,
+                rect.Width + (padding * 2f),
+                rect.Height + (padding * 2f));
+        }
+
+        private static void DrawGroupSelectionOutline(Graphics graphics, RectangleF rect)
+        {
+            if (graphics == null || rect.Width <= 0f || rect.Height <= 0f)
+            {
+                return;
+            }
+
+            RectangleF outlineRect = InflateRect(rect, 4f);
+            using (var pen = new Pen(GroupSelectionColor, 2f))
+            {
+                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dash;
+                graphics.DrawRectangle(pen, outlineRect.X, outlineRect.Y, outlineRect.Width, outlineRect.Height);
+            }
+        }
+
         private static float NormalizeOpacity(float opacity)
         {
             if (float.IsNaN(opacity) || float.IsInfinity(opacity))
@@ -10198,6 +12095,13 @@ namespace AnonPDF
             isClickOnRasterIcon = false;
             clickedRasterIconType = RasterIconType.None;
             rasterObjectForIcon = null;
+        }
+
+        private void ClearArrowIconClickState()
+        {
+            isClickOnArrowIcon = false;
+            clickedArrowIconType = ArrowIconType.None;
+            arrowObjectForIcon = null;
         }
 
         private bool TryGetRasterIconRects(RasterObject rasterObject, out Dictionary<RasterIconType, Rectangle> iconRects)
@@ -10264,6 +12168,66 @@ namespace AnonPDF
                 [RasterIconType.Duplicate] = BuildRectFromRight(2),
                 [RasterIconType.ResetSize] = BuildRectFromRight(1),
                 [RasterIconType.Delete] = BuildRectFromRight(0)
+            };
+
+            return true;
+        }
+
+        private bool TryGetArrowIconRects(ArrowObject arrowObject, out Dictionary<ArrowIconType, Rectangle> iconRects)
+        {
+            iconRects = null;
+            if (arrowObject == null || arrowObject.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
+            PointF endScreen = GetArrowScreenPoint(arrowObject.End);
+            float minX = Math.Min(startScreen.X, endScreen.X);
+            float maxX = Math.Max(startScreen.X, endScreen.X);
+            float minY = Math.Min(startScreen.Y, endScreen.Y);
+            float maxY = Math.Max(startScreen.Y, endScreen.Y);
+            if ((maxX - minX) < 1f && (maxY - minY) < 1f)
+            {
+                return false;
+            }
+
+            const int buttonCount = 4;
+            int totalWidth = (buttonCount * annotationsIconSize) + ((buttonCount - 1) * annotationsIconPadding);
+            int top = (int)Math.Round(minY) - annotationsIconSize - annotationsIconPadding - 8;
+            int right = (int)Math.Round(maxX);
+            int panelRight = Math.Max(2, pdfViewer.ClientSize.Width - 2);
+            int panelBottom = Math.Max(2, pdfViewer.ClientSize.Height - annotationsIconSize - 2);
+            if (top < 2)
+            {
+                top = (int)Math.Round(maxY) + annotationsIconPadding;
+            }
+            if (top > panelBottom)
+            {
+                top = panelBottom;
+            }
+
+            if (right > panelRight)
+            {
+                right = panelRight;
+            }
+            if (right - totalWidth < 2)
+            {
+                right = 2 + totalWidth;
+            }
+
+            Rectangle BuildRectFromRight(int indexFromRight)
+            {
+                int x = right - ((indexFromRight + 1) * annotationsIconSize) - (indexFromRight * annotationsIconPadding);
+                return new Rectangle(x, top, annotationsIconSize, annotationsIconSize);
+            }
+
+            iconRects = new Dictionary<ArrowIconType, Rectangle>
+            {
+                [ArrowIconType.Edit] = BuildRectFromRight(3),
+                [ArrowIconType.Lock] = BuildRectFromRight(2),
+                [ArrowIconType.Duplicate] = BuildRectFromRight(1),
+                [ArrowIconType.Delete] = BuildRectFromRight(0)
             };
 
             return true;
@@ -10451,8 +12415,10 @@ namespace AnonPDF
             ConstrainRasterObjectToPage(copy);
             copy.InitialBounds = copy.Bounds;
             rasterObjects.Add(copy);
+            ClearGroupSelection();
             selectedRasterObject = copy;
             selectedTextAnnotation = null;
+            selectedArrowObject = null;
             if (currentPage >= 1 && currentPage <= allPageStatuses.Count)
             {
                 PageItemStatus status = allPageStatuses[currentPage - 1];
@@ -10471,6 +12437,49 @@ namespace AnonPDF
             projectWasChangedAfterLastSave = true;
             saveProjectButton.Enabled = true;
             saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+        }
+
+        private void DuplicateArrowObject(ArrowObject source)
+        {
+            if (source == null || source.PageNumber != currentPage)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            PointF start = new PointF(source.Start.X + 12f, source.Start.Y + 12f);
+            PointF end = new PointF(source.End.X + 12f, source.End.Y + 12f);
+            var now = DateTime.UtcNow;
+            var copy = new ArrowObject
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                PageNumber = currentPage,
+                Start = start,
+                End = end,
+                LineColorArgb = source.LineColorArgb,
+                Thickness = NormalizeArrowThickness(source.Thickness),
+                HeadLength = NormalizeArrowHeadLength(source.HeadLength),
+                HeadWidth = NormalizeArrowHeadWidth(source.HeadWidth),
+                IsLocked = source.IsLocked,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            };
+
+            ConstrainArrowToPage(copy);
+            arrowObjects.Add(copy);
+            ClearGroupSelection();
+            selectedArrowObject = copy;
+            selectedRasterObject = null;
+            selectedTextAnnotation = null;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateCurrentPageObjectsMarker();
             pdfViewer.Invalidate();
         }
 
@@ -10519,6 +12528,34 @@ namespace AnonPDF
 
             if (!string.Equals(rasterObject.FilePath ?? string.Empty, newFilePath ?? string.Empty, StringComparison.OrdinalIgnoreCase))
             {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryHandleArrowIconMouseDown(Point location)
+        {
+            if (selectedArrowObject == null || selectedArrowObject.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            if (!TryGetArrowIconRects(selectedArrowObject, out Dictionary<ArrowIconType, Rectangle> iconRects))
+            {
+                return false;
+            }
+
+            foreach (var iconRect in iconRects)
+            {
+                if (!iconRect.Value.Contains(location))
+                {
+                    continue;
+                }
+
+                isClickOnArrowIcon = true;
+                clickedArrowIconType = iconRect.Key;
+                arrowObjectForIcon = selectedArrowObject;
                 return true;
             }
 
@@ -10947,7 +12984,9 @@ namespace AnonPDF
                 return false;
             }
 
+            EnsureRasterObjectId(hitObject);
             selectedRasterObject = hitObject;
+            ClearGroupSelection();
             ClearRasterIconClickState();
             if (BringRasterObjectToFront(hitObject))
             {
@@ -10963,6 +13002,8 @@ namespace AnonPDF
             rasterObjectToMove = hitObject;
             isMovingRasterObject = true;
             startPoint = location;
+            PointF mouseDoc = new PointF(location.X / scaleFactor, location.Y / scaleFactor);
+            rasterMoveMouseOffset = new PointF(mouseDoc.X - hitObject.Bounds.X, mouseDoc.Y - hitObject.Bounds.Y);
             this.Cursor = Cursors.SizeAll;
             return true;
         }
@@ -12398,7 +14439,7 @@ namespace AnonPDF
         {
             // Convert PDF coordinates to control coordinates (e.g. image or panel)
             int rotation = GetEffectiveRotationDegrees(pageNumber);
-            RectangleF pdfCoordinates = ConvertToPdfCoordinates(new RectangleF(resultRect.GetX(), resultRect.GetY(), resultRect.GetWidth(), resultRect.GetHeight()), pageNumber, rotation);
+            RectangleF pdfCoordinates = ConvertPdfToViewCoordinates(new RectangleF(resultRect.GetX(), resultRect.GetY(), resultRect.GetWidth(), resultRect.GetHeight()), pageNumber, rotation);
 
             // Scale coordinates if using zoom
             RectangleF scaledRect = new RectangleF(pdfCoordinates.X * scaleFactor,
@@ -12422,6 +14463,13 @@ namespace AnonPDF
             // Set AutoScrollPosition.
             // Note: AutoScrollPosition property interprets values as negative offsets.
             panel.AutoScrollPosition = new Point(scrollX, scrollY);
+
+            if (DebugLogEnabled && (rotation == 90 || rotation == 270))
+            {
+                LogDebug(
+                    $"SearchCenter page={pageNumber} pageRot={rotation} pdfRect={FormatRectFInvariant(new RectangleF(resultRect.GetX(), resultRect.GetY(), resultRect.GetWidth(), resultRect.GetHeight()))} " +
+                    $"viewRect={FormatRectFInvariant(pdfCoordinates)} scaledRect={FormatRectFInvariant(scaledRect)} scrollTarget={{X={scrollX},Y={scrollY}}}");
+            }
         }
 
         private ListViewItem FindListViewItemByPageNumber(int pageNumber)
@@ -12755,7 +14803,12 @@ namespace AnonPDF
                     result.Rect.GetWidth() - 2 * searchWidthCorrection,
                     result.Rect.GetHeight());
                 // Convert rectangle from iText layout to layout used by redactionBlocks
-                var convertedRect = ConvertToPdfCoordinates(screenRect, result.PageNumber, rotation);
+                var convertedRect = ConvertPdfToViewCoordinates(screenRect, result.PageNumber, rotation);
+                if (DebugLogEnabled && (rotation == 90 || rotation == 270))
+                {
+                    LogDebug(
+                        $"SearchToSelection page={result.PageNumber} pageRot={rotation} pdfRect={FormatRectFInvariant(screenRect)} viewRect={FormatRectFInvariant(convertedRect)}");
+                }
                 return new { result.PageNumber, ConvertedRect = convertedRect };
             }).ToList();
 
@@ -13034,6 +15087,11 @@ namespace AnonPDF
         private void AddRasterImageToolStripMenuItem_Click(object sender, EventArgs e)
         {
             AddRasterImageFromFileDialog();
+        }
+
+        private void AddArrowToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            AddArrowObject();
         }
 
         private void PasteObjectFromClipboardToolStripMenuItem_Click(object sender, EventArgs e)
@@ -14221,8 +16279,190 @@ namespace AnonPDF
         }
     }
 
+    public class EditArrowDialog : Form
+    {
+        private Button btnColor;
+        private NumericUpDown nudThickness;
+        private NumericUpDown nudHeadLength;
+        private NumericUpDown nudHeadWidth;
+        private CheckBox chkLocked;
+        private Button btnOK;
+        private Button btnCancel;
+        private bool suppressAutoApply;
 
+        public System.Drawing.Color ArrowColor { get; set; } = System.Drawing.Color.Red;
+        public float ThicknessValue { get; set; } = 3f;
+        public float HeadLengthValue { get; set; } = 18f;
+        public float HeadWidthValue { get; set; } = 12f;
+        public bool IsLocked { get; set; }
+        public Action ApplyChanges { get; set; }
 
+        public EditArrowDialog()
+        {
+            InitializeComponents();
+        }
+
+        private void InitializeComponents()
+        {
+            Text = "Edytuj strzalke";
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            StartPosition = FormStartPosition.CenterParent;
+            Width = 360;
+            Height = 280;
+            MaximizeBox = false;
+            MinimizeBox = false;
+
+            Label lblColor = new Label { Text = "Kolor:", Location = new Point(16, 22), AutoSize = true };
+            btnColor = new Button { Location = new Point(170, 16), Size = new Size(160, 28), Text = "Wybierz kolor" };
+            btnColor.Click += BtnColor_Click;
+
+            Label lblThickness = new Label { Text = "Grubosc linii:", Location = new Point(16, 64), AutoSize = true };
+            nudThickness = new NumericUpDown
+            {
+                Location = new Point(170, 60),
+                Size = new Size(160, 22),
+                Minimum = 1,
+                Maximum = 24,
+                DecimalPlaces = 1,
+                Increment = 0.5m
+            };
+            nudThickness.ValueChanged += (_, __) => TryApplyChanges();
+
+            Label lblHeadLength = new Label { Text = "Dlugosc grotu:", Location = new Point(16, 100), AutoSize = true };
+            nudHeadLength = new NumericUpDown
+            {
+                Location = new Point(170, 96),
+                Size = new Size(160, 22),
+                Minimum = 4,
+                Maximum = 120,
+                DecimalPlaces = 1,
+                Increment = 1m
+            };
+            nudHeadLength.ValueChanged += (_, __) => TryApplyChanges();
+
+            Label lblHeadWidth = new Label { Text = "Szerokosc grotu:", Location = new Point(16, 136), AutoSize = true };
+            nudHeadWidth = new NumericUpDown
+            {
+                Location = new Point(170, 132),
+                Size = new Size(160, 22),
+                Minimum = 4,
+                Maximum = 120,
+                DecimalPlaces = 1,
+                Increment = 1m
+            };
+            nudHeadWidth.ValueChanged += (_, __) => TryApplyChanges();
+
+            chkLocked = new CheckBox
+            {
+                Text = "Zablokuj obiekt",
+                Location = new Point(16, 168),
+                AutoSize = true
+            };
+            chkLocked.CheckedChanged += (_, __) => TryApplyChanges();
+
+            btnOK = new Button
+            {
+                Text = Resources.Merge_OK,
+                Location = new Point(166, 202),
+                Size = new Size(80, 30),
+                DialogResult = DialogResult.OK
+            };
+            btnOK.Click += BtnOK_Click;
+
+            btnCancel = new Button
+            {
+                Text = Resources.Merge_Cancel,
+                Location = new Point(252, 202),
+                Size = new Size(80, 30),
+                DialogResult = DialogResult.Cancel
+            };
+
+            Controls.Add(lblColor);
+            Controls.Add(btnColor);
+            Controls.Add(lblThickness);
+            Controls.Add(nudThickness);
+            Controls.Add(lblHeadLength);
+            Controls.Add(nudHeadLength);
+            Controls.Add(lblHeadWidth);
+            Controls.Add(nudHeadWidth);
+            Controls.Add(chkLocked);
+            Controls.Add(btnOK);
+            Controls.Add(btnCancel);
+
+            AcceptButton = btnOK;
+            CancelButton = btnCancel;
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            suppressAutoApply = true;
+            try
+            {
+                btnColor.BackColor = ArrowColor;
+                nudThickness.Value = ClampValue((decimal)ThicknessValue, nudThickness.Minimum, nudThickness.Maximum);
+                nudHeadLength.Value = ClampValue((decimal)HeadLengthValue, nudHeadLength.Minimum, nudHeadLength.Maximum);
+                nudHeadWidth.Value = ClampValue((decimal)HeadWidthValue, nudHeadWidth.Minimum, nudHeadWidth.Maximum);
+                chkLocked.Checked = IsLocked;
+                SyncPropertiesFromControls();
+            }
+            finally
+            {
+                suppressAutoApply = false;
+            }
+        }
+
+        private static decimal ClampValue(decimal value, decimal min, decimal max)
+        {
+            if (value < min)
+            {
+                return min;
+            }
+            if (value > max)
+            {
+                return max;
+            }
+            return value;
+        }
+
+        private void BtnColor_Click(object sender, EventArgs e)
+        {
+            using (var colorDialog = new ColorDialog())
+            {
+                colorDialog.Color = ArrowColor;
+                if (colorDialog.ShowDialog(this) == DialogResult.OK)
+                {
+                    ArrowColor = colorDialog.Color;
+                    btnColor.BackColor = ArrowColor;
+                    TryApplyChanges();
+                }
+            }
+        }
+
+        private void BtnOK_Click(object sender, EventArgs e)
+        {
+            SyncPropertiesFromControls();
+        }
+
+        private void SyncPropertiesFromControls()
+        {
+            ThicknessValue = (float)nudThickness.Value;
+            HeadLengthValue = (float)nudHeadLength.Value;
+            HeadWidthValue = (float)nudHeadWidth.Value;
+            IsLocked = chkLocked.Checked;
+        }
+
+        private void TryApplyChanges()
+        {
+            if (ApplyChanges == null || suppressAutoApply)
+            {
+                return;
+            }
+
+            SyncPropertiesFromControls();
+            ApplyChanges?.Invoke();
+        }
+    }
     public class SplitDocumentDialog : Form
     {
         private Label lblFile;
@@ -14934,6 +17174,7 @@ namespace AnonPDF
         public HashSet<int> PagesToRemove { get; set; }
         public List<TextAnnotation> TextAnnotations { get; set; }
         public List<RasterObject> RasterObjects { get; set; }
+        public List<ArrowObject> ArrowObjects { get; set; }
         public Dictionary<int, int> PageRotationOffsets { get; set; }
         public int CurrentPage { get; set; }
         public float? ZoomFactor { get; set; }
@@ -14959,6 +17200,21 @@ namespace AnonPDF
         public string FilePath { get; set; }
         public byte[] EmbeddedBytes { get; set; }
         public string MimeType { get; set; }
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+    }
+
+    public class ArrowObject
+    {
+        public string Id { get; set; }
+        public int PageNumber { get; set; }
+        public PointF Start { get; set; }
+        public PointF End { get; set; }
+        public int LineColorArgb { get; set; } = System.Drawing.Color.Red.ToArgb();
+        public float Thickness { get; set; } = 3f;
+        public float HeadLength { get; set; } = 18f;
+        public float HeadWidth { get; set; } = 12f;
+        public bool IsLocked { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     }
@@ -15875,3 +18131,4 @@ namespace AnonPDF
 }
 
 #pragma warning restore SPELL
+

@@ -225,6 +225,9 @@
   <data name="Menu_PasteObjectFromClipboard" xml:space="preserve">
     <value>Wklej obiekt ze schowka</value>
   </data>
+  <data name="Menu_AddSnapToGrid" xml:space="preserve">
+    <value>Dociagaj obiekty do siatki</value>
+  </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
     <value>Kopiuj tekst do schowka</value>
   </data>
@@ -902,6 +905,9 @@ Masz zdefiniowane i nie zapisane zaznaczenia w treści...</value>
   </data>
   <data name="Msg_Confirm_DeleteRasterObject" xml:space="preserve">
     <value>Czy na pewno chcesz usunąć ten obiekt graficzny?</value>
+  </data>
+  <data name="Msg_Confirm_DeleteMultipleObjects" xml:space="preserve">
+    <value>Czy na pewno chcesz usunąć zaznaczone obiekty?</value>
   </data>
   <data name="Msg_Confirm_ClearAllSelections" xml:space="preserve">
     <value>Czy na pewno chcesz usunąć wszystkie zaznaczenia z dokumentu?</value>
