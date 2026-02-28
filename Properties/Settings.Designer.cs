@@ -70,6 +70,18 @@ namespace AnonPDF.Properties {
                 this["LastColorCheckBoxState"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LastOutlineCheckBoxState {
+            get {
+                return ((bool)(this["LastOutlineCheckBoxState"]));
+            }
+            set {
+                this["LastOutlineCheckBoxState"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

@@ -752,6 +752,7 @@ namespace AnonPDF
             openSavedPDFCheckBox.CheckedChanged += OpenSavedPdfCheckBox_CheckedChanged;
             safeModeCheckBox.CheckedChanged += SafeModeCheckBox_CheckedChanged;
             colorCheckBox.CheckedChanged += ColorCheckBox_CheckedChanged;
+            outlineCheckBox.CheckedChanged += OutlineCheckBox_CheckedChanged;
             signaturesRemoveRadioButton.CheckedChanged += SignaturesRemoveRadioButton_CheckedChanged;
             signaturesOriginalRadioButton.CheckedChanged += SignaturesOriginalRadioButton_CheckedChanged;
             signaturesReportRadioButton.CheckedChanged += SignaturesReportRadioButton_CheckedChanged;
@@ -799,12 +800,14 @@ namespace AnonPDF
             selectionLastButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(selectionLastButton, CurrentTheme);
             clearPageButton.EnabledChanged += (_, __) => ApplySecondaryButtonTheme(clearPageButton, CurrentTheme);
             colorCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
+            outlineCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
             openSavedPDFCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
             safeModeCheckBox.EnabledChanged += (_, __) => UpdateOptionsGroupState();
             setSavePassword.EnabledChanged += (_, __) => UpdateOptionsGroupState();
 
             // Load last session state
             colorCheckBox.Checked = Properties.Settings.Default.LastColorCheckBoxState;
+            outlineCheckBox.Checked = Properties.Settings.Default.LastOutlineCheckBoxState;
             openSavedPDFCheckBox.Checked = Properties.Settings.Default.LastOpenSavedPDFCheckBoxState;
             signaturesRemoveRadioButton.Checked = Properties.Settings.Default.LastSignaturesRemoveRadioButton;
             signaturesOriginalRadioButton.Checked = Properties.Settings.Default.LastSignaturesOriginalRadioButton;
@@ -1818,6 +1821,7 @@ namespace AnonPDF
 
             // Checkboxes and radios
             try { colorCheckBox.Text = Resources.UI_Check_HighlightColor; } catch { }
+            try { outlineCheckBox.Text = LocalizedText("UI_Check_ShowOutline"); } catch { }
             try { openSavedPDFCheckBox.Text = Resources.UI_Check_PreviewAfterSave; } catch { }
             try { safeModeCheckBox.Text = Resources.UI_Check_SafeMode; } catch { }
             try { setSavePassword.Text = Resources.UI_Check_SetPassword; } catch { }
@@ -1889,6 +1893,7 @@ namespace AnonPDF
             try { toolTip1.SetToolTip(saveProjectAsButton, Resources.Tooltip_SaveProjectAs); } catch { }
             try { toolTip1.SetToolTip(openProjectButton, Resources.Tooltip_OpenProject); } catch { }
             try { toolTip1.SetToolTip(colorCheckBox, Resources.Tooltip_HighlightColor); } catch { }
+            try { toolTip1.SetToolTip(outlineCheckBox, LocalizedText("Tooltip_ShowOutline")); } catch { }
             try { toolTip1.SetToolTip(selectionFirstButton, Resources.Tooltip_SelectionFirst); } catch { }
             try { toolTip1.SetToolTip(selectionNextButton, Resources.Tooltip_SelectionNext); } catch { }
             try { toolTip1.SetToolTip(selectionPrevButton, Resources.Tooltip_SelectionPrev); } catch { }
@@ -6554,7 +6559,7 @@ namespace AnonPDF
 
 
                 PdfCleanUpTool cleanUpTool = new PdfCleanUpTool(pdfDoc);
-                var markerVisualPdfBoundsByBlock = new Dictionary<RedactionBlock, RectangleF>();
+                var redactionVisualPdfBoundsByBlock = new Dictionary<RedactionBlock, RectangleF>();
                 // Group redaction blocks by pages
                 var blocksByPage = redactionBlocks.GroupBy(b => b.PageNumber);
                 var visitedPages = new HashSet<int>();
@@ -6578,38 +6583,31 @@ namespace AnonPDF
                         {
                             LogDebug($"Redact block page={pageNum} rect={block.Bounds} -> pdfRect={pdfCoordinates}");
                         }
-                        iText.Kernel.Geom.Rectangle rectangle = new iText.Kernel.Geom.Rectangle(
+                        iText.Kernel.Geom.Rectangle cleanupRectangle = new iText.Kernel.Geom.Rectangle(
                             pdfCoordinates.X,
                             pdfCoordinates.Y,
                             pdfCoordinates.Width,
                             pdfCoordinates.Height
                         );
 
+                        iText.Kernel.Geom.Rectangle visualRectangle = cleanupRectangle;
                         if (block.IsMarkerSelection)
                         {
-                            iText.Kernel.Geom.Rectangle markerVisualRectangle = ExpandMarkerCleanupRectangleToTextBounds(
+                            visualRectangle = ExpandMarkerCleanupRectangleToTextBounds(
                                 pageWithSelections,
-                                rectangle,
+                                cleanupRectangle,
                                 pageNum,
                                 rotation,
                                 "visual");
-                            markerVisualPdfBoundsByBlock[block] = ConvertToItTextRectangleF(markerVisualRectangle);
                             if (DebugLogEnabled)
                             {
                                 LogDebug(
-                                    $"Redact marker-visual page={pageNum} source={FormatRectFInvariant(pdfCoordinates)} visual={FormatRectFInvariant(ConvertToItTextRectangleF(markerVisualRectangle))}");
-                            }
+                                    $"Redact marker-visual page={pageNum} source={FormatRectFInvariant(pdfCoordinates)} visual={FormatRectFInvariant(ConvertToItTextRectangleF(visualRectangle))}");
+                                }
                         }
+                        redactionVisualPdfBoundsByBlock[block] = ConvertToItTextRectangleF(visualRectangle);
 
-                        PdfCleanUpLocation cleanUpLocation;
-                        if (colorCheckBox.Checked)
-                        {
-                            cleanUpLocation = new PdfCleanUpLocation(pageNum, rectangle, cleanUpColorBlack);
-                        }
-                        else
-                        {
-                            cleanUpLocation = new PdfCleanUpLocation(pageNum, rectangle, cleanUpColorWhite);
-                        }
+                        PdfCleanUpLocation cleanUpLocation = new PdfCleanUpLocation(pageNum, cleanupRectangle, cleanUpColorWhite);
                         cleanUpTool.AddCleanupLocation(cleanUpLocation);
                     }
                 }
@@ -6626,9 +6624,9 @@ namespace AnonPDF
                     return;
                 }
 
-                if (colorCheckBox.Checked && markerVisualPdfBoundsByBlock.Count > 0)
+                if ((colorCheckBox.Checked || outlineCheckBox.Checked) && redactionVisualPdfBoundsByBlock.Count > 0)
                 {
-                    foreach (var pageGroup in markerVisualPdfBoundsByBlock
+                    foreach (var pageGroup in redactionVisualPdfBoundsByBlock
                         .Where(kvp => kvp.Key != null && kvp.Key.PageNumber >= 1 && kvp.Key.PageNumber <= pdfDoc.GetNumberOfPages())
                         .GroupBy(kvp => kvp.Key.PageNumber))
                     {
@@ -6643,11 +6641,24 @@ namespace AnonPDF
                                 continue;
                             }
 
-                            canvas.SaveState();
-                            canvas.SetFillColor(cleanUpColorBlack);
-                            canvas.Rectangle(visualRect.X, visualRect.Y, visualRect.Width, visualRect.Height);
-                            canvas.Fill();
-                            canvas.RestoreState();
+                            if (colorCheckBox.Checked)
+                            {
+                                canvas.SaveState();
+                                canvas.SetFillColor(cleanUpColorBlack);
+                                canvas.Rectangle(visualRect.X, visualRect.Y, visualRect.Width, visualRect.Height);
+                                canvas.Fill();
+                                canvas.RestoreState();
+                            }
+
+                            if (outlineCheckBox.Checked)
+                            {
+                                canvas.SaveState();
+                                canvas.SetStrokeColor(cleanUpColorBlack);
+                                canvas.SetLineWidth(0.4f);
+                                canvas.Rectangle(visualRect.X, visualRect.Y, visualRect.Width, visualRect.Height);
+                                canvas.Stroke();
+                                canvas.RestoreState();
+                            }
                         }
                     }
                 }
@@ -7023,7 +7034,7 @@ namespace AnonPDF
                     })
                     .ToList();
 
-                RenderFootnoteMarkersToPdf(pdfDoc, pagesWithBakedRotation, footnoteRenderableBlocks, footnoteBasisNumberMap, markerVisualPdfBoundsByBlock);
+                RenderFootnoteMarkersToPdf(pdfDoc, pagesWithBakedRotation, footnoteRenderableBlocks, footnoteBasisNumberMap, redactionVisualPdfBoundsByBlock);
 
                 if (pagesToRemove.Count > 0)
                 {
@@ -7503,6 +7514,7 @@ namespace AnonPDF
             saveProjectAsButton.Enabled = true;
             buttonRedactText.Enabled = true;
             colorCheckBox.Enabled = true;
+            outlineCheckBox.Enabled = true;
             setSavePassword.Enabled = true;
             openSavedPDFCheckBox.Enabled = true;
             safeModeCheckBox.Enabled = true;
@@ -7749,6 +7761,7 @@ namespace AnonPDF
             saveProjectButton.Enabled = false;
             buttonRedactText.Enabled = false;
             colorCheckBox.Enabled = false;
+            outlineCheckBox.Enabled = false;
             setSavePassword.Enabled = false;
             openSavedPDFCheckBox.Enabled = false;
             safeModeCheckBox.Enabled = false;
@@ -10612,7 +10625,7 @@ namespace AnonPDF
             ISet<int> pagesWithBakedRotation,
             IList<RedactionBlock> blocksWithFootnotes,
             IDictionary<string, int> basisNumberMap,
-            IDictionary<RedactionBlock, RectangleF> markerVisualPdfBoundsByBlock)
+            IDictionary<RedactionBlock, RectangleF> redactionVisualPdfBoundsByBlock)
         {
             if (pdfDoc == null || blocksWithFootnotes == null || blocksWithFootnotes.Count == 0)
             {
@@ -10645,7 +10658,7 @@ namespace AnonPDF
                     pageNumber,
                     rotation,
                     includeBaseRotation,
-                    markerVisualPdfBoundsByBlock);
+                    redactionVisualPdfBoundsByBlock);
                 float markerWidth = Math.Max(8f, markerFont.GetWidth(markerText, markerFontSize));
                 float markerHeight = markerFontSize + 1f;
                 PointF markerViewPoint = GetFootnoteAnchorPointForPdfExport(markerAnchorRect, rotation);
@@ -10712,7 +10725,7 @@ namespace AnonPDF
             int pageNumber,
             int rotation,
             bool includeBaseRotation,
-            IDictionary<RedactionBlock, RectangleF> markerVisualPdfBoundsByBlock)
+            IDictionary<RedactionBlock, RectangleF> redactionVisualPdfBoundsByBlock)
         {
             if (block == null || page == null)
             {
@@ -10720,10 +10733,6 @@ namespace AnonPDF
             }
 
             RectangleF anchorRect = block.Bounds;
-            if (!block.IsMarkerSelection)
-            {
-                return anchorRect;
-            }
 
             RectangleF sourcePdfRect = ConvertToPdfCoordinates(
                 block.Bounds,
@@ -10732,8 +10741,8 @@ namespace AnonPDF
                 includeBaseRotation);
             RectangleF visualPdfRect = sourcePdfRect;
             RectangleF cachedVisualRect = sourcePdfRect;
-            bool hasCachedVisualRect = markerVisualPdfBoundsByBlock != null &&
-                                       markerVisualPdfBoundsByBlock.TryGetValue(block, out cachedVisualRect);
+            bool hasCachedVisualRect = redactionVisualPdfBoundsByBlock != null &&
+                                       redactionVisualPdfBoundsByBlock.TryGetValue(block, out cachedVisualRect);
             if (hasCachedVisualRect)
             {
                 visualPdfRect = cachedVisualRect;
@@ -10752,7 +10761,8 @@ namespace AnonPDF
                 LogDebug(
                     $"FootnoteAnchor page={pageNumber} rot={normalizedRotation} includeBase={includeBaseRotation} " +
                     $"blockView={FormatRectFInvariant(block.Bounds)} sourcePdf={FormatRectFInvariant(sourcePdfRect)} " +
-                    $"visualPdf={FormatRectFInvariant(visualPdfRect)} fromCache={hasCachedVisualRect} anchorView={FormatRectFInvariant(anchorRect)}");
+                    $"visualPdf={FormatRectFInvariant(visualPdfRect)} fromCache={hasCachedVisualRect} marker={block.IsMarkerSelection} " +
+                    $"anchorView={FormatRectFInvariant(anchorRect)}");
             }
 
             return anchorRect;
@@ -15737,6 +15747,18 @@ namespace AnonPDF
         {
             Properties.Settings.Default.LastColorCheckBoxState = colorCheckBox.Checked;
             Properties.Settings.Default.Save();
+        }
+
+        private void OutlineCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.LastOutlineCheckBoxState = outlineCheckBox.Checked;
+            Properties.Settings.Default.Save();
+
+            if (outlineCheckBox.Enabled)
+            {
+                renderTimer.Stop();
+                renderTimer.Start();
+            }
         }
 
         private void OpenSavedPdfCheckBox_CheckedChanged(object sender, EventArgs e)

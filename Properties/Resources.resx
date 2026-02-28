@@ -363,6 +363,9 @@
   <data name="UI_Check_HighlightColor" xml:space="preserve">
     <value>Wyróżnienie kolorem</value>
   </data>
+  <data name="UI_Check_ShowOutline" xml:space="preserve">
+    <value>Pokaż obrys</value>
+  </data>
   <data name="UI_Check_PreviewAfterSave" xml:space="preserve">
     <value>Podgląd po zapisaniu</value>
   </data>
@@ -547,6 +550,9 @@ Ponowne kliknięcie usunie zaznaczenia.</value>
   </data>
   <data name="Tooltip_HighlightColor" xml:space="preserve">
     <value>W zapisie zaznaczenia będą wyróżnione kolorem.</value>
+  </data>
+  <data name="Tooltip_ShowOutline" xml:space="preserve">
+    <value>W zapisie pokaż cienki obrys zaznaczeń.</value>
   </data>
   <data name="Tooltip_SelectionFirst" xml:space="preserve">
     <value>Pierwsza strona z zaznaczeniami.</value>

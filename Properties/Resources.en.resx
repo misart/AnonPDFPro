@@ -363,6 +363,9 @@
   <data name="UI_Check_HighlightColor" xml:space="preserve">
     <value>Highlight with color</value>
   </data>
+  <data name="UI_Check_ShowOutline" xml:space="preserve">
+    <value>Show outline</value>
+  </data>
   <data name="UI_Check_PreviewAfterSave" xml:space="preserve">
     <value>Preview after save</value>
   </data>
@@ -547,6 +550,9 @@ Click again to remove marks.</value>
   </data>
   <data name="Tooltip_HighlightColor" xml:space="preserve">
     <value>Highlights will be colored in the saved file.</value>
+  </data>
+  <data name="Tooltip_ShowOutline" xml:space="preserve">
+    <value>Draw a thin outline for redaction areas in the saved file.</value>
   </data>
   <data name="Tooltip_SelectionFirst" xml:space="preserve">
     <value>First page with selections.</value>

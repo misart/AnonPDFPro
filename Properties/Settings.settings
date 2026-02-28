@@ -14,6 +14,9 @@
     <Setting Name="LastColorCheckBoxState" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="LastOutlineCheckBoxState" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="LastOpenSavedPDFCheckBoxState" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

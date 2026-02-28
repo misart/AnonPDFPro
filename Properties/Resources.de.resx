@@ -29,7 +29,7 @@ BEARBEITUNG GESPERRT</value>
     <value>Lizenz aktivieren...</value>
   </data>
   <data name="Msg_UpdateCheckInProgress" xml:space="preserve">
-    <value>Die Update-PrĂĽfung lĂ¤uft bereits.</value>
+    <value>Die Update-Prüfung läuft bereits.</value>
   </data>
   <data name="Msg_UpdateInfoFetchFailed" xml:space="preserve">
     <value>Update-Informationen konnten nicht geladen werden.</value>
@@ -38,19 +38,19 @@ BEARBEITUNG GESPERRT</value>
     <value>Sie verwenden bereits die neueste Version.</value>
   </data>
   <data name="Msg_StandaloneUpdate_AskDownloadAndRun" xml:space="preserve">
-    <value>MĂ¶chten Sie das Installationsprogramm jetzt herunterladen und starten?</value>
+    <value>Möchten Sie das Installationsprogramm jetzt herunterladen und starten?</value>
   </data>
   <data name="Title_UpdateAvailable" xml:space="preserve">
-    <value>Update verfĂĽgbar</value>
+    <value>Update verfügbar</value>
   </data>
   <data name="Msg_UpdateCancelled" xml:space="preserve">
     <value>Update wurde abgebrochen.</value>
   </data>
   <data name="Err_StandaloneUpdate_InvalidInstallerLink" xml:space="preserve">
-    <value>Kein gĂĽltiger Installations-Link in version.json gefunden (downloadUrl).</value>
+    <value>Kein gültiger Installations-Link in version.json gefunden (downloadUrl).</value>
   </data>
   <data name="Msg_StandaloneUpdate_DownloadInProgress" xml:space="preserve">
-    <value>Der Download des Update-Installers lĂ¤uft bereits. Bitte warten.</value>
+    <value>Der Download des Update-Installers läuft bereits. Bitte warten.</value>
   </data>
   <data name="Msg_StandaloneUpdate_Downloading" xml:space="preserve">
     <value>Der Update-Installer wird heruntergeladen. Bitte warten.
@@ -63,7 +63,7 @@ Sie erhalten eine Benachrichtigung nach Abschluss des Downloads.</value>
   <data name="Msg_StandaloneUpdate_InstallerReadyAskClose" xml:space="preserve">
     <value>Der Update-Installer wurde heruntergeladen.
 
-Anwendung schlieĂźen und Installer jetzt starten?</value>
+Anwendung schließen und Installer jetzt starten?</value>
   </data>
   <data name="Title_UpdateReady" xml:space="preserve">
     <value>Update bereit</value>
@@ -75,19 +75,19 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Installer konnte nicht gestartet werden: {0}</value>
   </data>
   <data name="Msg_LicenseActivation_StandaloneOnly" xml:space="preserve">
-    <value>Die Lizenzaktivierung aus Datei ist nur im Einzelplatzmodus verfĂĽgbar.</value>
+    <value>Die Lizenzaktivierung aus Datei ist nur im Einzelplatzmodus verfügbar.</value>
   </data>
   <data name="Dialog_SelectLicensePackage_Title" xml:space="preserve">
-    <value>Lizenzpaket auswĂ¤hlen</value>
+    <value>Lizenzpaket auswählen</value>
   </data>
   <data name="Dialog_SelectLicensePackage_Filter" xml:space="preserve">
     <value>Lizenzpakete (*.zip)|*.zip|Alle Dateien (*.*)|*.*</value>
   </data>
   <data name="Err_LicensePackage_NotFound" xml:space="preserve">
-    <value>Das ausgewĂ¤hlte Lizenzpaket wurde nicht gefunden.</value>
+    <value>Das ausgewählte Lizenzpaket wurde nicht gefunden.</value>
   </data>
   <data name="Err_LicensePackage_UnsupportedFile" xml:space="preserve">
-    <value>Nicht unterstĂĽtzte Datei im Paket: {0}</value>
+    <value>Nicht unterstützte Datei im Paket: {0}</value>
   </data>
   <data name="Err_LicensePackage_DuplicateFile" xml:space="preserve">
     <value>Doppelte Datei im Paket: {0}</value>
@@ -96,7 +96,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Erforderliche Datei im Paket fehlt: {0}</value>
   </data>
   <data name="Err_LicensePackage_InvalidLicense" xml:space="preserve">
-    <value>Das Paket enthĂ¤lt keine gĂĽltige AnonPDFPro-Lizenz.</value>
+    <value>Das Paket enthält keine gültige AnonPDFPro-Lizenz.</value>
   </data>
   <data name="Msg_LicenseActivated" xml:space="preserve">
     <value>Lizenz wurde aktiviert.</value>
@@ -105,7 +105,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Lizenz konnte nicht aktiviert werden: {0}</value>
   </data>
   <data name="Err_BitmapsDifferentDimensions" xml:space="preserve">
-    <value>Beide Bitmaps mĂĽssen dieselben Abmessungen haben.</value>
+    <value>Beide Bitmaps müssen dieselben Abmessungen haben.</value>
   </data>
   <data name="UI_PageCountTotalFormat" xml:space="preserve">
     <value>/ {0}</value>
@@ -117,7 +117,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Organisation</value>
   </data>
   <data name="Msg_PageMarkedForDeletion_UnmarkToEdit" xml:space="preserve">
-    <value>Diese Seite ist zum LĂ¶schen markiert. Markierung zuerst entfernen, um die Seite zu bearbeiten.</value>
+    <value>Diese Seite ist zum Löschen markiert. Markierung zuerst entfernen, um die Seite zu bearbeiten.</value>
   </data>
   <data name="Msg_TextAnnotation_Unlocked" xml:space="preserve">
     <value>Entsperrt</value>
@@ -126,7 +126,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Gesperrt</value>
   </data>
   <data name="Err_StandaloneUpdate_MsiexecNoProcess" xml:space="preserve">
-    <value>Der Installerstart hat keinen Prozess zurĂĽckgegeben.</value>
+    <value>Der Installerstart hat keinen Prozess zurückgegeben.</value>
   </data>
   <data name="Err_Codec_TiffMissing" xml:space="preserve">
     <value>TIFF-Codec wurde auf diesem System nicht gefunden.</value>
@@ -147,13 +147,13 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value> [DEMO: Lizenz widerrufen]</value>
   </data>
   <data name="Demo_TitleSuffix_UpdateOutOfRange" xml:space="preserve">
-    <value> [DEMO: keine Lizenz fĂĽr neuere Versionen]</value>
+    <value> [DEMO: keine Lizenz für neuere Versionen]</value>
   </data>
   <data name="Demo_TitleSuffix_Default" xml:space="preserve">
     <value> [DEMO VERSION]</value>
   </data>
   <data name="Demo_TitleSuffix_DaysLeft" xml:space="preserve">
-    <value> [DEMO: {0} Tage ĂĽbrig]</value>
+    <value> [DEMO: {0} Tage übrig]</value>
   </data>
   <data name="Demo_TitleSuffix_ExpiredOn" xml:space="preserve">
     <value> [DEMO: abgelaufen am {0:yyyy-MM-dd}]</value>
@@ -162,7 +162,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Lizenzstatus: fehlt</value>
   </data>
   <data name="LicenseStatus_Invalid" xml:space="preserve">
-    <value>Lizenzstatus: ungĂĽltig</value>
+    <value>Lizenzstatus: ungültig</value>
   </data>
   <data name="LicenseStatus_NoData" xml:space="preserve">
     <value>Lizenzstatus: keine Daten</value>
@@ -171,7 +171,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Lizenzstatus: DEMO (Lizenz widerrufen)</value>
   </data>
   <data name="LicenseStatus_Demo_UpdateOutOfRange" xml:space="preserve">
-    <value>Lizenzstatus: DEMO (keine Lizenz fĂĽr neuere Versionen)</value>
+    <value>Lizenzstatus: DEMO (keine Lizenz für neuere Versionen)</value>
   </data>
   <data name="LicenseStatus_Demo" xml:space="preserve">
     <value>Lizenzstatus: DEMO</value>
@@ -198,7 +198,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Support abgelaufen ({0:yyyy-MM-dd})</value>
   </data>
   <data name="LicensedTo_Line" xml:space="preserve">
-    <value>Lizenziert fĂĽr: {0}</value>
+    <value>Lizenziert für: {0}</value>
   </data>
   <data name="Err_InputFileDoesNotExist" xml:space="preserve">
     <value>Eingabedatei existiert nicht.</value>
@@ -217,7 +217,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
 </value>
   </data>
   <data name="Err_Merge_FilesHaveSecurity" xml:space="preserve">
-    <value>Dateien kĂ¶nnen nicht zusammengefĂĽhrt werden. Folgende Dateien haben Sicherheitseinstellungen:
+    <value>Dateien können nicht zusammengeführt werden. Folgende Dateien haben Sicherheitseinstellungen:
 
 </value>
   </data>
@@ -234,19 +234,19 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Lizenz-Payload oder Signatur fehlt.</value>
   </data>
   <data name="LicenseInfo_UnsupportedAlgorithm" xml:space="preserve">
-    <value>Nicht unterstĂĽtzter Signaturalgorithmus.</value>
+    <value>Nicht unterstützter Signaturalgorithmus.</value>
   </data>
   <data name="LicenseInfo_ParseError" xml:space="preserve">
     <value>Fehler beim Parsen der Lizenz: {0}</value>
   </data>
   <data name="LicenseInfo_PublicKeyNotFound" xml:space="preserve">
-    <value>Datei mit Ă¶ffentlichem SchlĂĽssel wurde nicht gefunden.</value>
+    <value>Datei mit öffentlichem Schlüssel wurde nicht gefunden.</value>
   </data>
   <data name="LicenseInfo_SignatureNotBase64" xml:space="preserve">
-    <value>Signatur ist kein gĂĽltiges Base64.</value>
+    <value>Signatur ist kein gültiges Base64.</value>
   </data>
   <data name="LicenseInfo_SignatureVerificationFailed" xml:space="preserve">
-    <value>SignaturprĂĽfung fehlgeschlagen: {0}</value>
+    <value>Signaturprüfung fehlgeschlagen: {0}</value>
   </data>
   <data name="Err_UnknownExceptionFallback" xml:space="preserve">
     <value>Unbekannte Ausnahme</value>
@@ -264,7 +264,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Warmer Sand</value>
   </data>
   <data name="Theme_ForestGreen" xml:space="preserve">
-    <value>WaldgrĂĽn</value>
+    <value>Waldgrün</value>
   </data>
   <data name="Theme_GraphiteDark" xml:space="preserve">
     <value>Dunkler Graphit</value>
@@ -315,19 +315,19 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Vorheriges Suchergebnis anzeigen.</value>
   </data>
   <data name="Tooltip_SearchResultNext" xml:space="preserve">
-    <value>NĂ¤chstes Suchergebnis anzeigen.</value>
+    <value>Nächstes Suchergebnis anzeigen.</value>
   </data>
   <data name="Tooltip_SearchResultLast" xml:space="preserve">
     <value>Letztes Suchergebnis anzeigen.</value>
   </data>
   <data name="Tooltip_SearchInput" xml:space="preserve">
-    <value>Suchtext eingeben und Enter drĂĽcken.</value>
+    <value>Suchtext eingeben und Enter drücken.</value>
   </data>
   <data name="UI_SearchClearGlyph" xml:space="preserve">
     <value>X</value>
   </data>
   <data name="About_Copyright" xml:space="preserve">
-    <value>Copyright Â© 2025â€“2026 UrzÂąd Miasta Szczecin; Ă„nderungen Â© 2026 MISART</value>
+    <value>Copyright © 2025–2026 Urz¹d Miasta Szczecin; Änderungen © 2026 MISART</value>
   </data>
   <data name="About_Description" xml:space="preserve">
     <value>Anwendung zur Anonymisierung von PDF-Dateien</value>
@@ -345,19 +345,19 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Vollbild</value>
   </data>
   <data name="Menu_Options_Theme" xml:space="preserve">
-    <value>OberflĂ¤chendesign</value>
+    <value>Oberflächendesign</value>
   </data>
   <data name="Menu_Help" xml:space="preserve">
     <value>?</value>
   </data>
   <data name="Menu_OpenPdf" xml:space="preserve">
-    <value>PDF Ă¶ffnen</value>
+    <value>PDF öffnen</value>
   </data>
   <data name="Menu_OpenProject" xml:space="preserve">
-    <value>Projekt Ă¶ffnen</value>
+    <value>Projekt öffnen</value>
   </data>
   <data name="Menu_OpenLast" xml:space="preserve">
-    <value>Letzte PDF und Projekt Ă¶ffnen</value>
+    <value>Letzte PDF und Projekt öffnen</value>
   </data>
   <data name="Menu_SaveProjectAs" xml:space="preserve">
     <value>Projekt speichern unter</value>
@@ -369,13 +369,13 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>PDF speichern</value>
   </data>
   <data name="Menu_SelectSignaturesToRemove" xml:space="preserve">
-    <value>Signaturen zum Entfernen wĂ¤hlen</value>
+    <value>Signaturen zum Entfernen wählen</value>
   </data>
   <data name="Menu_RecentFiles" xml:space="preserve">
     <value>Zuletzt verwendete Dateien</value>
   </data>
   <data name="Menu_CloseDocument" xml:space="preserve">
-    <value>Dokument schlieĂźen</value>
+    <value>Dokument schließen</value>
   </data>
   <data name="Menu_Exit" xml:space="preserve">
     <value>Beenden</value>
@@ -384,10 +384,10 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>PDF aufteilen</value>
   </data>
   <data name="Menu_MergePdf" xml:space="preserve">
-    <value>PDF zusammenfĂĽhren</value>
+    <value>PDF zusammenführen</value>
   </data>
   <data name="Menu_DeletePage" xml:space="preserve">
-    <value>Seite lĂ¶schen</value>
+    <value>Seite löschen</value>
   </data>
   <data name="Menu_RotatePage" xml:space="preserve">
     <value>Seite drehen</value>
@@ -396,7 +396,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>&amp;Objekte</value>
   </data>
   <data name="Menu_AddText" xml:space="preserve">
-    <value>Text hinzufĂĽgen</value>
+    <value>Text hinzufügen</value>
   </data>
   <data name="Menu_AddRasterImage" xml:space="preserve">
     <value>Bild hinzufuegen</value>
@@ -447,10 +447,10 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Grafiken exportieren</value>
   </data>
   <data name="Menu_IgnorePdfRestrictions" xml:space="preserve">
-    <value>PDF-EinschrĂ¤nkungen ignorieren</value>
+    <value>PDF-Einschränkungen ignorieren</value>
   </data>
   <data name="Menu_IgnorePdfRestrictions_Tooltip" xml:space="preserve">
-    <value>Erlaubt die Verarbeitung von PDF-Dateien mit vom EigentĂĽmer gesetzten BearbeitungseinschrĂ¤nkungen.</value>
+    <value>Erlaubt die Verarbeitung von PDF-Dateien mit vom Eigentümer gesetzten Bearbeitungseinschränkungen.</value>
   </data>
   <data name="Menu_Language" xml:space="preserve">
     <value>Sprache</value>
@@ -492,7 +492,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Alles leeren</value>
   </data>
   <data name="UI_Group_Open" xml:space="preserve">
-    <value>Ă–ffnen</value>
+    <value>Öffnen</value>
   </data>
   <data name="UI_Group_Save" xml:space="preserve">
     <value>Speichern</value>
@@ -513,7 +513,7 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Seiten</value>
   </data>
   <data name="UI_Group_PagesToRemove" xml:space="preserve">
-    <value>Zu lĂ¶schende Seiten</value>
+    <value>Zu löschende Seiten</value>
   </data>
   <data name="UI_Group_Filter" xml:space="preserve">
     <value>Filter</value>
@@ -522,10 +522,10 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>PDF speichern</value>
   </data>
   <data name="UI_Button_OpenPdf" xml:space="preserve">
-    <value>PDF Ă¶ffnen</value>
+    <value>PDF öffnen</value>
   </data>
   <data name="UI_Button_OpenProject" xml:space="preserve">
-    <value>Projekt Ă¶ffnen</value>
+    <value>Projekt öffnen</value>
   </data>
   <data name="UI_Button_ResumeWork" xml:space="preserve">
     <value>Arbeit fortsetzen</value>
@@ -539,8 +539,11 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
   <data name="UI_Check_HighlightColor" xml:space="preserve">
     <value>Farblich hervorheben</value>
   </data>
+  <data name="UI_Check_ShowOutline" xml:space="preserve">
+    <value>Umriss anzeigen</value>
+  </data>
   <data name="UI_Check_PreviewAfterSave" xml:space="preserve">
-    <value>Nach Speichern Ă¶ffnen</value>
+    <value>Nach Speichern öffnen</value>
   </data>
   <data name="UI_Check_SetPassword" xml:space="preserve">
     <value>Passwort setzen</value>
@@ -573,37 +576,37 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Suchergebnisse</value>
   </data>
   <data name="UI_Filter_Deletions" xml:space="preserve">
-    <value>Zum LĂ¶schen markiert</value>
+    <value>Zum Löschen markiert</value>
   </data>
   <data name="Tooltip_LoadPdf" xml:space="preserve">
-    <value>PDF-Datei zur Anonymisierung Ă¶ffnen. STRG + N.</value>
+    <value>PDF-Datei zur Anonymisierung öffnen. STRG + N.</value>
   </data>
   <data name="Tooltip_SetPassword" xml:space="preserve">
-    <value>Wenn aktiviert, wird die PDF-Datei mit einem Passwort geschĂĽtzt.</value>
+    <value>Wenn aktiviert, wird die PDF-Datei mit einem Passwort geschützt.</value>
   </data>
   <data name="Tooltip_RemovePage" xml:space="preserve">
-    <value>Aktuelle Seite zum LĂ¶schen markieren. ENTF.</value>
+    <value>Aktuelle Seite zum Löschen markieren. ENTF.</value>
   </data>
   <data name="Tooltip_RemovePageRange" xml:space="preserve">
-    <value>Seitenbereich zum LĂ¶schen auswĂ¤hlen oder LĂ¶schung aufheben.</value>
+    <value>Seitenbereich zum Löschen auswählen oder Löschung aufheben.</value>
   </data>
   <data name="Tooltip_Signatures_Report" xml:space="preserve">
-    <value>Signaturbericht auf einer zusĂ¤tzlichen Seite erstellen.</value>
+    <value>Signaturbericht auf einer zusätzlichen Seite erstellen.</value>
   </data>
   <data name="Tooltip_Signatures_Original" xml:space="preserve">
-    <value>Signaturen anonymisieren und ihre ursprĂĽngliche visuelle Darstellung beibehalten.</value>
+    <value>Signaturen anonymisieren und ihre ursprüngliche visuelle Darstellung beibehalten.</value>
   </data>
   <data name="Tooltip_Signatures_Remove" xml:space="preserve">
     <value>Qualifizierte Signaturen vor dem Speichern entfernen.</value>
   </data>
   <data name="Tooltip_PageNumber" xml:space="preserve">
-    <value>Seitennummer eingeben und Enter drĂĽcken.</value>
+    <value>Seitennummer eingeben und Enter drücken.</value>
   </data>
   <data name="Tooltip_FirstPage" xml:space="preserve">
     <value>Erste Seite. POS1.</value>
   </data>
   <data name="Tooltip_NextPage" xml:space="preserve">
-    <value>NĂ¤chste Seite. BILD AB.</value>
+    <value>Nächste Seite. BILD AB.</value>
   </data>
   <data name="Tooltip_PrevPage" xml:space="preserve">
     <value>Vorherige Seite. BILD AUF.</value>
@@ -615,13 +618,13 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
     <value>Auf Minimum verkleinern. STRG + Mausrad nach unten.</value>
   </data>
   <data name="Tooltip_ZoomMax" xml:space="preserve">
-    <value>Auf Maximum vergrĂ¶Ăźern. STRG + Mausrad nach oben.</value>
+    <value>Auf Maximum vergrößern. STRG + Mausrad nach oben.</value>
   </data>
   <data name="Tooltip_ZoomOut" xml:space="preserve">
     <value>Verkleinern. STRG + Mausrad nach unten.</value>
   </data>
   <data name="Tooltip_ZoomIn" xml:space="preserve">
-    <value>VergrĂ¶Ăźern. STRG + Mausrad nach oben.</value>
+    <value>Vergrößern. STRG + Mausrad nach oben.</value>
   </data>
   <data name="Tooltip_Search" xml:space="preserve">
     <value>Klicken, um zu suchen.</value>
@@ -631,31 +634,34 @@ Anwendung schlieĂźen und Installer jetzt starten?</value>
 Nochmal klicken, um Markierungen zu entfernen.</value>
   </data>
   <data name="Tooltip_SearchClear" xml:space="preserve">
-    <value>Suchergebnisse lĂ¶schen.</value>
+    <value>Suchergebnisse löschen.</value>
   </data>
   <data name="Tooltip_PersonalData" xml:space="preserve">
     <value>Nach Identifikatoren suchen (PESEL, Grundbuchnummer usw.).</value>
   </data>
   <data name="Tooltip_PreviewAfterSave" xml:space="preserve">
-    <value>Gespeicherte PDF nach dem Speichern Ă¶ffnen.</value>
+    <value>Gespeicherte PDF nach dem Speichern öffnen.</value>
   </data>
   <data name="Tooltip_SaveProject" xml:space="preserve">
     <value>Projekt mit Markierungen unter dem bisherigen Namen speichern. STRG + S.</value>
   </data>
   <data name="Tooltip_SaveProjectAs" xml:space="preserve">
-    <value>Projekt mit Markierungen unter einem gewĂ¤hlten Namen speichern.</value>
+    <value>Projekt mit Markierungen unter einem gewählten Namen speichern.</value>
   </data>
   <data name="Tooltip_OpenProject" xml:space="preserve">
-    <value>Projekt mit Markierungen zur Anonymisierung Ă¶ffnen. STRG + O.</value>
+    <value>Projekt mit Markierungen zur Anonymisierung öffnen. STRG + O.</value>
   </data>
   <data name="Tooltip_HighlightColor" xml:space="preserve">
     <value>Markierungen werden in der gespeicherten Datei farbig dargestellt.</value>
+  </data>
+  <data name="Tooltip_ShowOutline" xml:space="preserve">
+    <value>In der gespeicherten Datei einen dünnen Umriss der Markierungen anzeigen.</value>
   </data>
   <data name="Tooltip_SelectionFirst" xml:space="preserve">
     <value>Erste Seite mit Markierungen.</value>
   </data>
   <data name="Tooltip_SelectionNext" xml:space="preserve">
-    <value>NĂ¤chste Seite mit Markierungen.</value>
+    <value>Nächste Seite mit Markierungen.</value>
   </data>
   <data name="Tooltip_SelectionPrev" xml:space="preserve">
     <value>Vorherige Seite mit Markierungen.</value>
@@ -664,10 +670,10 @@ Nochmal klicken, um Markierungen zu entfernen.</value>
     <value>Letzte Seite mit Markierungen.</value>
   </data>
   <data name="Tooltip_Marker" xml:space="preserve">
-    <value>Marker-Modus â€” mit Strichen markieren. STRG - Box-Modus.</value>
+    <value>Marker-Modus — mit Strichen markieren. STRG - Box-Modus.</value>
   </data>
   <data name="Tooltip_Box" xml:space="preserve">
-    <value>Box-Modus â€” Rechteck zeichnen.</value>
+    <value>Box-Modus — Rechteck zeichnen.</value>
   </data>
   <data name="Tooltip_ClearPage" xml:space="preserve">
     <value>Markierungen von der aktuellen Seite entfernen.</value>
@@ -676,7 +682,7 @@ Nochmal klicken, um Markierungen zu entfernen.</value>
     <value>Alle Markierungen aus dem Dokument entfernen.</value>
   </data>
   <data name="Tooltip_SavePdf" xml:space="preserve">
-    <value>Anonymisierte PDF unter einem gewĂ¤hlten Namen speichern. STRG + UMSCHALT + S.</value>
+    <value>Anonymisierte PDF unter einem gewählten Namen speichern. STRG + UMSCHALT + S.</value>
   </data>
   <data name="Tooltip_PagesList" xml:space="preserve">
     <value>Ein Element anklicken, um die Seite anzuzeigen.</value>
@@ -696,7 +702,7 @@ Lizenzen und Komponenten:
 - BouncyCastle (MIT)
 - TesseractOCR (.NET) (Apache-2.0)
 
-Quellcode verfĂĽgbar unter AGPL-3.0 (siehe Datei LICENSE).
+Quellcode verfügbar unter AGPL-3.0 (siehe Datei LICENSE).
 Urheberrechte: siehe NOTICE.md.
 Repository: https://github.com/misart/AnonPDFPro</value>
   </data>
@@ -704,7 +710,7 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Geben Sie mindestens eine Seitennummer oder einen Teilungsschritt an!</value>
   </data>
   <data name="Delete_Err_StartGreater" xml:space="preserve">
-    <value>Die Startseite darf nicht grĂ¶Ăźer als die Endseite sein.</value>
+    <value>Die Startseite darf nicht größer als die Endseite sein.</value>
   </data>
   <data name="Delete_Label_End" xml:space="preserve">
     <value>Endseite:</value>
@@ -716,16 +722,16 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Schritt:</value>
   </data>
   <data name="Delete_Radio_Apply" xml:space="preserve">
-    <value>Zum LĂ¶schen markieren</value>
+    <value>Zum Löschen markieren</value>
   </data>
   <data name="Delete_Radio_Cancel" xml:space="preserve">
     <value>Markierung aufheben</value>
   </data>
   <data name="Delete_Title" xml:space="preserve">
-    <value>Seitenbereich auswĂ¤hlen</value>
+    <value>Seitenbereich auswählen</value>
   </data>
   <data name="Dialog_Filter_PAP" xml:space="preserve">
-    <value>APP-Projektdateien (*.app)|*.app|Ă„ltere PAP-Dateien (*.pap)|*.pap</value>
+    <value>APP-Projektdateien (*.app)|*.app|Ältere PAP-Dateien (*.pap)|*.pap</value>
   </data>
   <data name="Dialog_Filter_RasterImages" xml:space="preserve">
     <value>Bilddateien (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|Alle Dateien (*.*)|*.*</value>
@@ -734,16 +740,16 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>PDF-Dateien (*.pdf)|*.pdf</value>
   </data>
   <data name="Dialog_Title_OpenPap" xml:space="preserve">
-    <value>Projektdatei fĂĽr {0} auswĂ¤hlen</value>
+    <value>Projektdatei für {0} auswählen</value>
   </data>
   <data name="Dialog_Title_OpenPdf" xml:space="preserve">
-    <value>PDF-Datei auswĂ¤hlen</value>
+    <value>PDF-Datei auswählen</value>
   </data>
   <data name="Dialog_Title_SavePap" xml:space="preserve">
-    <value>Namen der Projektdatei fĂĽr {0} eingeben</value>
+    <value>Namen der Projektdatei für {0} eingeben</value>
   </data>
   <data name="Dialog_Title_AddRasterImage" xml:space="preserve">
-    <value>Rasterbild auswĂ¤hlen - {0}</value>
+    <value>Rasterbild auswählen - {0}</value>
   </data>
   <data name="Dialog_Title_SavePdfAs" xml:space="preserve">
     <value>PDF unter anderem Namen speichern</value>
@@ -758,10 +764,10 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Rechts</value>
   </data>
   <data name="EditText_ButtonColor" xml:space="preserve">
-    <value>Farbe wĂ¤hlen</value>
+    <value>Farbe wählen</value>
   </data>
   <data name="EditText_ButtonFont" xml:space="preserve">
-    <value>Schriftart wĂ¤hlen</value>
+    <value>Schriftart wählen</value>
   </data>
   <data name="EditText_EmptyError" xml:space="preserve">
     <value>Bitte geben Sie Text ein.</value>
@@ -770,7 +776,7 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Rasterobjekt bearbeiten</value>
   </data>
   <data name="EditRaster_GroupGeometry" xml:space="preserve">
-    <value>Position und GrĂ¶Ăźe</value>
+    <value>Position und Größe</value>
   </data>
   <data name="EditRaster_LabelX" xml:space="preserve">
     <value>X:</value>
@@ -782,7 +788,7 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Breite:</value>
   </data>
   <data name="EditRaster_LabelHeight" xml:space="preserve">
-    <value>HĂ¶he:</value>
+    <value>Höhe:</value>
   </data>
   <data name="EditRaster_GroupRotation" xml:space="preserve">
     <value>Drehung</value>
@@ -794,7 +800,7 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Optionen</value>
   </data>
   <data name="EditRaster_CheckLockAspect" xml:space="preserve">
-    <value>SeitenverhĂ¤ltnis sperren</value>
+    <value>Seitenverhältnis sperren</value>
   </data>
   <data name="EditRaster_CheckLocked" xml:space="preserve">
     <value>Objekt sperren</value>
@@ -821,7 +827,7 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Bild ersetzen</value>
   </data>
   <data name="EditRaster_ButtonResetAspect" xml:space="preserve">
-    <value>SeitenverhĂ¤ltnis zurĂĽcksetzen</value>
+    <value>Seitenverhältnis zurücksetzen</value>
   </data>
   <data name="EditRaster_ButtonResetOneToOne" xml:space="preserve">
     <value>1:1</value>
@@ -839,36 +845,36 @@ Repository: https://github.com/misart/AnonPDFPro</value>
     <value>Text eingeben:</value>
   </data>
   <data name="EditText_RotationLabel" xml:space="preserve">
-    <value>Winkel (Â°):</value>
+    <value>Winkel (°):</value>
   </data>
   <data name="EditText_Title" xml:space="preserve">
-    <value>Text hinzufĂĽgen</value>
+    <value>Text hinzufügen</value>
   </data>
   <data name="Err_AllPagesMarked" xml:space="preserve">
-    <value>Speichern nicht mĂ¶glich â€” alle Seiten sind zum LĂ¶schen markiert.</value>
+    <value>Speichern nicht möglich — alle Seiten sind zum Löschen markiert.</value>
   </data>
   <data name="Err_CannotAnonymizePdf" xml:space="preserve">
     <value>Diese PDF-Datei kann nicht anonymisiert werden!</value>
   </data>
   <data name="Err_Crop_OutsideBitmap" xml:space="preserve">
-    <value>Auswahl auĂźerhalb der Bitmap oder ohne GrĂ¶Ăźe: {0}</value>
+    <value>Auswahl außerhalb der Bitmap oder ohne Größe: {0}</value>
   </data>
   <data name="Err_IncorrectPassword" xml:space="preserve">
-    <value>Falsches Passwort â€” bitte erneut versuchen.</value>
+    <value>Falsches Passwort — bitte erneut versuchen.</value>
   </data>
   <data name="Err_InvalidPageNumber" xml:space="preserve">
-    <value>Geben Sie eine gĂĽltige Seitennummer ein.</value>
+    <value>Geben Sie eine gültige Seitennummer ein.</value>
   </data>
   <data name="Err_InvalidPageNumberValue" xml:space="preserve">
-    <value>UngĂĽltige Seitennummer: '{0}'.</value>
+    <value>Ungültige Seitennummer: '{0}'.</value>
   </data>
   <data name="Err_InvalidPdfFile" xml:space="preserve">
-    <value>Diese PDF-Datei ist ungĂĽltig.
+    <value>Diese PDF-Datei ist ungültig.
 
-PrĂĽfen Sie, ob Sie sie in einer anderen Anwendung Ă¶ffnen kĂ¶nnen.</value>
+Prüfen Sie, ob Sie sie in einer anderen Anwendung öffnen können.</value>
   </data>
   <data name="Err_InvalidProjectFormat" xml:space="preserve">
-    <value>Dieses Projektformat ist ungĂĽltig.
+    <value>Dieses Projektformat ist ungültig.
 
 Kontaktieren Sie den Autor der Anwendung.</value>
   </data>
@@ -888,7 +894,7 @@ Kontaktieren Sie den Autor der Anwendung.</value>
     <value>Fehler beim Speichern: {0}</value>
   </data>
   <data name="Err_SelectValidProjectFile" xml:space="preserve">
-    <value>WĂ¤hlen Sie eine gĂĽltige Projektdatei aus.</value>
+    <value>Wählen Sie eine gültige Projektdatei aus.</value>
   </data>
   <data name="Err_TooFewPages" xml:space="preserve">
     <value>Zu wenige Seiten im Dokument!</value>
@@ -902,7 +908,7 @@ Details wurden gespeichert in:
 {1}</value>
   </data>
   <data name="License_ConfigInvalid" xml:space="preserve">
-    <value>UngĂĽltige config.json: {0}</value>
+    <value>Ungültige config.json: {0}</value>
   </data>
   <data name="License_ConfigMissing" xml:space="preserve">
     <value>Fehlende config.json: {0}</value>
@@ -911,16 +917,16 @@ Details wurden gespeichert in:
     <value>Fehlende Lizenzdatei: {0}</value>
   </data>
   <data name="License_Invalid" xml:space="preserve">
-    <value>UngĂĽltige Lizenz: {0}</value>
+    <value>Ungültige Lizenz: {0}</value>
   </data>
   <data name="License_PublicKeyMissing" xml:space="preserve">
-    <value>Fehlende Datei mit Ă¶ffentlichem SchlĂĽssel: {0}</value>
+    <value>Fehlende Datei mit öffentlichem Schlüssel: {0}</value>
   </data>
   <data name="License_RevokedDefault" xml:space="preserve">
     <value>Die Lizenz wurde widerrufen. Die Anwendung wechselt in den DEMO-Modus.</value>
   </data>
   <data name="License_StartupError" xml:space="preserve">
-    <value>Lizenzdateien fehlen oder sind ungĂĽltig:
+    <value>Lizenzdateien fehlen oder sind ungültig:
 {0}
 
 Die Anwendung wird geschlossen.</value>
@@ -929,10 +935,10 @@ Die Anwendung wird geschlossen.</value>
     <value>Keine zuletzt verwendeten Dateien</value>
   </data>
   <data name="Merge_AddDirectory" xml:space="preserve">
-    <value>Ordner hinzufĂĽgen...</value>
+    <value>Ordner hinzufügen...</value>
   </data>
   <data name="Merge_AddFiles" xml:space="preserve">
-    <value>Dateien hinzufĂĽgen...</value>
+    <value>Dateien hinzufügen...</value>
   </data>
   <data name="Merge_Cancel" xml:space="preserve">
     <value>Abbrechen</value>
@@ -944,25 +950,25 @@ Die Anwendung wird geschlossen.</value>
     <value>Nach unten</value>
   </data>
   <data name="Merge_Err_Merge" xml:space="preserve">
-    <value>Fehler beim ZusammenfĂĽhren: {0}</value>
+    <value>Fehler beim Zusammenführen: {0}</value>
   </data>
   <data name="Merge_OK" xml:space="preserve">
     <value>OK</value>
   </data>
   <data name="Merge_RemoveSelected" xml:space="preserve">
-    <value>AusgewĂ¤hlte entfernen</value>
+    <value>Ausgewählte entfernen</value>
   </data>
   <data name="Merge_Success" xml:space="preserve">
-    <value>Dateien wurden erfolgreich zusammengefĂĽhrt.</value>
+    <value>Dateien wurden erfolgreich zusammengeführt.</value>
   </data>
   <data name="Merge_Title" xml:space="preserve">
-    <value>PDF-Dateien zusammenfĂĽhren</value>
+    <value>PDF-Dateien zusammenführen</value>
   </data>
   <data name="Merge_Up" xml:space="preserve">
     <value>Nach oben</value>
   </data>
   <data name="Msg_CannotLoadRecentFiles" xml:space="preserve">
-    <value>Zuletzt verwendete Dateien kĂ¶nnen nicht geladen werden.</value>
+    <value>Zuletzt verwendete Dateien können nicht geladen werden.</value>
   </data>
   <data name="Msg_Closing_UnsavedSelectionsPrefix" xml:space="preserve">
     <value>Sie haben nicht gespeicherte Aenderungen im Projekt
@@ -970,44 +976,44 @@ Die Anwendung wird geschlossen.</value>
 </value>
   </data>
   <data name="Msg_Confirm_ClearAllSelections" xml:space="preserve">
-    <value>MĂ¶chten Sie wirklich alle Markierungen aus dem Dokument entfernen?</value>
+    <value>Möchten Sie wirklich alle Markierungen aus dem Dokument entfernen?</value>
   </data>
   <data name="Msg_Confirm_CloseApp" xml:space="preserve">
-    <value>MĂ¶chten Sie die Anwendung wirklich schlieĂźen?</value>
+    <value>Möchten Sie die Anwendung wirklich schließen?</value>
   </data>
   <data name="Msg_Confirm_CloseWithUnsavedSelections" xml:space="preserve">
-    <value>MĂ¶chten Sie das Dokument wirklich schlieĂźen?
+    <value>Möchten Sie das Dokument wirklich schließen?
 
 Sie haben im Dokument definierte, nicht gespeicherte Markierungen...</value>
   </data>
   <data name="Msg_Confirm_DeleteTextAnnotation" xml:space="preserve">
-    <value>MĂ¶chten Sie diesen Text wirklich lĂ¶schen?</value>
+    <value>Möchten Sie diesen Text wirklich löschen?</value>
   </data>
   <data name="Msg_Confirm_DeleteRasterObject" xml:space="preserve">
-    <value>MĂ¶chten Sie dieses Grafikobjekt wirklich lĂ¶schen?</value>
+    <value>Möchten Sie dieses Grafikobjekt wirklich löschen?</value>
   </data>
   <data name="Msg_Confirm_DeleteMultipleObjects" xml:space="preserve">
     <value>Möchten Sie die ausgewählten Objekte wirklich löschen?</value>
   </data>
   <data name="Msg_Confirm_DiscardUnsavedRedactions" xml:space="preserve">
-    <value>Sie haben ungespeicherte SchwĂ¤rzungsĂ¤nderungen im Dokument.
+    <value>Sie haben ungespeicherte Schwärzungsänderungen im Dokument.
 
-MĂ¶chten Sie sie wirklich verwerfen?</value>
+Möchten Sie sie wirklich verwerfen?</value>
   </data>
   <data name="Msg_Confirm_NameSearchSlow" xml:space="preserve">
     <value>Hinweis: Die Suche nach Namen kann lange dauern
 
-und mĂ¶glicherweise keine korrekten Ergebnisse liefern.
+und möglicherweise keine korrekten Ergebnisse liefern.
 
-MĂ¶chten Sie fortfahren?</value>
+Möchten Sie fortfahren?</value>
   </data>
   <data name="Msg_Confirm_OpenNewWithUnsavedSelections" xml:space="preserve">
-    <value>MĂ¶chten Sie wirklich eine neue PDF Ă¶ffnen?
+    <value>Möchten Sie wirklich eine neue PDF öffnen?
 
 Sie haben im Dokument definierte, nicht gespeicherte Markierungen...</value>
   </data>
   <data name="Msg_DragDrop_UnsupportedFileType" xml:space="preserve">
-    <value>Nicht unterstĂĽtzter Dateityp. Ziehen Sie eine PDF- oder .app-Datei hierher.</value>
+    <value>Nicht unterstützter Dateityp. Ziehen Sie eine PDF- oder .app-Datei hierher.</value>
   </data>
   <data name="Msg_ExportGraphics_Done" xml:space="preserve">
     <value>Der Export von Grafiken wurde abgeschlossen.
@@ -1019,7 +1025,7 @@ Dateien gespeichert in:
     <value>Die Dateiliste ist leer.</value>
   </data>
   <data name="Msg_FileOpenError" xml:space="preserve">
-    <value>Beim Ă–ffnen der Datei ist ein Problem aufgetreten: {0}</value>
+    <value>Beim Öffnen der Datei ist ein Problem aufgetreten: {0}</value>
   </data>
   <data name="Msg_HelpNotFound" xml:space="preserve">
     <value>Die Hilfe-PDF wurde im Anwendungsordner nicht gefunden.</value>
@@ -1039,21 +1045,21 @@ Projekt: {0}</value>
     <value>Herunterfahren in {0}</value>
   </data>
   <data name="Msg_MaintenanceRecoveryPrompt" xml:space="preserve">
-    <value>Die Anwendung wurde wegen Wartung geschlossen. MĂ¶chten Sie die letzte Sitzung wiederherstellen?</value>
+    <value>Die Anwendung wurde wegen Wartung geschlossen. Möchten Sie die letzte Sitzung wiederherstellen?</value>
   </data>
   <data name="Msg_NameSearchServiceUnavailable" xml:space="preserve">
-    <value>Der Dienst zur Namenssuche ist derzeit nicht verfĂĽgbar.</value>
+    <value>Der Dienst zur Namenssuche ist derzeit nicht verfügbar.</value>
   </data>
   <data name="Msg_NewVersionAvailable" xml:space="preserve">
-    <value>Eine neuere Version {0} ist verfĂĽgbar (aktualisiert: {1}).</value>
+    <value>Eine neuere Version {0} ist verfügbar (aktualisiert: {1}).</value>
   </data>
   <data name="Msg_NewVersionChangesHeader" xml:space="preserve">
-    <value>Ă„nderungen in dieser Version:</value>
+    <value>Änderungen in dieser Version:</value>
   </data>
   <data name="Msg_NewVersionDetectedMaintenance" xml:space="preserve">
-    <value>Eine neuere Version von {1} wurde erkannt. Die Wartung lĂ¤uft bis {0}.
+    <value>Eine neuere Version von {1} wurde erkannt. Die Wartung läuft bis {0}.
 
-Bitte speichern Sie Ihre Arbeit und schlieĂźen Sie die Anwendung.
+Bitte speichern Sie Ihre Arbeit und schließen Sie die Anwendung.
 
   Die Anwendung wird in 5 Minuten automatisch geschlossen.</value>
   </data>
@@ -1061,13 +1067,13 @@ Bitte speichern Sie Ihre Arbeit und schlieĂźen Sie die Anwendung.
     <value>Download-Link: {0}</value>
   </data>
   <data name="Msg_NewVersionNoChanges" xml:space="preserve">
-    <value>Keine Ă„nderungsliste verfĂĽgbar.</value>
+    <value>Keine Änderungsliste verfügbar.</value>
   </data>
   <data name="Msg_NoIdentifiersFound" xml:space="preserve">
-    <value>Im Dokument wurden keine gĂĽltigen PESEL-, Grundbuchnummern oder andere Identifikatoren gefunden.</value>
+    <value>Im Dokument wurden keine gültigen PESEL-, Grundbuchnummern oder andere Identifikatoren gefunden.</value>
   </data>
   <data name="Msg_NoPasswordOpenCancelled" xml:space="preserve">
-    <value>Kein Passwort angegeben â€” Ă–ffnen abgebrochen.</value>
+    <value>Kein Passwort angegeben — Öffnen abgebrochen.</value>
   </data>
   <data name="Msg_NoSearchResultsOnPage" xml:space="preserve">
     <value>Auf der aktuellen Seite wurden keine Suchergebnisse gefunden.</value>
@@ -1088,10 +1094,10 @@ Bitte speichern Sie Ihre Arbeit und schlieĂźen Sie die Anwendung.
     <value>Das Einfuegen von Vektorgrafiken aus der Zwischenablage wird im naechsten Schritt verfuegbar sein.</value>
   </data>
   <data name="Msg_PasteGraphic_NotImplemented" xml:space="preserve">
-    <value>Das EinfÄ‚Ä˝gen von Grafiken aus der Zwischenablage (Raster und Vektor) wird im nÄ‚Â¤chsten Schritt verfÄ‚Ä˝gbar sein.</value>
+    <value>Das Einf?gen von Grafiken aus der Zwischenablage (Raster und Vektor) wird im n?chsten Schritt verf?gbar sein.</value>
   </data>
   <data name="Msg_ClipboardUnavailable" xml:space="preserve">
-    <value>Die Zwischenablage ist vorÄ‚Ä˝bergehend nicht verfÄ‚Ä˝gbar. Bitte versuchen Sie es erneut.</value>
+    <value>Die Zwischenablage ist vor?bergehend nicht verf?gbar. Bitte versuchen Sie es erneut.</value>
   </data>
   <data name="Err_RasterImageLoad" xml:space="preserve">
     <value>Bild konnte nicht hinzugefuegt werden: {0}</value>
@@ -1100,32 +1106,32 @@ Bitte speichern Sie Ihre Arbeit und schlieĂźen Sie die Anwendung.
     <value>Die Drittanbieterhinweise "THIRD-PARTY-NOTICES.md" wurden im Anwendungsordner nicht gefunden.</value>
   </data>
   <data name="Msg_OpenPdfError" xml:space="preserve">
-    <value>Beim Ă–ffnen der PDF-Datei ist ein Problem aufgetreten: {0}</value>
+    <value>Beim Öffnen der PDF-Datei ist ein Problem aufgetreten: {0}</value>
   </data>
   <data name="Msg_OpenPdfFirst" xml:space="preserve">
-    <value>Ă–ffnen Sie zuerst eine PDF-Datei.</value>
+    <value>Öffnen Sie zuerst eine PDF-Datei.</value>
   </data>
   <data name="Msg_PreviewSavedPdf" xml:space="preserve">
-    <value>PrĂĽfen Sie die gespeicherte PDF in der Vorschau.</value>
+    <value>Prüfen Sie die gespeicherte PDF in der Vorschau.</value>
   </data>
   <data name="Msg_ProjectSaved" xml:space="preserve">
     <value>Der aktuelle Projektstand wurde
-unter dem gewĂ¤hlten Namen gespeichert.</value>
+unter dem gewählten Namen gespeichert.</value>
   </data>
   <data name="Msg_SearchNotFound" xml:space="preserve">
-    <value>â€ž{0}â€ś nicht gefunden.</value>
+    <value>„{0}“ nicht gefunden.</value>
   </data>
   <data name="Msg_ServiceUpdateInProgress" xml:space="preserve">
-    <value>Eine Wartungsaktualisierung von {1} lĂ¤uft bis {0}.</value>
+    <value>Eine Wartungsaktualisierung von {1} läuft bis {0}.</value>
   </data>
   <data name="Msg_TextPositionInfo" xml:space="preserve">
-    <value>{0} ermĂ¶glicht das Ă„ndern der Objektposition.</value>
+    <value>{0} ermöglicht das Ändern der Objektposition.</value>
   </data>
   <data name="Msg_TextsCopiedToClipboard" xml:space="preserve">
     <value>Texte aus den Markierungen wurden in die Zwischenablage kopiert.</value>
   </data>
   <data name="Msg_UpdateLicenseOutOfRange" xml:space="preserve">
-    <value>Diese Version ist neuer als Ihr Supportanspruch. FĂĽr neuere Versionen wurde keine Lizenz erworben.
+    <value>Diese Version ist neuer als Ihr Supportanspruch. Für neuere Versionen wurde keine Lizenz erworben.
 
 Die Anwendung wechselt in den DEMO-Modus.</value>
   </data>
@@ -1133,7 +1139,7 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
     <value>Passwort:</value>
   </data>
   <data name="PwdPrompt_Title_CanChangeRemove" xml:space="preserve">
-    <value>Sie kĂ¶nnen das PDF-Passwort Ă¤ndern oder entfernen</value>
+    <value>Sie können das PDF-Passwort ändern oder entfernen</value>
   </data>
   <data name="PwdPrompt_Title_Enter" xml:space="preserve">
     <value>PDF-Passwort eingeben</value>
@@ -1160,22 +1166,22 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
     <value>Funktion</value>
   </data>
   <data name="Signatures_Select_Title" xml:space="preserve">
-    <value>Zu entfernende Signaturen auswĂ¤hlen</value>
+    <value>Zu entfernende Signaturen auswählen</value>
   </data>
   <data name="Split_Browse" xml:space="preserve">
     <value>Durchsuchen...</value>
   </data>
   <data name="Split_Dlg_Title" xml:space="preserve">
-    <value>PDF-Datei auswĂ¤hlen</value>
+    <value>PDF-Datei auswählen</value>
   </data>
   <data name="Split_Err_ReadFile" xml:space="preserve">
     <value>Fehler beim Lesen der PDF-Datei:\n{0}</value>
   </data>
   <data name="Split_Err_SelectFile" xml:space="preserve">
-    <value>Bitte wĂ¤hlen Sie eine vorhandene PDF-Datei aus.</value>
+    <value>Bitte wählen Sie eine vorhandene PDF-Datei aus.</value>
   </data>
   <data name="Split_FileLabel" xml:space="preserve">
-    <value>PDF-Datei auswĂ¤hlen:</value>
+    <value>PDF-Datei auswählen:</value>
   </data>
   <data name="Split_PageCountLabel" xml:space="preserve">
     <value>Seitenanzahl: {0}</value>
@@ -1184,7 +1190,7 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
     <value>Seitenanzahl: ?</value>
   </data>
   <data name="Split_PagesLabel" xml:space="preserve">
-    <value>Seitennummern fĂĽr die Teilung eingeben (durch Kommas getrennt):</value>
+    <value>Seitennummern für die Teilung eingeben (durch Kommas getrennt):</value>
   </data>
   <data name="Split_StepLabel" xml:space="preserve">
     <value>Teilungsschritt eingeben:</value>
@@ -1196,7 +1202,7 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
     <value>PDF-Dokument teilen</value>
   </data>
   <data name="Title_Confirmation" xml:space="preserve">
-    <value>BestĂ¤tigung</value>
+    <value>Bestätigung</value>
   </data>
   <data name="Title_CriticalAppError" xml:space="preserve">
     <value>Kritischer Anwendungsfehler</value>
@@ -1220,10 +1226,10 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
     <value>Thema</value>
   </data>
   <data name="Tutorial_InvalidFormat" xml:space="preserve">
-    <value>UngĂĽltiges Format der Datei tutorial.json.</value>
+    <value>Ungültiges Format der Datei tutorial.json.</value>
   </data>
   <data name="Tutorial_NoItems" xml:space="preserve">
-    <value>Das Tutorial enthĂ¤lt keine Themen.</value>
+    <value>Das Tutorial enthält keine Themen.</value>
   </data>
   <data name="Tutorial_NotFound" xml:space="preserve">
     <value>Tutorial wurde nicht gefunden unter:

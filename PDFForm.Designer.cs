@@ -72,6 +72,7 @@
             this.groupBoxOpen = new ThemedGroupBox();
             this.groupBoxSave = new ThemedGroupBox();
             this.groupBoxOptions = new ThemedGroupBox();
+            this.outlineCheckBox = new ThemedCheckBox();
             this.colorCheckBox = new ThemedCheckBox();
             this.groupBoxSelections = new ThemedGroupBox();
             this.selectionLastButton = new System.Windows.Forms.Button();
@@ -214,10 +215,10 @@
             this.setSavePassword.AutoSize = true;
             this.setSavePassword.Enabled = false;
             this.setSavePassword.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.setSavePassword.Location = new System.Drawing.Point(15, 88);
+            this.setSavePassword.Location = new System.Drawing.Point(15, 111);
             this.setSavePassword.Name = "setSavePassword";
             this.setSavePassword.Size = new System.Drawing.Size(124, 17);
-            this.setSavePassword.TabIndex = 3;
+            this.setSavePassword.TabIndex = 4;
             this.setSavePassword.Text = Res("UI_Check_SetPassword");
             this.toolTip1.SetToolTip(this.setSavePassword, Res("Tooltip_SetPassword"));
             this.setSavePassword.UseVisualStyleBackColor = true;
@@ -227,10 +228,10 @@
             this.safeModeCheckBox.AutoSize = true;
             this.safeModeCheckBox.Enabled = false;
             this.safeModeCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.safeModeCheckBox.Location = new System.Drawing.Point(15, 65);
+            this.safeModeCheckBox.Location = new System.Drawing.Point(15, 88);
             this.safeModeCheckBox.Name = "safeModeCheckBox";
             this.safeModeCheckBox.Size = new System.Drawing.Size(106, 17);
-            this.safeModeCheckBox.TabIndex = 2;
+            this.safeModeCheckBox.TabIndex = 3;
             this.safeModeCheckBox.Text = Res("UI_Check_SafeMode");
             this.toolTip1.SetToolTip(this.safeModeCheckBox, Res("Tooltip_SafeMode"));
             this.safeModeCheckBox.UseVisualStyleBackColor = true;
@@ -627,10 +628,10 @@
             this.openSavedPDFCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
             this.openSavedPDFCheckBox.Enabled = false;
             this.openSavedPDFCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
-            this.openSavedPDFCheckBox.Location = new System.Drawing.Point(15, 42);
+            this.openSavedPDFCheckBox.Location = new System.Drawing.Point(15, 65);
             this.openSavedPDFCheckBox.Name = "openSavedPDFCheckBox";
             this.openSavedPDFCheckBox.Size = new System.Drawing.Size(147, 17);
-            this.openSavedPDFCheckBox.TabIndex = 1;
+            this.openSavedPDFCheckBox.TabIndex = 2;
             this.openSavedPDFCheckBox.Text = Res("UI_Check_PreviewAfterSave");
             this.toolTip1.SetToolTip(this.openSavedPDFCheckBox, Res("Tooltip_PreviewAfterSave"));
             this.openSavedPDFCheckBox.UseVisualStyleBackColor = true;
@@ -702,13 +703,27 @@
             this.groupBoxOptions.Controls.Add(this.setSavePassword);
             this.groupBoxOptions.Controls.Add(this.safeModeCheckBox);
             this.groupBoxOptions.Controls.Add(this.openSavedPDFCheckBox);
+            this.groupBoxOptions.Controls.Add(this.outlineCheckBox);
             this.groupBoxOptions.Controls.Add(this.colorCheckBox);
             this.groupBoxOptions.Location = new System.Drawing.Point(12, 794);
             this.groupBoxOptions.Name = "groupBoxOptions";
-            this.groupBoxOptions.Size = new System.Drawing.Size(184, 110);
+            this.groupBoxOptions.Size = new System.Drawing.Size(184, 134);
             this.groupBoxOptions.TabIndex = 8;
             this.groupBoxOptions.TabStop = true;
             this.groupBoxOptions.Text = Res("UI_Group_Options");
+            // 
+            // outlineCheckBox
+            // 
+            this.outlineCheckBox.AutoSize = true;
+            this.outlineCheckBox.Enabled = false;
+            this.outlineCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold);
+            this.outlineCheckBox.Location = new System.Drawing.Point(14, 42);
+            this.outlineCheckBox.Name = "outlineCheckBox";
+            this.outlineCheckBox.Size = new System.Drawing.Size(128, 17);
+            this.outlineCheckBox.TabIndex = 1;
+            this.outlineCheckBox.Text = Res("UI_Check_ShowOutline");
+            this.toolTip1.SetToolTip(this.outlineCheckBox, Res("Tooltip_ShowOutline"));
+            this.outlineCheckBox.UseVisualStyleBackColor = true;
             // 
             // colorCheckBox
             // 
@@ -1395,6 +1410,7 @@
         private ThemedRadioButton markerRadioButton;
         private ThemedRadioButton boxRadioButton;
         private ThemedGroupBox groupBoxSelections;
+        private ThemedCheckBox outlineCheckBox;
         private ThemedCheckBox colorCheckBox;
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.TextBox pageNumberTextBox;
