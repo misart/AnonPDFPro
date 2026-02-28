@@ -6225,6 +6225,12 @@ namespace AnonPDF
             return rotation;
         }
 
+        private bool IsMarkerVerticalForCurrentPage()
+        {
+            int rotationOffset = NormalizeRotation(GetRotationOffset(currentPage));
+            return rotationOffset == 90 || rotationOffset == 270;
+        }
+
         private static int OrientationToDegrees(PageOrientations orientation)
         {
             switch (orientation)
@@ -11016,8 +11022,18 @@ namespace AnonPDF
                     }
                     else
                     {
-                        y = (startPoint.Y - (markerWidth * scaleFactor / 2));
-                        height = (markerWidth * scaleFactor);
+                        if (IsMarkerVerticalForCurrentPage())
+                        {
+                            x = startPoint.X - (markerWidth * scaleFactor / 2f);
+                            width = markerWidth * scaleFactor;
+                            y = Math.Min(startPoint.Y, e.Y);
+                            height = Math.Abs(e.Y - startPoint.Y);
+                        }
+                        else
+                        {
+                            y = (startPoint.Y - (markerWidth * scaleFactor / 2));
+                            height = (markerWidth * scaleFactor);
+                        }
                     }
                 }
                 else
@@ -11310,7 +11326,10 @@ namespace AnonPDF
                         if (markerRadioButton.Checked)
                         {
                             renderTimer.Stop();
-                            bool enoughWidth = currentSelection.Width > markerWidth * scaleFactor;
+                            bool markerVerticalMode = !isMarkerCtrlBoxMode && IsMarkerVerticalForCurrentPage();
+                            bool enoughWidth = markerVerticalMode
+                                ? currentSelection.Height > markerHeight * scaleFactor
+                                : currentSelection.Width > markerWidth * scaleFactor;
                             bool enoughHeightForCtrlBox = !isMarkerCtrlBoxMode || currentSelection.Height > markerHeight * scaleFactor;
                             if (isDrawing && enoughWidth && enoughHeightForCtrlBox)
                             {
