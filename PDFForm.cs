@@ -56,13 +56,6 @@ namespace AnonPDF
         private static readonly string DebugLogPath = Path.Combine(Path.GetTempPath(), "AnonPDF-debug.log");
         private static readonly string MaintenanceRecoveryDirectory = Path.Combine(Path.GetTempPath(), "AnonPDFPro");
         private static readonly string MaintenanceRecoveryProjectPath = Path.Combine(MaintenanceRecoveryDirectory, "maintenance-recovery.app");
-        private static readonly (int? Number, string Label)[] DemoFootnoteOptions =
-        {
-            (null, "Brak przypisu"),
-            (1, "1. Ochrona innych tajemnic"),
-            (2, "2. Ochrona danych osobowych"),
-            (3, "3. Ochrona prywatności")
-        };
         private static readonly Dictionary<int, string> DemoFootnoteDetails = new Dictionary<int, string>
         {
             {
@@ -79,7 +72,7 @@ namespace AnonPDF
             }
         };
         private const string FootnoteSummaryTitle = "Przypisy wyłączenia jawności:";
-        private const string FootnoteSummaryAuthorityLine = "Organ, który dokonał wyłączenia: Gmina Miasto Stare Czarnowo";
+        private const string FootnoteSummaryAuthorityLine = "Organ, który dokonał wyłączenia: Gmina Stare Czarnowo";
         private static bool diagnosticModeEnabled = false;
         private static bool DebugLogEnabled => diagnosticModeEnabled;
         private readonly string fileVersion;
@@ -101,6 +94,10 @@ namespace AnonPDF
         private const string SignatureModeOriginal = "original";
         private const string SignatureModeRemove = "remove";
         private const string SignatureModeReport = "report";
+        private const string ClassificationSourceNone = "none";
+        private const string ClassificationSourceAuto = "auto";
+        private const string ClassificationSourceManual = "manual";
+        private const float FootnoteMarkerGapPx = 2f;
         private const string RasterSourceClipboard = "Clipboard";
         private const string RasterSourceFile = "File";
 
@@ -111,6 +108,7 @@ namespace AnonPDF
         private float maxScaleFactor = 3.2f;
         private readonly int markerWidth = 7;
         private readonly int markerHeight = 7;
+        private const float MarkerCleanupVerticalPadding = 0.75f;
         private System.Drawing.Point startPoint;
         private bool isDrawing;
         private bool isMoving;
@@ -141,11 +139,23 @@ namespace AnonPDF
         private int? pendingViewScrollY;
         private HashSet<int> pagesToRemove = new HashSet<int>();
         private Dictionary<int, int> pageRotationOffsets = new Dictionary<int, int>();
+        private bool autoFootnotesEnabled = false;
 
         private readonly Timer zoomTimer;
         private bool zoomPending = false;
         private readonly Timer pagingTimer;
         private readonly Timer renderTimer;
+        private readonly List<ExclusionScopeDefinition> exclusionScopesCatalog = new List<ExclusionScopeDefinition>();
+        private readonly Dictionary<string, ExclusionScopeDefinition> exclusionScopesById = new Dictionary<string, ExclusionScopeDefinition>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<LegalBasisDefinition> legalBasesCatalog = new List<LegalBasisDefinition>();
+        private readonly Dictionary<string, LegalBasisDefinition> legalBasesById = new Dictionary<string, LegalBasisDefinition>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> footnotesCatalogLoadWarnings = new List<string>();
+        private string globalExclusionScopesPath = string.Empty;
+        private string localExclusionScopesPath = string.Empty;
+        private string globalLegalBasesPath = string.Empty;
+        private string localLegalBasesPath = string.Empty;
+        private bool canWriteGlobalExclusionScopes;
+        private bool canWriteGlobalLegalBases;
         private static readonly HttpClient VersionHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(5)
@@ -174,7 +184,10 @@ namespace AnonPDF
         private ToolStripMenuItem addCommentToolStripMenuItem;
         private ToolStripMenuItem addBlankPageToolStripMenuItem;
         private ToolStripMenuItem snapToGridToolStripMenuItem;
+        private ToolStripMenuItem legalBasesDictionaryToolStripMenuItem;
+        private ToolStripMenuItem automaticFootnotesToolStripMenuItem;
         private bool snapToGridEnabled = true;
+        private bool suppressAutomaticFootnotesMenuSync;
         private const float SnapGridStep = 5f;
         private static readonly System.Drawing.Color GroupSelectionColor = System.Drawing.Color.DeepSkyBlue;
         private bool pagesListTooltipShownThisSession;
@@ -636,6 +649,8 @@ namespace AnonPDF
             InitializeComponent();
             InitializeUpdateMenu();
             InitializeRasterMenu();
+            LoadFootnotesCatalog();
+            ApplyAutomaticFootnotesMenuState();
             LoadPreferredTheme();
             ApplyTheme();
             this.HandleCreated += (_, __) => ApplyTitleBarColor();
@@ -938,6 +953,22 @@ namespace AnonPDF
             };
             snapToGridToolStripMenuItem.CheckedChanged += SnapToGridToolStripMenuItem_CheckedChanged;
 
+            legalBasesDictionaryToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "legalBasesDictionaryToolStripMenuItem",
+                Enabled = true
+            };
+            legalBasesDictionaryToolStripMenuItem.Click += LegalBasesDictionaryToolStripMenuItem_Click;
+
+            automaticFootnotesToolStripMenuItem = new ToolStripMenuItem
+            {
+                Name = "automaticFootnotesToolStripMenuItem",
+                CheckOnClick = true,
+                Checked = autoFootnotesEnabled,
+                Enabled = false
+            };
+            automaticFootnotesToolStripMenuItem.CheckedChanged += AutomaticFootnotesToolStripMenuItem_CheckedChanged;
+
             if (menuStrip1 == null)
             {
                 return;
@@ -975,6 +1006,9 @@ namespace AnonPDF
             menuAddItem.DropDownItems.Add(addBlankPageToolStripMenuItem);
             menuAddItem.DropDownItems.Add(new ToolStripSeparator());
             menuAddItem.DropDownItems.Add(snapToGridToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(new ToolStripSeparator());
+            menuAddItem.DropDownItems.Add(legalBasesDictionaryToolStripMenuItem);
+            menuAddItem.DropDownItems.Add(automaticFootnotesToolStripMenuItem);
         }
 
         private void ApplyAddMenuLocalization()
@@ -1021,6 +1055,16 @@ namespace AnonPDF
             {
                 addBlankPageToolStripMenuItem.Text = LocalizedText("Menu_AddBlankPage");
             }
+
+            if (legalBasesDictionaryToolStripMenuItem != null)
+            {
+                legalBasesDictionaryToolStripMenuItem.Text = GetLegalBasesDictionaryMenuText();
+            }
+
+            if (automaticFootnotesToolStripMenuItem != null)
+            {
+                automaticFootnotesToolStripMenuItem.Text = GetAutomaticFootnotesMenuText();
+            }
         }
 
         private void SnapToGridToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
@@ -1031,6 +1075,103 @@ namespace AnonPDF
             }
 
             snapToGridEnabled = snapToGridToolStripMenuItem.Checked;
+        }
+
+        private void LegalBasesDictionaryToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show(
+                this,
+                GetLegalBasesDictionaryNotImplementedMessage(),
+                Resources.Title_Info,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+        private void AutomaticFootnotesToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            if (automaticFootnotesToolStripMenuItem == null || suppressAutomaticFootnotesMenuSync)
+            {
+                return;
+            }
+
+            autoFootnotesEnabled = automaticFootnotesToolStripMenuItem.Checked;
+
+            if (pdf != null)
+            {
+                projectWasChangedAfterLastSave = true;
+                saveProjectButton.Enabled = true;
+                saveProjectMenuItem.Enabled = true;
+            }
+        }
+
+        private void ApplyAutomaticFootnotesMenuState()
+        {
+            if (automaticFootnotesToolStripMenuItem == null)
+            {
+                return;
+            }
+
+            suppressAutomaticFootnotesMenuSync = true;
+            try
+            {
+                automaticFootnotesToolStripMenuItem.Checked = autoFootnotesEnabled;
+                automaticFootnotesToolStripMenuItem.Enabled = pdf != null;
+            }
+            finally
+            {
+                suppressAutomaticFootnotesMenuSync = false;
+            }
+        }
+
+        private string GetLegalBasesDictionaryMenuText()
+        {
+            CultureInfo culture = Resources.Culture ?? CultureInfo.CurrentUICulture;
+            string lang = culture.TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Słownik podstaw prawnych";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Rechtsgrundlagen";
+            }
+
+            return "Legal bases dictionary";
+        }
+
+        private string GetAutomaticFootnotesMenuText()
+        {
+            CultureInfo culture = Resources.Culture ?? CultureInfo.CurrentUICulture;
+            string lang = culture.TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Automatyczne przypisy";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Automatische Fußnoten";
+            }
+
+            return "Automatic footnotes";
+        }
+
+        private string GetLegalBasesDictionaryNotImplementedMessage()
+        {
+            CultureInfo culture = Resources.Culture ?? CultureInfo.CurrentUICulture;
+            string lang = culture.TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Słownik podstaw prawnych będzie dostępny w kolejnym etapie.";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Das Wörterbuch der Rechtsgrundlagen wird in der nächsten Phase verfügbar sein.";
+            }
+
+            return "Legal bases dictionary will be available in the next phase.";
         }
 
         private static float SnapValueToGrid(float value, float step)
@@ -3375,7 +3516,8 @@ namespace AnonPDF
                     FilePath = inputPdfPath,
                     CurrentPage = currentPage,
                     SignaturesMode = GetSignatureModeForProject(),
-                    SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
+                    SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null,
+                    AutoFootnotesEnabled = autoFootnotesEnabled
                 };
 
                 string json = JsonConvert.SerializeObject(projectData, jsonSettings);
@@ -6412,6 +6554,7 @@ namespace AnonPDF
 
 
                 PdfCleanUpTool cleanUpTool = new PdfCleanUpTool(pdfDoc);
+                var markerVisualPdfBoundsByBlock = new Dictionary<RedactionBlock, RectangleF>();
                 // Group redaction blocks by pages
                 var blocksByPage = redactionBlocks.GroupBy(b => b.PageNumber);
                 var visitedPages = new HashSet<int>();
@@ -6436,11 +6579,28 @@ namespace AnonPDF
                             LogDebug($"Redact block page={pageNum} rect={block.Bounds} -> pdfRect={pdfCoordinates}");
                         }
                         iText.Kernel.Geom.Rectangle rectangle = new iText.Kernel.Geom.Rectangle(
-                            (int)Math.Round(pdfCoordinates.X),
-                            (int)Math.Round(pdfCoordinates.Y),
-                            (int)Math.Round(pdfCoordinates.Width),
-                            (int)Math.Round(pdfCoordinates.Height)
+                            pdfCoordinates.X,
+                            pdfCoordinates.Y,
+                            pdfCoordinates.Width,
+                            pdfCoordinates.Height
                         );
+
+                        if (block.IsMarkerSelection)
+                        {
+                            iText.Kernel.Geom.Rectangle markerVisualRectangle = ExpandMarkerCleanupRectangleToTextBounds(
+                                pageWithSelections,
+                                rectangle,
+                                pageNum,
+                                rotation,
+                                "visual");
+                            markerVisualPdfBoundsByBlock[block] = ConvertToItTextRectangleF(markerVisualRectangle);
+                            if (DebugLogEnabled)
+                            {
+                                LogDebug(
+                                    $"Redact marker-visual page={pageNum} source={FormatRectFInvariant(pdfCoordinates)} visual={FormatRectFInvariant(ConvertToItTextRectangleF(markerVisualRectangle))}");
+                            }
+                        }
+
                         PdfCleanUpLocation cleanUpLocation;
                         if (colorCheckBox.Checked)
                         {
@@ -6464,6 +6624,32 @@ namespace AnonPDF
                     MessageBox.Show(this, Resources.Err_CannotAnonymizePdf, Resources.Title_Error,
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
+                }
+
+                if (colorCheckBox.Checked && markerVisualPdfBoundsByBlock.Count > 0)
+                {
+                    foreach (var pageGroup in markerVisualPdfBoundsByBlock
+                        .Where(kvp => kvp.Key != null && kvp.Key.PageNumber >= 1 && kvp.Key.PageNumber <= pdfDoc.GetNumberOfPages())
+                        .GroupBy(kvp => kvp.Key.PageNumber))
+                    {
+                        int pageNum = pageGroup.Key;
+                        var page = pdfDoc.GetPage(pageNum);
+                        var canvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+                        foreach (var item in pageGroup)
+                        {
+                            RectangleF visualRect = item.Value;
+                            if (visualRect.Width <= 0f || visualRect.Height <= 0f)
+                            {
+                                continue;
+                            }
+
+                            canvas.SaveState();
+                            canvas.SetFillColor(cleanUpColorBlack);
+                            canvas.Rectangle(visualRect.X, visualRect.Y, visualRect.Width, visualRect.Height);
+                            canvas.Fill();
+                            canvas.RestoreState();
+                        }
+                    }
                 }
 
                 // --- Section for rendering captions from textAnnotations list ---
@@ -6825,12 +7011,19 @@ namespace AnonPDF
                 List<RedactionBlock> footnoteBlocksForExport = redactionBlocks
                     .Where(block =>
                         block != null &&
-                        block.FootnoteNumber.HasValue &&
-                        block.FootnoteNumber.Value > 0 &&
                         !pagesToRemove.Contains(block.PageNumber))
                     .ToList();
 
-                RenderFootnoteMarkersToPdf(pdfDoc, pagesWithBakedRotation, footnoteBlocksForExport);
+                Dictionary<string, int> footnoteBasisNumberMap = BuildLegalBasisFootnoteNumberMap(footnoteBlocksForExport);
+                List<RedactionBlock> footnoteRenderableBlocks = footnoteBlocksForExport
+                    .Where(block =>
+                    {
+                        string markerText;
+                        return TryBuildFootnoteMarkerText(block, footnoteBasisNumberMap, out markerText);
+                    })
+                    .ToList();
+
+                RenderFootnoteMarkersToPdf(pdfDoc, pagesWithBakedRotation, footnoteRenderableBlocks, footnoteBasisNumberMap, markerVisualPdfBoundsByBlock);
 
                 if (pagesToRemove.Count > 0)
                 {
@@ -6844,7 +7037,7 @@ namespace AnonPDF
                     }
                 }
 
-                AppendFootnotesSummaryPageIfNeeded(pdfDoc, footnoteBlocksForExport);
+                AppendFootnotesSummaryPageIfNeeded(pdfDoc, footnoteRenderableBlocks, footnoteBasisNumberMap);
 
                 var info = pdfDoc.GetDocumentInfo();
 
@@ -6882,7 +7075,7 @@ namespace AnonPDF
             }
             catch (Exception ex)
             {
-                LogDebug("Failed to apply demo watermark: " + ex);
+                LogDebug("Failed to apply watermark: " + ex.Message);
             }
         }
 
@@ -6900,30 +7093,18 @@ namespace AnonPDF
             var watermarkColor = new DeviceRgb(220, 0, 0);
             var opacityState = new PdfExtGState().SetFillOpacity(0.15f);
             int totalPages = pdfDoc.GetNumberOfPages();
-            LogDebug($"DemoWatermark start pages={totalPages} textLen={watermarkText.Length} provider={(rotationProvider == null ? "null" : "custom")}");
 
             for (int pageNumber = 1; pageNumber <= totalPages; pageNumber++)
             {
                 var page = pdfDoc.GetPage(pageNumber);
                 var pageSize = page.GetPageSize();
                 var rotatedSize = page.GetPageSizeWithRotation();
-                PdfNumber rawRotateObj = page.GetPdfObject()?.GetAsNumber(PdfName.Rotate);
 
                 int rotationDeg = rotationProvider?.Invoke(pageNumber) ?? page.GetRotation();
-                int pageRotation = page.GetRotation();
                 float angle = ComputeWatermarkAngle(rotatedSize, rotationDeg);
                 float fontSize = GetWatermarkFontSize(pageSize);
-                float angleDeg = (float)(angle * 180.0 / Math.PI);
                 float centerX = pageSize.GetWidth() / 2f;
                 float centerY = pageSize.GetHeight() / 2f;
-
-                LogDebug(
-                    $"DemoWatermark page={pageNumber}/{totalPages} rawRotate={(rawRotateObj == null ? "null" : rawRotateObj.IntValue().ToString(CultureInfo.InvariantCulture))} " +
-                    $"pageRotate={pageRotation} providerRotate={rotationDeg} normalizedRotate={NormalizeRotation(rotationDeg)} " +
-                    $"pageSize={pageSize.GetWidth().ToString("0.##", CultureInfo.InvariantCulture)}x{pageSize.GetHeight().ToString("0.##", CultureInfo.InvariantCulture)} " +
-                    $"rotatedSize={rotatedSize.GetWidth().ToString("0.##", CultureInfo.InvariantCulture)}x{rotatedSize.GetHeight().ToString("0.##", CultureInfo.InvariantCulture)} " +
-                    $"font={fontSize.ToString("0.##", CultureInfo.InvariantCulture)} angleRad={angle.ToString("0.####", CultureInfo.InvariantCulture)} angleDeg={angleDeg.ToString("0.##", CultureInfo.InvariantCulture)} " +
-                    $"center={centerX.ToString("0.##", CultureInfo.InvariantCulture)},{centerY.ToString("0.##", CultureInfo.InvariantCulture)}");
 
                 // Isolate existing page content graphics state from appended watermark content.
                 // Some PDFs end content streams with non-default CTM, which can flip/rotate overlays.
@@ -6931,7 +7112,6 @@ namespace AnonPDF
                 wrapBeforeCanvas.WriteLiteral("\nq\n");
                 var wrapAfterCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page.NewContentStreamAfter(), page.GetResources(), pdfDoc);
                 wrapAfterCanvas.WriteLiteral("\nQ\n");
-                LogDebug($"DemoWatermark wrap page={pageNumber}/{totalPages} qQ=inserted-literal");
 
                 var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page.NewContentStreamAfter(), page.GetResources(), pdfDoc);
                 pdfCanvas.SaveState();
@@ -6953,7 +7133,6 @@ namespace AnonPDF
                         iText.Layout.Properties.TextAlignment.CENTER,
                         iText.Layout.Properties.VerticalAlignment.MIDDLE,
                         angle);
-                    LogDebug($"DemoWatermark drawn page={pageNumber}/{totalPages}");
                 }
                 finally
                 {
@@ -7258,6 +7437,7 @@ namespace AnonPDF
             PdfTextSearcher.ClearCache();
             signaturesToRemove.Clear();
             hasCustomSignatureSelection = false;
+            autoFootnotesEnabled = false;
 
             inputProjectPath = "";
             lastSavedProjectName = "";
@@ -7342,6 +7522,7 @@ namespace AnonPDF
             {
                 addArrowToolStripMenuItem.Enabled = true;
             }
+            ApplyAutomaticFootnotesMenuState();
             deletePageMenuItem.Enabled = true;
             rotatePageMenuItem.Enabled = true;
             copyToClipboardMenuItem.Enabled = true;
@@ -7537,6 +7718,7 @@ namespace AnonPDF
             PdfTextSearcher.ClearCache();
             signaturesToRemove.Clear();
             hasCustomSignatureSelection = false;
+            autoFootnotesEnabled = false;
             allPageStatuses.Clear();
             pagesListView.Clear();
             searchTextBox.Text = string.Empty;
@@ -7588,6 +7770,7 @@ namespace AnonPDF
             {
                 addArrowToolStripMenuItem.Enabled = false;
             }
+            ApplyAutomaticFootnotesMenuState();
             deletePageMenuItem.Enabled = false;
             rotatePageMenuItem.Enabled = false;
             copyToClipboardMenuItem.Enabled = false;
@@ -8096,6 +8279,266 @@ namespace AnonPDF
             return Path.Combine(GetUserDataDirectory(), "resume-project.app");
         }
 
+        private static string GetGlobalExclusionScopesFilePath()
+        {
+            return Path.Combine(Application.StartupPath, "exclusion_scopes.json");
+        }
+
+        private static string GetLocalExclusionScopesFilePath()
+        {
+            return Path.Combine(GetUserDataDirectory(), "user_exclusion_scopes.json");
+        }
+
+        private static string GetGlobalLegalBasesFilePath()
+        {
+            return Path.Combine(Application.StartupPath, "legal_bases.json");
+        }
+
+        private static string GetLocalLegalBasesFilePath()
+        {
+            return Path.Combine(GetUserDataDirectory(), "user_legal_bases.json");
+        }
+
+        private void LoadFootnotesCatalog()
+        {
+            exclusionScopesCatalog.Clear();
+            exclusionScopesById.Clear();
+            legalBasesCatalog.Clear();
+            legalBasesById.Clear();
+            footnotesCatalogLoadWarnings.Clear();
+
+            globalExclusionScopesPath = GetGlobalExclusionScopesFilePath();
+            localExclusionScopesPath = GetLocalExclusionScopesFilePath();
+            globalLegalBasesPath = GetGlobalLegalBasesFilePath();
+            localLegalBasesPath = GetLocalLegalBasesFilePath();
+
+            canWriteGlobalExclusionScopes = HasWriteAccessToTarget(globalExclusionScopesPath);
+            canWriteGlobalLegalBases = HasWriteAccessToTarget(globalLegalBasesPath);
+
+            LoadMergedExclusionScopesCatalog();
+            LoadMergedLegalBasesCatalog();
+
+            if (footnotesCatalogLoadWarnings.Count > 0)
+            {
+                LogDebug("Footnotes catalog warnings: " + string.Join(" | ", footnotesCatalogLoadWarnings));
+            }
+
+            LogDebug(
+                $"Footnotes catalog loaded scopes={exclusionScopesCatalog.Count} legalBases={legalBasesCatalog.Count} " +
+                $"globalScopesWritable={canWriteGlobalExclusionScopes} globalLegalWritable={canWriteGlobalLegalBases}");
+        }
+
+        private void LoadMergedExclusionScopesCatalog()
+        {
+            if (TryLoadCatalogFile(globalExclusionScopesPath, out ExclusionScopesCatalogFile globalFile, out string globalError))
+            {
+                AddExclusionScopesToCatalog(globalFile.ExclusionScopes, ExclusionScopeSource.Global, globalExclusionScopesPath);
+            }
+            else if (!string.IsNullOrWhiteSpace(globalError))
+            {
+                footnotesCatalogLoadWarnings.Add(globalError);
+            }
+
+            if (TryLoadCatalogFile(localExclusionScopesPath, out ExclusionScopesCatalogFile localFile, out string localError))
+            {
+                AddExclusionScopesToCatalog(localFile.ExclusionScopes, ExclusionScopeSource.Local, localExclusionScopesPath);
+            }
+            else if (!string.IsNullOrWhiteSpace(localError))
+            {
+                footnotesCatalogLoadWarnings.Add(localError);
+            }
+        }
+
+        private void AddExclusionScopesToCatalog(IEnumerable<ExclusionScopeDefinition> scopes, ExclusionScopeSource source, string sourcePath)
+        {
+            if (scopes == null)
+            {
+                return;
+            }
+
+            foreach (var scope in scopes)
+            {
+                if (!NormalizeScopeDefinition(scope, source))
+                {
+                    continue;
+                }
+
+                if (exclusionScopesById.ContainsKey(scope.ScopeId))
+                {
+                    footnotesCatalogLoadWarnings.Add($"Duplicate scope_id '{scope.ScopeId}' in {sourcePath}. Entry skipped.");
+                    continue;
+                }
+
+                exclusionScopesCatalog.Add(scope);
+                exclusionScopesById[scope.ScopeId] = scope;
+            }
+        }
+
+        private void LoadMergedLegalBasesCatalog()
+        {
+            if (TryLoadCatalogFile(globalLegalBasesPath, out LegalBasesCatalogFile globalFile, out string globalError))
+            {
+                AddLegalBasesToCatalog(globalFile.LegalBases, LegalBasisSource.Global, globalLegalBasesPath);
+            }
+            else if (!string.IsNullOrWhiteSpace(globalError))
+            {
+                footnotesCatalogLoadWarnings.Add(globalError);
+            }
+
+            if (TryLoadCatalogFile(localLegalBasesPath, out LegalBasesCatalogFile localFile, out string localError))
+            {
+                AddLegalBasesToCatalog(localFile.LegalBases, LegalBasisSource.Local, localLegalBasesPath);
+            }
+            else if (!string.IsNullOrWhiteSpace(localError))
+            {
+                footnotesCatalogLoadWarnings.Add(localError);
+            }
+        }
+
+        private void AddLegalBasesToCatalog(IEnumerable<LegalBasisDefinition> legalBases, LegalBasisSource source, string sourcePath)
+        {
+            if (legalBases == null)
+            {
+                return;
+            }
+
+            foreach (var legalBasis in legalBases)
+            {
+                if (!NormalizeLegalBasisDefinition(legalBasis, source))
+                {
+                    continue;
+                }
+
+                if (legalBasesById.ContainsKey(legalBasis.Id))
+                {
+                    footnotesCatalogLoadWarnings.Add($"Duplicate legal base id '{legalBasis.Id}' in {sourcePath}. Entry skipped.");
+                    continue;
+                }
+
+                legalBasesCatalog.Add(legalBasis);
+                legalBasesById[legalBasis.Id] = legalBasis;
+            }
+        }
+
+        private static bool NormalizeScopeDefinition(ExclusionScopeDefinition scope, ExclusionScopeSource source)
+        {
+            if (scope == null)
+            {
+                return false;
+            }
+
+            scope.ScopeId = string.IsNullOrWhiteSpace(scope.ScopeId) ? null : scope.ScopeId.Trim();
+            if (string.IsNullOrWhiteSpace(scope.ScopeId))
+            {
+                return false;
+            }
+
+            scope.FriendlyName = string.IsNullOrWhiteSpace(scope.FriendlyName) ? scope.ScopeId : scope.FriendlyName.Trim();
+            scope.Category = string.IsNullOrWhiteSpace(scope.Category) ? string.Empty : scope.Category.Trim();
+            scope.Description = string.IsNullOrWhiteSpace(scope.Description) ? string.Empty : scope.Description.Trim();
+            scope.UiColor = string.IsNullOrWhiteSpace(scope.UiColor) ? string.Empty : scope.UiColor.Trim();
+
+            scope.AutoDetectTags = (scope.AutoDetectTags ?? new List<string>())
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Select(tag => tag.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            scope.DefaultBasisIds = (scope.DefaultBasisIds ?? new List<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            scope.SourceKind = source;
+
+            return true;
+        }
+
+        private static bool NormalizeLegalBasisDefinition(LegalBasisDefinition legalBasis, LegalBasisSource source)
+        {
+            if (legalBasis == null)
+            {
+                return false;
+            }
+
+            legalBasis.Id = string.IsNullOrWhiteSpace(legalBasis.Id) ? null : legalBasis.Id.Trim();
+            if (string.IsNullOrWhiteSpace(legalBasis.Id))
+            {
+                return false;
+            }
+
+            legalBasis.Title = string.IsNullOrWhiteSpace(legalBasis.Title) ? legalBasis.Id : legalBasis.Title.Trim();
+            legalBasis.FullCitation = string.IsNullOrWhiteSpace(legalBasis.FullCitation) ? string.Empty : legalBasis.FullCitation.Trim();
+            legalBasis.DescriptionHint = string.IsNullOrWhiteSpace(legalBasis.DescriptionHint) ? string.Empty : legalBasis.DescriptionHint.Trim();
+            legalBasis.SourceKind = source;
+            return true;
+        }
+
+        private static bool TryLoadCatalogFile<T>(string path, out T data, out string error)
+            where T : class
+        {
+            data = null;
+            error = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(path);
+                data = JsonConvert.DeserializeObject<T>(json);
+                if (data == null)
+                {
+                    error = $"File '{path}' contains empty or invalid JSON object.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = $"Cannot load '{path}': {ex.Message}";
+                return false;
+            }
+        }
+
+        private static bool HasWriteAccessToTarget(string targetPath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(targetPath))
+                {
+                    return false;
+                }
+
+                if (File.Exists(targetPath))
+                {
+                    using (FileStream fs = File.Open(targetPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+                    {
+                    }
+                    return true;
+                }
+
+                string directoryPath = Path.GetDirectoryName(targetPath);
+                if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
+                {
+                    return false;
+                }
+
+                string probeFilePath = Path.Combine(directoryPath, $".write_probe_{Guid.NewGuid():N}.tmp");
+                File.WriteAllText(probeFilePath, "probe");
+                File.Delete(probeFilePath);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private bool IsAutoResumeProjectPath(string path)
         {
             return ArePathsEqual(path, GetAutoResumeProjectFilePath());
@@ -8151,7 +8594,8 @@ namespace AnonPDF
                 ScrollX = scrollX,
                 ScrollY = scrollY,
                 SignaturesMode = GetSignatureModeForProject(),
-                SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
+                SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null,
+                AutoFootnotesEnabled = autoFootnotesEnabled
             };
         }
 
@@ -9332,7 +9776,7 @@ namespace AnonPDF
                             renderTimer.Stop();
                             if (isDrawing && currentSelection.Width > markerWidth * scaleFactor)
                             {
-                                redactionBlocks.Add(new RedactionBlock(rect, currentPage));
+                                redactionBlocks.Add(CreateRedactionBlockWithAutomaticClassification(rect, currentPage, isMarkerSelection: true));
                                 
                                 
 
@@ -9363,7 +9807,7 @@ namespace AnonPDF
                             renderTimer.Stop();
                             if (isDrawing && currentSelection.Width > markerWidth * scaleFactor && currentSelection.Height > markerHeight * scaleFactor)
                             {
-                                redactionBlocks.Add(new RedactionBlock(rect, currentPage));
+                                redactionBlocks.Add(CreateRedactionBlockWithAutomaticClassification(rect, currentPage, isMarkerSelection: false));
 
                                 
                                 status.HasSelections = true;
@@ -9444,39 +9888,446 @@ namespace AnonPDF
             var menu = new ContextMenuStrip();
             menu.Items.Add(LocalizedText("Menu_Context_Delete"), null, (_, __) => RemoveRedactionBlock(block));
             menu.Items.Add(new ToolStripSeparator());
-            foreach (var option in DemoFootnoteOptions)
+
+            bool hasDynamicScopes = exclusionScopesCatalog.Count > 0;
+            bool hasDynamicBases = legalBasesCatalog.Count > 0;
+            var scopeMenu = new ToolStripMenuItem(GetScopeContextMenuText());
+            if (hasDynamicScopes)
             {
-                int? selectedNumber = option.Number;
-                var footnoteItem = new ToolStripMenuItem(option.Label)
+                var noScopeItem = new ToolStripMenuItem(GetScopeNoneContextMenuText())
                 {
-                    Checked = block.FootnoteNumber == selectedNumber
+                    Checked = string.IsNullOrWhiteSpace(block.ScopeId)
                 };
-                footnoteItem.Click += (_, __) => SetRedactionBlockFootnote(block, selectedNumber);
-                menu.Items.Add(footnoteItem);
+                noScopeItem.Click += (_, __) => SetRedactionBlockScope(block, null);
+                scopeMenu.DropDownItems.Add(noScopeItem);
+                scopeMenu.DropDownItems.Add(new ToolStripSeparator());
+
+                foreach (var scope in exclusionScopesCatalog.OrderBy(s => s.FriendlyName, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    string scopeId = scope.ScopeId;
+                    var scopeItem = new ToolStripMenuItem(scope.FriendlyName)
+                    {
+                        Checked = string.Equals(block.ScopeId, scopeId, StringComparison.OrdinalIgnoreCase),
+                        ToolTipText = string.IsNullOrWhiteSpace(scope.Description) ? scopeId : scope.Description
+                    };
+                    scopeItem.Click += (_, __) => SetRedactionBlockScope(block, scopeId);
+                    scopeMenu.DropDownItems.Add(scopeItem);
+                }
+            }
+            else
+            {
+                scopeMenu.DropDownItems.Add(new ToolStripMenuItem(GetCatalogUnavailableContextMenuText())
+                {
+                    Enabled = false
+                });
+            }
+
+            menu.Items.Add(scopeMenu);
+            menu.Items.Add(new ToolStripSeparator());
+
+            var basisHeader = new ToolStripMenuItem(GetLegalBasisContextMenuText())
+            {
+                Enabled = false
+            };
+            menu.Items.Add(basisHeader);
+
+            if (hasDynamicBases)
+            {
+                var clearBasisItem = new ToolStripMenuItem(GetLegalBasisNoneContextMenuText())
+                {
+                    Checked = block.BasisIds == null || block.BasisIds.Count == 0
+                };
+                clearBasisItem.Click += (_, __) => ClearRedactionBlockBasis(block);
+                menu.Items.Add(clearBasisItem);
+
+                HashSet<string> selectedBasisIds = new HashSet<string>(
+                    block.BasisIds ?? new List<string>(),
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var legalBasis in legalBasesCatalog.OrderBy(b => b.Title, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    string basisId = legalBasis.Id;
+                    var basisItem = new ToolStripMenuItem(FormatLegalBasisMenuLabel(legalBasis))
+                    {
+                        Checked = selectedBasisIds.Contains(basisId),
+                        ToolTipText = string.IsNullOrWhiteSpace(legalBasis.FullCitation)
+                            ? legalBasis.Title
+                            : legalBasis.FullCitation
+                    };
+                    basisItem.Click += (_, __) => ToggleRedactionBlockBasis(block, basisId);
+                    menu.Items.Add(basisItem);
+                }
+            }
+            else
+            {
+                menu.Items.Add(new ToolStripMenuItem(GetCatalogUnavailableContextMenuText())
+                {
+                    Enabled = false
+                });
             }
 
             menu.Show(pdfViewer, location);
             return true;
         }
 
-        private void SetRedactionBlockFootnote(RedactionBlock block, int? footnoteNumber)
+        private void SetRedactionBlockScope(RedactionBlock block, string scopeId)
         {
             if (block == null)
             {
                 return;
             }
 
-            int? normalized = (footnoteNumber.HasValue && footnoteNumber.Value > 0) ? footnoteNumber.Value : (int?)null;
-            if (block.FootnoteNumber == normalized)
+            string normalizedScopeId = string.IsNullOrWhiteSpace(scopeId) ? null : scopeId.Trim();
+            var previousBasis = new HashSet<string>(block.BasisIds ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            bool changed = !string.Equals(block.ScopeId, normalizedScopeId, StringComparison.OrdinalIgnoreCase);
+            bool hadLegacyFootnote = block.FootnoteNumber.HasValue;
+
+            block.ScopeId = normalizedScopeId;
+            block.MatchedTag = null;
+            block.ClassificationSource = ClassificationSourceManual;
+            block.FootnoteNumber = null;
+            changed = changed || hadLegacyFootnote;
+
+            if (string.IsNullOrWhiteSpace(normalizedScopeId))
+            {
+                block.BasisIds = new List<string>();
+                changed = changed || previousBasis.Count > 0;
+            }
+            else if (exclusionScopesById.TryGetValue(normalizedScopeId, out ExclusionScopeDefinition scope))
+            {
+                block.BasisIds = (scope.DefaultBasisIds ?? new List<string>())
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id.Trim())
+                    .Where(id => legalBasesById.Count == 0 || legalBasesById.ContainsKey(id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var nextBasis = new HashSet<string>(block.BasisIds, StringComparer.OrdinalIgnoreCase);
+                changed = changed || !previousBasis.SetEquals(nextBasis);
+            }
+
+            if (!changed)
             {
                 return;
             }
 
-            block.FootnoteNumber = normalized;
             projectWasChangedAfterLastSave = true;
             saveProjectButton.Enabled = true;
             saveProjectMenuItem.Enabled = true;
             pdfViewer.Invalidate();
+        }
+
+        private void ToggleRedactionBlockBasis(RedactionBlock block, string basisId)
+        {
+            if (block == null || string.IsNullOrWhiteSpace(basisId))
+            {
+                return;
+            }
+
+            string normalizedBasisId = basisId.Trim();
+            if (block.BasisIds == null)
+            {
+                block.BasisIds = new List<string>();
+            }
+
+            bool changed;
+            int existingIndex = block.BasisIds.FindIndex(id => string.Equals(id, normalizedBasisId, StringComparison.OrdinalIgnoreCase));
+            if (existingIndex >= 0)
+            {
+                block.BasisIds.RemoveAt(existingIndex);
+                changed = true;
+            }
+            else
+            {
+                block.BasisIds.Add(normalizedBasisId);
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+
+            block.ClassificationSource = ClassificationSourceManual;
+            block.MatchedTag = null;
+            block.FootnoteNumber = null;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+        }
+
+        private void ClearRedactionBlockBasis(RedactionBlock block)
+        {
+            if (block == null)
+            {
+                return;
+            }
+
+            if (block.BasisIds == null || block.BasisIds.Count == 0)
+            {
+                return;
+            }
+
+            block.BasisIds.Clear();
+            block.ClassificationSource = ClassificationSourceManual;
+            block.MatchedTag = null;
+            block.FootnoteNumber = null;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+        }
+
+        private string FormatLegalBasisMenuLabel(LegalBasisDefinition legalBasis)
+        {
+            if (legalBasis == null)
+            {
+                return string.Empty;
+            }
+
+            string prefix = legalBasis.SourceKind == LegalBasisSource.Global ? "G" : "L";
+            return $"[{prefix}] {legalBasis.Title}";
+        }
+
+        private string GetScopeContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Zakres wyłączenia";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Ausschlussumfang";
+            }
+
+            return "Exclusion scope";
+        }
+
+        private string GetScopeNoneContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Brak zakresu";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Kein Umfang";
+            }
+
+            return "No scope";
+        }
+
+        private string GetLegalBasisContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Podstawa prawna";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Rechtsgrundlage";
+            }
+
+            return "Legal basis";
+        }
+
+        private string GetLegalBasisNoneContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Brak podstawy";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Keine Grundlage";
+            }
+
+            return "No basis";
+        }
+
+        private string GetCatalogUnavailableContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Brak danych słownika";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Keine Wörterbuchdaten";
+            }
+
+            return "No dictionary data";
+        }
+
+        private static string NormalizeClassificationSource(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return ClassificationSourceNone;
+            }
+
+            string normalized = value.Trim().ToLowerInvariant();
+            if (normalized == ClassificationSourceAuto || normalized == ClassificationSourceManual)
+            {
+                return normalized;
+            }
+
+            return ClassificationSourceNone;
+        }
+
+        private static void NormalizeRedactionBlockMetadata(RedactionBlock block)
+        {
+            if (block == null)
+            {
+                return;
+            }
+
+            block.ScopeId = string.IsNullOrWhiteSpace(block.ScopeId) ? null : block.ScopeId.Trim();
+            block.MatchedTag = string.IsNullOrWhiteSpace(block.MatchedTag) ? null : block.MatchedTag.Trim();
+            block.InterestSubject = string.IsNullOrWhiteSpace(block.InterestSubject) ? null : block.InterestSubject.Trim();
+            block.ClassificationSource = NormalizeClassificationSource(block.ClassificationSource);
+
+            if (block.BasisIds == null)
+            {
+                block.BasisIds = new List<string>();
+                return;
+            }
+
+            block.BasisIds = block.BasisIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private RedactionBlock CreateRedactionBlockWithAutomaticClassification(RectangleF bounds, int pageNumber, bool isMarkerSelection = false)
+        {
+            var block = new RedactionBlock(bounds, pageNumber);
+            block.IsMarkerSelection = isMarkerSelection;
+            NormalizeRedactionBlockMetadata(block);
+            TryApplyAutomaticFootnoteClassification(block);
+            return block;
+        }
+
+        private bool TryApplyAutomaticFootnoteClassification(RedactionBlock block)
+        {
+            if (block == null || !autoFootnotesEnabled)
+            {
+                return false;
+            }
+
+            if (NormalizeClassificationSource(block.ClassificationSource) == ClassificationSourceManual)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(inputPdfPath) || !File.Exists(inputPdfPath))
+            {
+                return false;
+            }
+
+            string extractedText;
+            try
+            {
+                extractedText = ExtractTextFromRectangle(inputPdfPath, block);
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Auto footnote classification text extraction failed: " + ex.Message);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(extractedText))
+            {
+                return false;
+            }
+
+            var detectedTags = PdfTextSearcher.DetectIdentifierTags(extractedText);
+            if (detectedTags == null || detectedTags.Count == 0)
+            {
+                return false;
+            }
+
+            ExclusionScopeDefinition matchedScope = ResolveScopeForDetectedTags(detectedTags, out string matchedTag);
+            if (matchedScope == null)
+            {
+                return false;
+            }
+
+            List<string> basisIds = (matchedScope.DefaultBasisIds ?? new List<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Where(id => legalBasesById.Count == 0 || legalBasesById.ContainsKey(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            block.ScopeId = matchedScope.ScopeId;
+            block.BasisIds = basisIds;
+            block.MatchedTag = matchedTag;
+            block.ClassificationSource = ClassificationSourceAuto;
+
+            if (DebugLogEnabled)
+            {
+                LogDebug(
+                    $"AutoClassify page={block.PageNumber} scope={block.ScopeId} tag={block.MatchedTag} " +
+                    $"basis={string.Join(",", block.BasisIds ?? new List<string>())} text='{TruncateForLog(extractedText, 80)}'");
+            }
+
+            return true;
+        }
+
+        private ExclusionScopeDefinition ResolveScopeForDetectedTags(
+            IReadOnlyList<string> detectedTags,
+            out string matchedTag)
+        {
+            matchedTag = null;
+            if (detectedTags == null || detectedTags.Count == 0 || exclusionScopesCatalog.Count == 0)
+            {
+                return null;
+            }
+
+            foreach (string rawTag in detectedTags)
+            {
+                if (string.IsNullOrWhiteSpace(rawTag))
+                {
+                    continue;
+                }
+
+                string tag = rawTag.Trim();
+                ExclusionScopeDefinition scope = exclusionScopesCatalog.FirstOrDefault(s =>
+                    s != null &&
+                    s.AutoDetectTags != null &&
+                    s.AutoDetectTags.Any(scopeTag => string.Equals(scopeTag, tag, StringComparison.OrdinalIgnoreCase)));
+
+                if (scope != null)
+                {
+                    matchedTag = tag;
+                    return scope;
+                }
+            }
+
+            return null;
+        }
+
+        private static string TruncateForLog(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || maxLength <= 0 || value.Length <= maxLength)
+            {
+                return value ?? string.Empty;
+            }
+
+            return value.Substring(0, maxLength) + "...";
         }
 
         private static string GetFootnoteDetailText(int footnoteNumber)
@@ -9495,55 +10346,27 @@ namespace AnonPDF
             bool clampToViewer,
             out float rotationCompensation)
         {
-            rotationOffset = NormalizeRotation(rotationOffset);
-            rotationCompensation = (badgeWidth - badgeHeight) / 2f;
-
-            float badgeX;
-            float badgeY;
-            switch (rotationOffset)
-            {
-                case 90:
-                    badgeX = selectionRect.Right - badgeWidth;
-                    badgeY = selectionRect.Bottom + margin;
-                    break;
-                case 180:
-                    badgeX = selectionRect.Left - badgeWidth - margin;
-                    badgeY = selectionRect.Bottom - badgeHeight;
-                    break;
-                case 270:
-                    badgeX = selectionRect.Left;
-                    badgeY = selectionRect.Top - badgeHeight - margin;
-                    break;
-                default:
-                    badgeX = selectionRect.Right + margin;
-                    badgeY = selectionRect.Top;
-                    break;
-            }
-
-            if (rotationOffset == 90)
-            {
-                badgeX += rotationCompensation;
-                badgeY += rotationCompensation;
-            }
-            else if (rotationOffset == 270)
-            {
-                badgeX -= rotationCompensation;
-                badgeY -= rotationCompensation;
-            }
+            rotationCompensation = 0f;
+            float badgeX = selectionRect.Left - badgeWidth - margin;
+            float badgeY = selectionRect.Top - badgeHeight - margin;
 
             if (clampToViewer)
             {
-                if (badgeX + badgeWidth > pdfViewer.ClientSize.Width)
-                {
-                    badgeX = Math.Max(0f, selectionRect.Right - badgeWidth - 2f);
-                }
                 if (badgeX < 0f)
                 {
-                    badgeX = 0f;
+                    badgeX = Math.Min(
+                        pdfViewer.ClientSize.Width - badgeWidth,
+                        selectionRect.Left + margin);
+                }
+                if (badgeX + badgeWidth > pdfViewer.ClientSize.Width)
+                {
+                    badgeX = Math.Max(0f, pdfViewer.ClientSize.Width - badgeWidth);
                 }
                 if (badgeY < 0f)
                 {
-                    badgeY = 0f;
+                    badgeY = Math.Min(
+                        pdfViewer.ClientSize.Height - badgeHeight,
+                        selectionRect.Top + margin);
                 }
                 if (badgeY + badgeHeight > pdfViewer.ClientSize.Height)
                 {
@@ -9554,10 +10377,242 @@ namespace AnonPDF
             return new RectangleF(badgeX, badgeY, badgeWidth, badgeHeight);
         }
 
+        private static PointF GetFootnoteAnchorPointForPdfExport(RectangleF selectionRect, int rotationOffset)
+        {
+            switch (NormalizeRotation(rotationOffset))
+            {
+                case 90:
+                    return new PointF(selectionRect.Right, selectionRect.Bottom);
+                case 180:
+                    return new PointF(selectionRect.Left, selectionRect.Bottom);
+                case 270:
+                    return new PointF(selectionRect.Left, selectionRect.Top);
+                case 0:
+                default:
+                    return new PointF(selectionRect.Right, selectionRect.Top);
+            }
+        }
+
+        private static PointF ApplyFootnoteAnchorGapForPdfExport(PointF anchorPoint, int rotationOffset)
+        {
+            switch (NormalizeRotation(rotationOffset))
+            {
+                case 90:
+                    return new PointF(anchorPoint.X, anchorPoint.Y + FootnoteMarkerGapPx);
+                case 180:
+                    return new PointF(anchorPoint.X - FootnoteMarkerGapPx, anchorPoint.Y);
+                case 270:
+                    return new PointF(anchorPoint.X, anchorPoint.Y - FootnoteMarkerGapPx);
+                case 0:
+                default:
+                    return new PointF(anchorPoint.X + FootnoteMarkerGapPx, anchorPoint.Y);
+            }
+        }
+
+        private void DrawCornerDebugMarkersOnPreview(Graphics graphics, RectangleF rect)
+        {
+            if (!DebugLogEnabled || graphics == null || rect.Width <= 0f || rect.Height <= 0f)
+            {
+                return;
+            }
+
+            using (var debugFont = new Font(this.Font.FontFamily, Math.Max(7f, this.Font.SizeInPoints - 1f), FontStyle.Bold))
+            using (var debugBrush = new SolidBrush(System.Drawing.Color.Red))
+            {
+                PointF[] corners = new[]
+                {
+                    new PointF(rect.Left, rect.Top),
+                    new PointF(rect.Right, rect.Top),
+                    new PointF(rect.Right, rect.Bottom),
+                    new PointF(rect.Left, rect.Bottom)
+                };
+
+                for (int i = 0; i < corners.Length; i++)
+                {
+                    graphics.DrawString((i + 1).ToString(CultureInfo.InvariantCulture), debugFont, debugBrush, corners[i].X + 1f, corners[i].Y + 1f);
+                }
+            }
+        }
+
+        private void DrawCornerDebugMarkersOnPdf(
+            iText.Kernel.Pdf.Canvas.PdfCanvas pdfCanvas,
+            PdfFont font,
+            RectangleF selectionRect,
+            int pageNumber,
+            int rotation,
+            bool includeBaseRotation)
+        {
+            if (!DebugLogEnabled || pdfCanvas == null || font == null || selectionRect.Width <= 0f || selectionRect.Height <= 0f)
+            {
+                return;
+            }
+
+            PointF[] corners = new[]
+            {
+                new PointF(selectionRect.Left, selectionRect.Top),
+                new PointF(selectionRect.Right, selectionRect.Top),
+                new PointF(selectionRect.Right, selectionRect.Bottom),
+                new PointF(selectionRect.Left, selectionRect.Bottom)
+            };
+
+            pdfCanvas.SaveState();
+            pdfCanvas.SetFillColor(new DeviceRgb(220, 0, 0));
+            pdfCanvas.BeginText();
+            pdfCanvas.SetFontAndSize(font, 7f);
+
+            for (int i = 0; i < corners.Length; i++)
+            {
+                PointF cornerPdf = ConvertPointToPdfCoordinates(corners[i], pageNumber, rotation, includeBaseRotation);
+                pdfCanvas.SetTextMatrix(1, 0, 0, 1, cornerPdf.X, cornerPdf.Y);
+                pdfCanvas.ShowText((i + 1).ToString(CultureInfo.InvariantCulture));
+            }
+
+            pdfCanvas.EndText();
+            pdfCanvas.RestoreState();
+        }
+
+        private Dictionary<string, int> BuildLegalBasisFootnoteNumberMap(IEnumerable<RedactionBlock> blocks = null)
+        {
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            IEnumerable<RedactionBlock> sourceBlocks = blocks ?? redactionBlocks;
+            if (sourceBlocks == null)
+            {
+                return map;
+            }
+
+            List<string> usedBasisIds = sourceBlocks
+                .Where(block => block != null && block.BasisIds != null)
+                .SelectMany(block => block.BasisIds)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            usedBasisIds.Sort((left, right) =>
+                string.Compare(
+                    GetLegalBasisSortKey(left),
+                    GetLegalBasisSortKey(right),
+                    StringComparison.CurrentCultureIgnoreCase));
+
+            int number = 1;
+            foreach (string basisId in usedBasisIds)
+            {
+                map[basisId] = number++;
+            }
+
+            return map;
+        }
+
+        private string GetLegalBasisSortKey(string basisId)
+        {
+            if (string.IsNullOrWhiteSpace(basisId))
+            {
+                return string.Empty;
+            }
+
+            if (legalBasesById.TryGetValue(basisId.Trim(), out LegalBasisDefinition legalBasis))
+            {
+                if (!string.IsNullOrWhiteSpace(legalBasis.Title))
+                {
+                    return legalBasis.Title;
+                }
+            }
+
+            return basisId.Trim();
+        }
+
+        private bool TryBuildFootnoteMarkerText(RedactionBlock block, IDictionary<string, int> basisNumberMap, out string markerText)
+        {
+            markerText = null;
+            if (block == null)
+            {
+                return false;
+            }
+
+            List<int> markerNumbers = new List<int>();
+
+            if (block.BasisIds != null && basisNumberMap != null && basisNumberMap.Count > 0)
+            {
+                foreach (string basisId in block.BasisIds)
+                {
+                    if (string.IsNullOrWhiteSpace(basisId))
+                    {
+                        continue;
+                    }
+
+                    if (basisNumberMap.TryGetValue(basisId.Trim(), out int number) && !markerNumbers.Contains(number))
+                    {
+                        markerNumbers.Add(number);
+                    }
+                }
+            }
+
+            if (markerNumbers.Count == 0 && block.FootnoteNumber.HasValue && block.FootnoteNumber.Value > 0)
+            {
+                markerNumbers.Add(block.FootnoteNumber.Value);
+            }
+
+            if (markerNumbers.Count == 0)
+            {
+                return false;
+            }
+
+            markerNumbers.Sort();
+            markerText = markerNumbers.Count == 1
+                ? $"[{markerNumbers[0]}]"
+                : "[" + string.Join(",", markerNumbers) + "]";
+            return true;
+        }
+
+        private List<(int Number, string Text)> BuildFootnoteSummaryEntries(
+            IList<RedactionBlock> blocksWithFootnotes,
+            IDictionary<string, int> basisNumberMap)
+        {
+            var entries = new List<(int Number, string Text)>();
+
+            if (basisNumberMap != null && basisNumberMap.Count > 0)
+            {
+                foreach (var pair in basisNumberMap.OrderBy(p => p.Value))
+                {
+                    string text;
+                    if (legalBasesById.TryGetValue(pair.Key, out LegalBasisDefinition legalBasis))
+                    {
+                        text = !string.IsNullOrWhiteSpace(legalBasis.FullCitation)
+                            ? legalBasis.FullCitation
+                            : legalBasis.Title;
+                    }
+                    else
+                    {
+                        text = pair.Key;
+                    }
+
+                    entries.Add((pair.Value, text));
+                }
+
+                return entries;
+            }
+
+            List<int> usedNumbers = (blocksWithFootnotes ?? new List<RedactionBlock>())
+                .Where(block => block != null && block.FootnoteNumber.HasValue && block.FootnoteNumber.Value > 0)
+                .Select(block => block.FootnoteNumber.Value)
+                .Distinct()
+                .OrderBy(number => number)
+                .ToList();
+
+            foreach (int number in usedNumbers)
+            {
+                entries.Add((number, GetFootnoteDetailText(number)));
+            }
+
+            return entries;
+        }
+
         private void RenderFootnoteMarkersToPdf(
             iText.Kernel.Pdf.PdfDocument pdfDoc,
             ISet<int> pagesWithBakedRotation,
-            IList<RedactionBlock> blocksWithFootnotes)
+            IList<RedactionBlock> blocksWithFootnotes,
+            IDictionary<string, int> basisNumberMap,
+            IDictionary<RedactionBlock, RectangleF> markerVisualPdfBoundsByBlock)
         {
             if (pdfDoc == null || blocksWithFootnotes == null || blocksWithFootnotes.Count == 0)
             {
@@ -9566,11 +10621,10 @@ namespace AnonPDF
 
             PdfFont markerFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA, "Cp1250");
             const float markerFontSize = 6f;
-            const float markerMargin = 2f;
 
             foreach (var block in blocksWithFootnotes)
             {
-                if (block == null || !block.FootnoteNumber.HasValue || block.FootnoteNumber.Value <= 0)
+                if (!TryBuildFootnoteMarkerText(block, basisNumberMap, out string markerText))
                 {
                     continue;
                 }
@@ -9583,59 +10637,139 @@ namespace AnonPDF
 
                 bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
                 int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
-                string markerText = $"[{block.FootnoteNumber.Value}]";
+                bool includeBaseRotation = !baseRotationBaked;
+                iText.Kernel.Pdf.PdfPage page = pdfDoc.GetPage(pageNumber);
+                RectangleF markerAnchorRect = GetFootnoteMarkerAnchorRect(
+                    block,
+                    page,
+                    pageNumber,
+                    rotation,
+                    includeBaseRotation,
+                    markerVisualPdfBoundsByBlock);
                 float markerWidth = Math.Max(8f, markerFont.GetWidth(markerText, markerFontSize));
                 float markerHeight = markerFontSize + 1f;
-                RectangleF badgeRect = CalculateFootnoteBadgeRect(
-                    block.Bounds,
+                PointF markerViewPoint = GetFootnoteAnchorPointForPdfExport(markerAnchorRect, rotation);
+                markerViewPoint = ApplyFootnoteAnchorGapForPdfExport(markerViewPoint, rotation);
+                RectangleF badgeRect = new RectangleF(
+                    markerViewPoint.X,
+                    markerViewPoint.Y,
                     markerWidth,
-                    markerHeight,
-                    rotation,
-                    markerMargin,
-                    false,
-                    out float rotationCompensation);
+                    markerHeight);
 
-                PointF markerViewPoint = new PointF(badgeRect.X, badgeRect.Bottom);
                 PointF markerPdfPoint = ConvertPointToPdfCoordinates(
                     markerViewPoint,
                     pageNumber,
                     rotation,
-                    includeBaseRotation: !baseRotationBaked);
+                    includeBaseRotation: includeBaseRotation);
 
                 if (DebugLogEnabled)
                 {
                     LogDebug(
-                        $"FootnoteExport page={pageNumber} footnote={block.FootnoteNumber.Value} rot={NormalizeRotation(rotation)} " +
-                        $"selection={FormatRectFInvariant(block.Bounds)} badge={FormatRectFInvariant(badgeRect)} comp={rotationCompensation.ToString("0.###", CultureInfo.InvariantCulture)}");
+                        $"FootnoteExport page={pageNumber} footnote={markerText} rot={NormalizeRotation(rotation)} " +
+                        $"selection={FormatRectFInvariant(markerAnchorRect)} badge={FormatRectFInvariant(badgeRect)} " +
+                        $"viewPoint={FormatPointFInvariant(markerViewPoint)} pdfPoint={FormatPointFInvariant(markerPdfPoint)} " +
+                        $"textW={markerWidth.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                        $"textH={markerHeight.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                        $"anchorUsed={FormatPointFInvariant(markerViewPoint)} " +
+                        $"anchorTL={FormatPointFInvariant(new PointF(markerAnchorRect.Left, markerAnchorRect.Top))} " +
+                        $"anchorTR={FormatPointFInvariant(new PointF(markerAnchorRect.Right, markerAnchorRect.Top))} " +
+                        $"comp=0");
                 }
 
-                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(pdfDoc.GetPage(pageNumber));
-                pdfCanvas.BeginText();
-                pdfCanvas.SetFontAndSize(markerFont, markerFontSize);
-                pdfCanvas.SetFillColor(new DeviceRgb(0, 0, 0));
-                pdfCanvas.MoveText(markerPdfPoint.X, markerPdfPoint.Y);
-                pdfCanvas.ShowText(markerText);
-                pdfCanvas.EndText();
+                using (var layoutCanvas = new Canvas(new iText.Kernel.Pdf.Canvas.PdfCanvas(page), page.GetPageSize()))
+                {
+                    var markerParagraph = new iText.Layout.Element.Paragraph(markerText)
+                        .SetMargin(0)
+                        .SetPadding(0)
+                        .SetMultipliedLeading(1f)
+                        .SetFont(markerFont)
+                        .SetFontSize(markerFontSize)
+                        .SetFontColor(new DeviceRgb(0, 0, 0));
+
+                    layoutCanvas.ShowTextAligned(
+                        markerParagraph,
+                        markerPdfPoint.X,
+                        markerPdfPoint.Y,
+                        pageNumber,
+                        iText.Layout.Properties.TextAlignment.LEFT,
+                        iText.Layout.Properties.VerticalAlignment.TOP,
+                        0f);
+                }
+
+                DrawCornerDebugMarkersOnPdf(
+                    new iText.Kernel.Pdf.Canvas.PdfCanvas(page),
+                    markerFont,
+                    markerAnchorRect,
+                    pageNumber,
+                    rotation,
+                    includeBaseRotation);
             }
+        }
+
+        private RectangleF GetFootnoteMarkerAnchorRect(
+            RedactionBlock block,
+            iText.Kernel.Pdf.PdfPage page,
+            int pageNumber,
+            int rotation,
+            bool includeBaseRotation,
+            IDictionary<RedactionBlock, RectangleF> markerVisualPdfBoundsByBlock)
+        {
+            if (block == null || page == null)
+            {
+                return RectangleF.Empty;
+            }
+
+            RectangleF anchorRect = block.Bounds;
+            if (!block.IsMarkerSelection)
+            {
+                return anchorRect;
+            }
+
+            RectangleF sourcePdfRect = ConvertToPdfCoordinates(
+                block.Bounds,
+                pageNumber,
+                rotation,
+                includeBaseRotation);
+            RectangleF visualPdfRect = sourcePdfRect;
+            RectangleF cachedVisualRect = sourcePdfRect;
+            bool hasCachedVisualRect = markerVisualPdfBoundsByBlock != null &&
+                                       markerVisualPdfBoundsByBlock.TryGetValue(block, out cachedVisualRect);
+            if (hasCachedVisualRect)
+            {
+                visualPdfRect = cachedVisualRect;
+            }
+
+            anchorRect = ConvertPdfToViewCoordinates(
+                visualPdfRect,
+                pageNumber,
+                rotation,
+                includeBaseRotation);
+
+            int normalizedRotation = NormalizeRotation(rotation);
+
+            if (DebugLogEnabled)
+            {
+                LogDebug(
+                    $"FootnoteAnchor page={pageNumber} rot={normalizedRotation} includeBase={includeBaseRotation} " +
+                    $"blockView={FormatRectFInvariant(block.Bounds)} sourcePdf={FormatRectFInvariant(sourcePdfRect)} " +
+                    $"visualPdf={FormatRectFInvariant(visualPdfRect)} fromCache={hasCachedVisualRect} anchorView={FormatRectFInvariant(anchorRect)}");
+            }
+
+            return anchorRect;
         }
 
         private void AppendFootnotesSummaryPageIfNeeded(
             iText.Kernel.Pdf.PdfDocument pdfDoc,
-            IList<RedactionBlock> blocksWithFootnotes)
+            IList<RedactionBlock> blocksWithFootnotes,
+            IDictionary<string, int> basisNumberMap)
         {
             if (pdfDoc == null || blocksWithFootnotes == null || blocksWithFootnotes.Count == 0)
             {
                 return;
             }
 
-            List<int> usedNumbers = blocksWithFootnotes
-                .Where(block => block != null && block.FootnoteNumber.HasValue && block.FootnoteNumber.Value > 0)
-                .Select(block => block.FootnoteNumber.Value)
-                .Distinct()
-                .OrderBy(number => number)
-                .ToList();
-
-            if (usedNumbers.Count == 0)
+            List<(int Number, string Text)> summaryEntries = BuildFootnoteSummaryEntries(blocksWithFootnotes, basisNumberMap);
+            if (summaryEntries.Count == 0)
             {
                 return;
             }
@@ -9670,9 +10804,9 @@ namespace AnonPDF
 
             currentY -= lineHeight * 2f;
 
-            foreach (int footnoteNumber in usedNumbers)
+            foreach (var entry in summaryEntries)
             {
-                string line = $"[{footnoteNumber}] {GetFootnoteDetailText(footnoteNumber)}";
+                string line = $"[{entry.Number}] {entry.Text}";
                 var wrappedLines = WrapTextToWidth(bodyFont, line, bodyFontSize, maxTextWidth);
                 if (wrappedLines.Count == 0)
                 {
@@ -9741,9 +10875,9 @@ namespace AnonPDF
             pdfViewer.Invalidate();
         }
 
-        private void LogFootnoteBadgeLayoutIfNeeded(RedactionBlock block, RectangleF selectionRect, RectangleF badgeRect, int rotationOffset, float rotationCompensation)
+        private void LogFootnoteBadgeLayoutIfNeeded(string markerText, RedactionBlock block, RectangleF selectionRect, RectangleF badgeRect, int rotationOffset, float rotationCompensation)
         {
-            if (!DebugLogEnabled || block == null || !block.FootnoteNumber.HasValue)
+            if (!DebugLogEnabled || block == null || string.IsNullOrWhiteSpace(markerText))
             {
                 return;
             }
@@ -9758,7 +10892,7 @@ namespace AnonPDF
                 CultureInfo.InvariantCulture,
                 "{0}|{1}|{2}|{3}|{4}",
                 block.PageNumber,
-                block.FootnoteNumber.Value,
+                markerText,
                 rotationOffset,
                 FormatRectFInvariant(selectionRect),
                 FormatRectFInvariant(badgeRect));
@@ -9770,7 +10904,7 @@ namespace AnonPDF
 
             lastFootnoteBadgeLayoutLogKey = key;
             LogDebug(
-                $"FootnoteBadge page={block.PageNumber} footnote={block.FootnoteNumber.Value} rot={rotationOffset} " +
+                $"FootnoteBadge page={block.PageNumber} footnote={markerText} rot={rotationOffset} " +
                 $"selection={FormatRectFInvariant(selectionRect)} badge={FormatRectFInvariant(badgeRect)} " +
                 $"topDelta={topDelta.ToString("0.###", CultureInfo.InvariantCulture)} comp={rotationCompensation.ToString("0.###", CultureInfo.InvariantCulture)} scale={scaleFactor.ToString("0.###", CultureInfo.InvariantCulture)}");
         }
@@ -9786,6 +10920,8 @@ namespace AnonPDF
                 }
             }
 
+            Dictionary<string, int> previewBasisNumberMap = BuildLegalBasisFootnoteNumberMap();
+
             // Drawing saved redaction blocks for current page
             foreach (var block in redactionBlocks.Where(b => b.PageNumber == currentPage))
             {
@@ -9793,10 +10929,10 @@ namespace AnonPDF
                 {
                     System.Drawing.RectangleF rect = new System.Drawing.RectangleF((block.Bounds.X * scaleFactor), (block.Bounds.Y * scaleFactor), (block.Bounds.Width * scaleFactor), (block.Bounds.Height * scaleFactor));
                     e.Graphics.FillRectangle(brush, rect);
+                    DrawCornerDebugMarkersOnPreview(e.Graphics, rect);
 
-                    if (block.FootnoteNumber.HasValue && block.FootnoteNumber.Value > 0)
+                    if (TryBuildFootnoteMarkerText(block, previewBasisNumberMap, out string badgeText))
                     {
-                        string badgeText = $"[{block.FootnoteNumber.Value}]";
                         float badgeFontSize = Math.Max(8f, this.Font.SizeInPoints - 1f);
                         using (Font badgeFont = new Font(this.Font.FontFamily, badgeFontSize, FontStyle.Bold))
                         {
@@ -9860,7 +10996,7 @@ namespace AnonPDF
                             }
 
                             RectangleF badgeRect = new RectangleF(badgeX, badgeY, badgeWidth, badgeHeight);
-                            LogFootnoteBadgeLayoutIfNeeded(block, rect, badgeRect, rotationOffset, halfDiff);
+                            LogFootnoteBadgeLayoutIfNeeded(badgeText, block, rect, badgeRect, rotationOffset, halfDiff);
                             using (SolidBrush badgeBackground = new SolidBrush(System.Drawing.Color.FromArgb(235, 255, 255, 255)))
                             using (Pen badgeBorder = new Pen(System.Drawing.Color.FromArgb(200, 170, 0, 0), 1f))
                             using (SolidBrush badgeTextBrush = new SolidBrush(System.Drawing.Color.FromArgb(220, 120, 0, 0)))
@@ -10724,6 +11860,8 @@ namespace AnonPDF
                     Dictionary<int, int> rotationOffsetsJson = projectData.PageRotationOffsets ?? new Dictionary<int, int>();
                     List<string> signaturesToRemoveJson = projectData.SignaturesToRemove;
                     string signaturesMode = projectData.SignaturesMode;
+                    autoFootnotesEnabled = projectData.AutoFootnotesEnabled ?? false;
+                    ApplyAutomaticFootnotesMenuState();
 
                     if (redactionBlocksJson.Count > 0)
                     {
@@ -10737,6 +11875,10 @@ namespace AnonPDF
  
                     ClearRedactionBlocks();
                     redactionBlocks = redactionBlocksJson;
+                    foreach (var block in redactionBlocks)
+                    {
+                        NormalizeRedactionBlockMetadata(block);
+                    }
 
                     ClearPagesToRemove();
                     pagesToRemove = pagesToRemoveJson;
@@ -10999,7 +12141,8 @@ namespace AnonPDF
                             ScrollX = scrollX,
                             ScrollY = scrollY,
                             SignaturesMode = GetSignatureModeForProject(),
-                            SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
+                            SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null,
+                            AutoFootnotesEnabled = autoFootnotesEnabled
                         };
 
                         // Serialize list to JSON string
@@ -11431,7 +12574,8 @@ namespace AnonPDF
                             ScrollX = scrollX,
                             ScrollY = scrollY,
                             SignaturesMode = GetSignatureModeForProject(),
-                            SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null
+                            SignaturesToRemove = hasCustomSignatureSelection ? new List<string>(signaturesToRemove) : null,
+                            AutoFootnotesEnabled = autoFootnotesEnabled
                         };
 
                         // Serialize list to JSON string
@@ -12710,6 +13854,15 @@ namespace AnonPDF
                 rect.Y,
                 rect.Width,
                 rect.Height);
+        }
+
+        private static string FormatPointFInvariant(PointF point)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{{X={0:0.###},Y={1:0.###}}}",
+                point.X,
+                point.Y);
         }
 
         private RectangleF GetRasterObjectScreenBounds(RasterObject rasterObject)
@@ -15756,6 +16909,109 @@ namespace AnonPDF
             return new System.Drawing.RectangleF(rect.GetX(), rect.GetY(), rect.GetWidth(), rect.GetHeight());
         }
 
+        private iText.Kernel.Geom.Rectangle ExpandMarkerCleanupRectangleToTextBounds(
+            iText.Kernel.Pdf.PdfPage page,
+            iText.Kernel.Geom.Rectangle sourceRectangle,
+            int pageNumber,
+            int rotation,
+            string context)
+        {
+            if (page == null || sourceRectangle == null)
+            {
+                return sourceRectangle;
+            }
+
+            if (!TryGetTextBoundsInRectangle(page, sourceRectangle, out iText.Kernel.Geom.Rectangle textBounds, pageNumber, context))
+            {
+                if (DebugLogEnabled)
+                {
+                    LogDebug(
+                        $"MarkerBounds page={pageNumber} rot={NormalizeRotation(rotation)} context={context} " +
+                        $"source={FormatRectFInvariant(ConvertToItTextRectangleF(sourceRectangle))} textBounds=none result=source");
+                }
+                return sourceRectangle;
+            }
+
+            float sourceTop = sourceRectangle.GetTop();
+            float sourceBottom = sourceRectangle.GetBottom();
+            float expandedTop = Math.Max(sourceTop, textBounds.GetTop() + MarkerCleanupVerticalPadding);
+            float expandedBottom = Math.Min(sourceBottom, textBounds.GetBottom() - MarkerCleanupVerticalPadding);
+
+            var pageSize = page.GetPageSize();
+            float minPageY = pageSize.GetBottom();
+            float maxPageY = pageSize.GetTop();
+            expandedBottom = Math.Max(minPageY, expandedBottom);
+            expandedTop = Math.Min(maxPageY, expandedTop);
+
+            if (expandedTop <= expandedBottom)
+            {
+                if (DebugLogEnabled)
+                {
+                    LogDebug(
+                        $"MarkerBounds page={pageNumber} rot={NormalizeRotation(rotation)} context={context} " +
+                        $"source={FormatRectFInvariant(ConvertToItTextRectangleF(sourceRectangle))} " +
+                        $"text={FormatRectFInvariant(ConvertToItTextRectangleF(textBounds))} result=source reason=collapsed");
+                }
+                return sourceRectangle;
+            }
+
+            var adjusted = new iText.Kernel.Geom.Rectangle(
+                sourceRectangle.GetX(),
+                expandedBottom,
+                sourceRectangle.GetWidth(),
+                expandedTop - expandedBottom);
+
+            if (DebugLogEnabled)
+            {
+                LogDebug(
+                    $"MarkerBounds page={pageNumber} rot={NormalizeRotation(rotation)} context={context} " +
+                    $"source={FormatRectFInvariant(ConvertToItTextRectangleF(sourceRectangle))} " +
+                    $"text={FormatRectFInvariant(ConvertToItTextRectangleF(textBounds))} " +
+                    $"adjusted={FormatRectFInvariant(ConvertToItTextRectangleF(adjusted))} " +
+                    $"pad={MarkerCleanupVerticalPadding.ToString("0.###", CultureInfo.InvariantCulture)}");
+            }
+
+            return adjusted;
+        }
+
+        private bool TryGetTextBoundsInRectangle(
+            iText.Kernel.Pdf.PdfPage page,
+            iText.Kernel.Geom.Rectangle rectangle,
+            out iText.Kernel.Geom.Rectangle textBounds,
+            int pageNumber,
+            string context)
+        {
+            textBounds = null;
+            if (page == null || rectangle == null || rectangle.GetWidth() <= 0f || rectangle.GetHeight() <= 0f)
+            {
+                return false;
+            }
+
+            try
+            {
+                CustomTextExtractionStrategy strategy = new CustomTextExtractionStrategy(rectangle);
+                PdfTextExtractor.GetTextFromPage(page, strategy);
+                bool hasBounds = strategy.TryGetCoveredBounds(out textBounds);
+                if (DebugLogEnabled)
+                {
+                    string boundsText = hasBounds
+                        ? FormatRectFInvariant(ConvertToItTextRectangleF(textBounds))
+                        : "none";
+                    LogDebug(
+                        $"MarkerTextBounds page={pageNumber} context={context} query={FormatRectFInvariant(ConvertToItTextRectangleF(rectangle))} " +
+                        $"result={boundsText}");
+                }
+                return hasBounds;
+            }
+            catch (Exception ex)
+            {
+                LogDebug(
+                    $"MarkerTextBounds page={pageNumber} context={context} query={FormatRectFInvariant(ConvertToItTextRectangleF(rectangle))} " +
+                    $"error={ex.Message}");
+                return false;
+            }
+        }
+
 
         private void SearchToSelectionButton_Click(object sender, EventArgs e)
         {
@@ -15811,7 +17067,7 @@ namespace AnonPDF
                 // Add each search result to redactionBlocks
                 foreach (var cr in convertedResults)
                 {
-                    redactionBlocks.Add(new RedactionBlock(cr.ConvertedRect, cr.PageNumber));
+                    redactionBlocks.Add(CreateRedactionBlockWithAutomaticClassification(cr.ConvertedRect, cr.PageNumber));
                 }
             }
 
@@ -18074,12 +19330,24 @@ namespace AnonPDF
         public System.Drawing.RectangleF Bounds { get; set; }
         public int PageNumber { get; set; }
         public int? FootnoteNumber { get; set; }
+        public string ScopeId { get; set; }
+        public List<string> BasisIds { get; set; }
+        public string ClassificationSource { get; set; }
+        public string MatchedTag { get; set; }
+        public string InterestSubject { get; set; }
+        public bool IsMarkerSelection { get; set; }
 
         public RedactionBlock(System.Drawing.RectangleF bounds, int pageNumber)
         {
             Bounds = bounds;
             PageNumber = pageNumber;
             FootnoteNumber = null;
+            ScopeId = null;
+            BasisIds = new List<string>();
+            ClassificationSource = "none";
+            MatchedTag = null;
+            InterestSubject = null;
+            IsMarkerSelection = false;
         }
     }
 
@@ -18184,6 +19452,84 @@ namespace AnonPDF
         }
     }
 
+    public enum LegalBasisSource
+    {
+        Global = 0,
+        Local = 1
+    }
+
+    public enum ExclusionScopeSource
+    {
+        Global = 0,
+        Local = 1
+    }
+
+    public class ExclusionScopesCatalogFile
+    {
+        [JsonProperty("version")]
+        public string Version { get; set; }
+
+        [JsonProperty("exclusion_scopes")]
+        public List<ExclusionScopeDefinition> ExclusionScopes { get; set; }
+    }
+
+    public class ExclusionScopeDefinition
+    {
+        [JsonProperty("scope_id")]
+        public string ScopeId { get; set; }
+
+        [JsonProperty("friendly_name")]
+        public string FriendlyName { get; set; }
+
+        [JsonProperty("category")]
+        public string Category { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("auto_detect_tags")]
+        public List<string> AutoDetectTags { get; set; }
+
+        [JsonProperty("default_basis_ids")]
+        public List<string> DefaultBasisIds { get; set; }
+
+        [JsonProperty("ui_color")]
+        public string UiColor { get; set; }
+
+        [JsonIgnore]
+        public ExclusionScopeSource SourceKind { get; set; }
+    }
+
+    public class LegalBasesCatalogFile
+    {
+        [JsonProperty("source")]
+        public string Source { get; set; }
+
+        [JsonProperty("legal_bases")]
+        public List<LegalBasisDefinition> LegalBases { get; set; }
+    }
+
+    public class LegalBasisDefinition
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("title")]
+        public string Title { get; set; }
+
+        [JsonProperty("full_citation")]
+        public string FullCitation { get; set; }
+
+        [JsonProperty("requires_interest_subject")]
+        public bool RequiresInterestSubject { get; set; }
+
+        [JsonProperty("description_hint")]
+        public string DescriptionHint { get; set; }
+
+        [JsonIgnore]
+        public LegalBasisSource SourceKind { get; set; }
+    }
+
     public class ProjectData
     {
         public List<RedactionBlock> RedactionBlocks { get; set; }
@@ -18198,6 +19544,7 @@ namespace AnonPDF
         public int? ScrollY { get; set; }
         public List<string> SignaturesToRemove { get; set; }
         public string SignaturesMode { get; set; }
+        public bool? AutoFootnotesEnabled { get; set; }
         public String FilePath { get; set; }
     }
 
@@ -18771,6 +20118,49 @@ namespace AnonPDF
         private static readonly Regex PropertyRegisterPattern = new Regex(@"([A-Z]{2}\d{1}[A-Z0-9]{1})/\d{8}/\d{1}");
         private static readonly Regex IdCardPattern = new Regex(@"[A-Z]{3}\s?\d{6}");
         private static readonly Regex EmailPattern = new Regex(@"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}");
+        private static readonly Regex NipPattern = new Regex(@"\b\d{10}\b");
+        private static readonly Regex RegonPattern = new Regex(@"\b\d{9}(?:\d{5})?\b");
+
+        internal static IReadOnlyList<string> DetectIdentifierTags(string text)
+        {
+            var detectedTags = new List<string>();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return detectedTags;
+            }
+
+            if (PeselPattern.Matches(text).Cast<Match>().Any(match => ValidatePesel(match.Value)))
+            {
+                detectedTags.Add("PESEL");
+            }
+
+            if (PropertyRegisterPattern.Matches(text).Cast<Match>().Any(match => ValidatePropertyRegister(match.Value)))
+            {
+                detectedTags.Add("KW");
+            }
+
+            if (IdCardPattern.Matches(text).Cast<Match>().Any(match => ValidateIdCard(match.Value)))
+            {
+                detectedTags.Add("IDENTITY_CARD");
+            }
+
+            if (EmailPattern.IsMatch(text))
+            {
+                detectedTags.Add("EMAIL");
+            }
+
+            if (NipPattern.Matches(text).Cast<Match>().Any(match => ValidateNip(match.Value)))
+            {
+                detectedTags.Add("NIP");
+            }
+
+            if (RegonPattern.Matches(text).Cast<Match>().Any(match => ValidateRegon(match.Value)))
+            {
+                detectedTags.Add("REGON");
+            }
+
+            return detectedTags;
+        }
 
         private static bool ValidatePesel(string pesel)
         {
@@ -18925,6 +20315,75 @@ namespace AnonPDF
             return calculatedCheckDigit == checkDigit;
         }
 
+        private static bool ValidateNip(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length != 10 || !value.All(char.IsDigit))
+            {
+                return false;
+            }
+
+            int[] weights = { 6, 5, 7, 2, 3, 4, 5, 6, 7 };
+            int sum = 0;
+            for (int i = 0; i < 9; i++)
+            {
+                sum += (value[i] - '0') * weights[i];
+            }
+
+            int checksum = sum % 11;
+            if (checksum == 10)
+            {
+                return false;
+            }
+
+            return checksum == (value[9] - '0');
+        }
+
+        private static bool ValidateRegon(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || !value.All(char.IsDigit))
+            {
+                return false;
+            }
+
+            if (value.Length == 9)
+            {
+                int[] weights = { 8, 9, 2, 3, 4, 5, 6, 7 };
+                int sum = 0;
+                for (int i = 0; i < 8; i++)
+                {
+                    sum += (value[i] - '0') * weights[i];
+                }
+
+                int checksum = sum % 11;
+                if (checksum == 10)
+                {
+                    checksum = 0;
+                }
+
+                return checksum == (value[8] - '0');
+            }
+
+            if (value.Length == 14)
+            {
+                int[] weights = { 2, 4, 8, 5, 0, 9, 7, 3, 6, 1, 2, 4, 8 };
+                int sum = 0;
+                for (int i = 0; i < 13; i++)
+                {
+                    sum += (value[i] - '0') * weights[i];
+                }
+
+                int checksum = sum % 11;
+                if (checksum == 10)
+                {
+                    checksum = 0;
+                }
+
+                return checksum == (value[13] - '0');
+            }
+
+            return false;
+        }
+
         private static KernelGeom.Rectangle AdjustRectangleForRotation(KernelGeom.Rectangle rect, int rotation)
         {
             if (rotation == 0 || rotation == 360)
@@ -18964,11 +20423,21 @@ namespace AnonPDF
         private readonly float _yTolerance = 1.0f; // Tolerance for Y coordinate (in points)
         private readonly bool _sortByX = false; // Set to true if you want to sort by X
         private readonly bool _reverseOrder = false; // Ustaw na true dla tekstu od prawej do lewej
+        private bool _hasCoveredBounds;
+        private float _coveredMinX;
+        private float _coveredMinY;
+        private float _coveredMaxX;
+        private float _coveredMaxY;
 
         public CustomTextExtractionStrategy(iText.Kernel.Geom.Rectangle targetRect)
         {
             _targetRect = targetRect;
             _textChunks = new List<TextChunk>();
+            _hasCoveredBounds = false;
+            _coveredMinX = float.MaxValue;
+            _coveredMinY = float.MaxValue;
+            _coveredMaxX = float.MinValue;
+            _coveredMaxY = float.MinValue;
         }
 
         public void EventOccurred(IEventData data, EventType type)
@@ -18995,6 +20464,21 @@ namespace AnonPDF
                     if (intersects)
                     {
                         _textChunks.Add(new TextChunk(chunk.GetText(), y1, x1));
+                        if (!_hasCoveredBounds)
+                        {
+                            _coveredMinX = x1;
+                            _coveredMinY = y1;
+                            _coveredMaxX = x2;
+                            _coveredMaxY = y2;
+                            _hasCoveredBounds = true;
+                        }
+                        else
+                        {
+                            _coveredMinX = Math.Min(_coveredMinX, x1);
+                            _coveredMinY = Math.Min(_coveredMinY, y1);
+                            _coveredMaxX = Math.Max(_coveredMaxX, x2);
+                            _coveredMaxY = Math.Max(_coveredMaxY, y2);
+                        }
                         // Debug: print coordinates (uncomment if needed)
                     }
                 }
@@ -19050,6 +20534,25 @@ namespace AnonPDF
         public ICollection<EventType> GetSupportedEvents()
         {
             return new List<EventType> { EventType.RENDER_TEXT };
+        }
+
+        public bool TryGetCoveredBounds(out iText.Kernel.Geom.Rectangle bounds)
+        {
+            bounds = null;
+            if (!_hasCoveredBounds)
+            {
+                return false;
+            }
+
+            float width = _coveredMaxX - _coveredMinX;
+            float height = _coveredMaxY - _coveredMinY;
+            if (width <= 0f || height <= 0f)
+            {
+                return false;
+            }
+
+            bounds = new iText.Kernel.Geom.Rectangle(_coveredMinX, _coveredMinY, width, height);
+            return true;
         }
 
         private class TextChunk
