@@ -128,8 +128,14 @@ namespace AnonPDF
         private bool isDrawing;
         private bool isMarkerCtrlBoxMode;
         private bool isMoving;
+        private bool isRotatingTextAnnotation;
+        private bool textRotationInteractionChanged;
         private TextAnnotation annotationToMove = null;
+        private TextAnnotation annotationToRotate = null;
         private TextAnnotation selectedTextAnnotation = null;
+        private int textRotationStartValue;
+        private float textRotationStartAngle;
+        private PointF textRotationStartCenterDoc = PointF.Empty;
         private PDFiumSharp.PdfDocument pdf;
         private string lastSavedProjectName = "";
         private System.Drawing.RectangleF currentSelection;
@@ -225,6 +231,8 @@ namespace AnonPDF
         private ArrowObject arrowObjectToMove;
         private ArrowObject arrowObjectToAdjust;
         private VectorShapeObject vectorShapeToMove;
+        private VectorShapeObject vectorShapeToAdjust;
+        private VectorShapeObject vectorShapeToRotate;
         private PointF textMoveMouseOffset;
         private PointF rasterMoveMouseOffset;
         private PointF arrowMoveStartMouseDoc;
@@ -258,6 +266,8 @@ namespace AnonPDF
         private bool isMovingArrowObject;
         private bool isAdjustingArrowHandle;
         private bool isMovingVectorShape;
+        private bool isAdjustingVectorHandle;
+        private bool isRotatingVectorShape;
         private bool rasterMouseActionInProgress;
         private bool arrowMouseActionInProgress;
         private bool vectorMouseActionInProgress;
@@ -271,12 +281,16 @@ namespace AnonPDF
         private const int RasterRotateHandleSize = 14;
         private const int RasterRotateHandleOffset = 35;
         private const int RasterResizeHandleSize = 11;
-        private const int ArrowHandleRadius = 6;
         private const float ArrowLineSelectionTolerance = 8f;
         private const float DefaultArrowThickness = 3f;
         private const float DefaultArrowHeadLength = 18f;
         private const float DefaultArrowHeadWidth = 12f;
         private readonly System.Drawing.Color DefaultArrowColor = System.Drawing.Color.Red;
+        private const float SelectedObjectBorderWidth = 2f;
+        private int vectorHandlePointIndex = -1;
+        private float vectorRotationStartAngle;
+        private List<PointF> vectorRotateInitialPoints = new List<PointF>();
+        private PointF vectorRotateCenterDoc = PointF.Empty;
 
         private enum RasterResizeHandleType
         {
@@ -8951,6 +8965,10 @@ namespace AnonPDF
             textAnnotations.Clear();
             selectedTextAnnotation = null;
             selectedTextAnnotations.Clear();
+            isMoving = false;
+            annotationToMove = null;
+            textMoveMouseOffset = PointF.Empty;
+            ResetTextRotationInteractionState();
             ResetGroupMoveState();
             pdfViewer.Invalidate();
         }
@@ -12021,6 +12039,7 @@ namespace AnonPDF
             ClearRasterIconClickState();
             ClearArrowIconClickState();
             ClearVectorIconClickState();
+            ResetTextRotationInteractionState();
             rasterMouseActionInProgress = false;
             arrowMouseActionInProgress = false;
             vectorMouseActionInProgress = false;
@@ -12030,6 +12049,7 @@ namespace AnonPDF
                 ResetRasterInteractionState();
                 ResetArrowInteractionState();
                 ResetVectorInteractionState();
+                ResetTextRotationInteractionState();
                 selectedVectorShape = null;
                 ResetGroupMoveState();
                 ClearArrowIconClickState();
@@ -12092,6 +12112,23 @@ namespace AnonPDF
 
                     ClearGroupSelection();
                     ResetGroupMoveState();
+                }
+
+                if (TryHandleTextRotationMouseDown(e.Location, dpiX, dpiY))
+                {
+                    selectedArrowObject = null;
+                    ResetArrowInteractionState();
+                    ClearArrowIconClickState();
+                    selectedVectorShape = null;
+                    ResetVectorInteractionState();
+                    selectedRasterObject = null;
+                    ResetRasterInteractionState();
+                    isDrawing = false;
+                    isMoving = false;
+                    annotationToMove = null;
+                    textMoveMouseOffset = PointF.Empty;
+                    pdfViewer.Invalidate();
+                    return;
                 }
 
                 if (TryHandleAnnotationIconMouseDown(e.Location, dpiX, dpiY))
@@ -12277,6 +12314,7 @@ namespace AnonPDF
                 isDrawing = false;
                 isMoving = false;
                 annotationToMove = null;
+                ResetTextRotationInteractionState();
                 ResetRasterInteractionState();
                 ResetArrowInteractionState();
                 ResetVectorInteractionState();
@@ -12356,6 +12394,49 @@ namespace AnonPDF
                 return;
             }
 
+            if (isRotatingTextAnnotation && annotationToRotate != null)
+            {
+                float dpiX;
+                float dpiY;
+                using (Graphics g = pdfViewer.CreateGraphics())
+                {
+                    dpiX = g.DpiX;
+                    dpiY = g.DpiY;
+                }
+
+                PointF center = GetAnnotationScreenCenter(annotationToRotate, dpiX, dpiY);
+                if (TryGetAnnotationTextFrameGeometry(
+                        annotationToRotate,
+                        dpiX,
+                        dpiY,
+                        out _,
+                        out _,
+                        out PointF frameCenter,
+                        out _))
+                {
+                    center = frameCenter;
+                }
+                float currentAngle = GetAngleDegrees(center, e.Location);
+                float delta = NormalizeAngleDelta(currentAngle - textRotationStartAngle);
+                int updatedRotation = NormalizeRotation(textRotationStartValue + (int)Math.Round(delta));
+                int previousRotation = NormalizeRotation(annotationToRotate.AnnotationRotation);
+                annotationToRotate.AnnotationRotation = updatedRotation;
+                SizeF rotatedSize = GetAnnotationSize(annotationToRotate.AnnotationText, annotationToRotate.AnnotationFont, updatedRotation);
+                annotationToRotate.AnnotationBounds = new RectangleF(
+                    textRotationStartCenterDoc.X - (rotatedSize.Width / 2f),
+                    textRotationStartCenterDoc.Y - (rotatedSize.Height / 2f),
+                    rotatedSize.Width,
+                    rotatedSize.Height);
+                if (updatedRotation != previousRotation)
+                {
+                    textRotationInteractionChanged = true;
+                }
+
+                this.Cursor = Cursors.Hand;
+                pdfViewer.Invalidate();
+                return;
+            }
+
             if (isAdjustingArrowHandle && arrowObjectToAdjust != null && arrowHandleType != ArrowHandleType.None)
             {
                 PointF mousePoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
@@ -12375,7 +12456,7 @@ namespace AnonPDF
                 arrowObjectToAdjust.HeadWidth = NormalizeArrowHeadWidth(arrowObjectToAdjust.HeadWidth);
                 arrowObjectToAdjust.UpdatedAtUtc = DateTime.UtcNow;
                 arrowInteractionChanged = true;
-                this.Cursor = Cursors.Hand;
+                this.Cursor = GetArrowHandleCursor(arrowObjectToAdjust, arrowHandleType);
                 pdfViewer.Invalidate();
                 return;
             }
@@ -12618,6 +12699,38 @@ namespace AnonPDF
                 return;
             }
 
+            if (isRotatingVectorShape &&
+                vectorShapeToRotate != null &&
+                vectorRotateInitialPoints != null &&
+                vectorRotateInitialPoints.Count > 0)
+            {
+                PointF centerScreen = new PointF(vectorRotateCenterDoc.X * scaleFactor, vectorRotateCenterDoc.Y * scaleFactor);
+                float currentAngle = GetAngleDegrees(centerScreen, e.Location);
+                float deltaDegrees = NormalizeAngleDelta(currentAngle - vectorRotationStartAngle);
+                float radians = (float)(Math.PI * deltaDegrees / 180.0);
+                float cos = (float)Math.Cos(radians);
+                float sin = (float)Math.Sin(radians);
+
+                var rotatedPoints = new List<PointF>(vectorRotateInitialPoints.Count);
+                foreach (PointF point in vectorRotateInitialPoints)
+                {
+                    float localX = point.X - vectorRotateCenterDoc.X;
+                    float localY = point.Y - vectorRotateCenterDoc.Y;
+                    float rotatedX = (localX * cos) - (localY * sin);
+                    float rotatedY = (localX * sin) + (localY * cos);
+                    rotatedPoints.Add(new PointF(
+                        vectorRotateCenterDoc.X + rotatedX,
+                        vectorRotateCenterDoc.Y + rotatedY));
+                }
+
+                vectorShapeToRotate.Points = rotatedPoints;
+                vectorShapeToRotate.UpdatedAtUtc = DateTime.UtcNow;
+                vectorInteractionChanged = vectorInteractionChanged || Math.Abs(deltaDegrees) > 0.05f;
+                this.Cursor = Cursors.Hand;
+                pdfViewer.Invalidate();
+                return;
+            }
+
             if (isMovingVectorShape && vectorShapeToMove != null)
             {
                 PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
@@ -12654,9 +12767,77 @@ namespace AnonPDF
                 return;
             }
 
+            if (isAdjustingVectorHandle &&
+                vectorShapeToAdjust != null &&
+                vectorHandlePointIndex >= 0 &&
+                vectorMoveInitialPoints != null &&
+                vectorMoveInitialPoints.Count > vectorHandlePointIndex)
+            {
+                PointF updatedPoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                if (snapToGridEnabled)
+                {
+                    updatedPoint.X = SnapValueToGrid(updatedPoint.X, SnapGridStep);
+                    updatedPoint.Y = SnapValueToGrid(updatedPoint.Y, SnapGridStep);
+                }
+
+                var pageSize = GetPageSizeWithOffset(vectorShapeToAdjust.PageNumber);
+                if (pageSize.Width > 0f && pageSize.Height > 0f)
+                {
+                    updatedPoint = new PointF(
+                        Math.Max(0f, Math.Min(pageSize.Width, updatedPoint.X)),
+                        Math.Max(0f, Math.Min(pageSize.Height, updatedPoint.Y)));
+                }
+
+                List<PointF> updatedPoints = vectorMoveInitialPoints.Select(p => p).ToList();
+                updatedPoints[vectorHandlePointIndex] = updatedPoint;
+
+                VectorShapeType shapeType = ParseVectorShapeType(vectorShapeToAdjust.ShapeType);
+                if ((Control.ModifierKeys & Keys.Alt) == Keys.Alt &&
+                    IsTwoPointConstrainedShape(shapeType) &&
+                    updatedPoints.Count >= 2)
+                {
+                    if (vectorHandlePointIndex == 1)
+                    {
+                        updatedPoints[1] = ApplyAltConstraintToSecondPoint(shapeType, updatedPoints[0], updatedPoints[1]);
+                    }
+                    else if (vectorHandlePointIndex == 0)
+                    {
+                        updatedPoints[0] = ApplyAltConstraintToSecondPoint(shapeType, updatedPoints[1], updatedPoints[0]);
+                    }
+                }
+
+                if (pageSize.Width > 0f && pageSize.Height > 0f)
+                {
+                    PointF constrainedPoint = updatedPoints[vectorHandlePointIndex];
+                    updatedPoints[vectorHandlePointIndex] = new PointF(
+                        Math.Max(0f, Math.Min(pageSize.Width, constrainedPoint.X)),
+                        Math.Max(0f, Math.Min(pageSize.Height, constrainedPoint.Y)));
+                }
+
+                vectorShapeToAdjust.Points = updatedPoints;
+                vectorShapeToAdjust.UpdatedAtUtc = DateTime.UtcNow;
+                PointF initialPoint = vectorMoveInitialPoints[vectorHandlePointIndex];
+                PointF currentPoint = updatedPoints[vectorHandlePointIndex];
+                vectorInteractionChanged = vectorInteractionChanged ||
+                                           Math.Abs(initialPoint.X - currentPoint.X) > 0.001f ||
+                                           Math.Abs(initialPoint.Y - currentPoint.Y) > 0.001f;
+                this.Cursor = GetVectorHandleCursor(vectorShapeToAdjust, vectorHandlePointIndex);
+                pdfViewer.Invalidate();
+                return;
+            }
+
             if (Control.MouseButtons == MouseButtons.None)
             {
-                if (!TryUpdateVectorHoverCursor(e.Location) &&
+                float dpiX;
+                float dpiY;
+                using (Graphics g = pdfViewer.CreateGraphics())
+                {
+                    dpiX = g.DpiX;
+                    dpiY = g.DpiY;
+                }
+
+                if (!TryUpdateTextHoverCursor(e.Location, dpiX, dpiY) &&
+                    !TryUpdateVectorHoverCursor(e.Location) &&
                     !TryUpdateArrowHoverCursor(e.Location) &&
                     !TryUpdateRasterHoverCursor(e.Location))
                 {
@@ -12788,6 +12969,7 @@ namespace AnonPDF
                 isMoving = false;
                 annotationToMove = null;
                 textMoveMouseOffset = PointF.Empty;
+                ResetTextRotationInteractionState();
                 ResetRasterInteractionState();
                 ResetArrowInteractionState();
                 ResetVectorInteractionState();
@@ -12856,6 +13038,21 @@ namespace AnonPDF
                 {
                     bool changed = vectorInteractionChanged;
                     ResetVectorInteractionState();
+                    this.Cursor = Cursors.Default;
+                    if (changed)
+                    {
+                        projectWasChangedAfterLastSave = true;
+                        saveProjectButton.Enabled = true;
+                        saveProjectMenuItem.Enabled = true;
+                    }
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (isRotatingTextAnnotation)
+                {
+                    bool changed = textRotationInteractionChanged;
+                    ResetTextRotationInteractionState();
                     this.Cursor = Cursors.Default;
                     if (changed)
                     {
@@ -14739,7 +14936,7 @@ namespace AnonPDF
                 if (isSelectedVector)
                 {
                     pen.Color = System.Drawing.Color.Red;
-                    pen.Width = Math.Max(pen.Width, 2f);
+                    pen.Width = Math.Max(SelectedObjectBorderWidth, pen.Width + 1f);
                 }
                 pen.DashStyle = ToDrawingDashStyle(strokeKind);
                 pen.LineJoin = LineJoin.Round;
@@ -14913,7 +15110,7 @@ namespace AnonPDF
                     System.Drawing.Color borderColor = (isSelectedRaster && !multiSelectionActive)
                         ? System.Drawing.Color.Red
                         : System.Drawing.Color.SteelBlue;
-                    float borderWidth = (isSelectedRaster && !multiSelectionActive) ? 2f : 1f;
+                    float borderWidth = (isSelectedRaster && !multiSelectionActive) ? SelectedObjectBorderWidth : 1f;
                     using (var borderPen = new Pen(borderColor, borderWidth))
                     {
                         graphics.DrawRectangle(borderPen, 0f, 0f, scaledBounds.Width, scaledBounds.Height);
@@ -14927,9 +15124,12 @@ namespace AnonPDF
                 RectangleF frameBounds = GetRasterObjectScreenFrameBounds(rasterObject);
                 if (frameBounds.Width > 0f && frameBounds.Height > 0f)
                 {
-                    using (var framePen = new Pen(System.Drawing.Color.Green, 1f))
+                    if (showRasterTools)
                     {
-                        graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
+                        using (var framePen = new Pen(System.Drawing.Color.Green, 1f))
+                        {
+                            graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
+                        }
                     }
 
                     if (multiSelectionActive && isSelectedRaster)
@@ -15058,23 +15258,15 @@ namespace AnonPDF
 
                 if (showArrowTools)
                 {
-                    RectangleF startHandle = new RectangleF(
-                        startScreen.X - ArrowHandleRadius,
-                        startScreen.Y - ArrowHandleRadius,
-                        ArrowHandleRadius * 2f,
-                        ArrowHandleRadius * 2f);
-                    RectangleF endHandle = new RectangleF(
-                        endScreen.X - ArrowHandleRadius,
-                        endScreen.Y - ArrowHandleRadius,
-                        ArrowHandleRadius * 2f,
-                        ArrowHandleRadius * 2f);
+                    RectangleF startHandle = BuildHandleRect(startScreen, RasterResizeHandleSize);
+                    RectangleF endHandle = BuildHandleRect(endScreen, RasterResizeHandleSize);
                     using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
-                    using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                    using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
                     {
-                        graphics.FillEllipse(handleBrush, startHandle);
-                        graphics.DrawEllipse(handlePen, startHandle);
-                        graphics.FillEllipse(handleBrush, endHandle);
-                        graphics.DrawEllipse(handlePen, endHandle);
+                        graphics.FillRectangle(handleBrush, startHandle);
+                        graphics.DrawRectangle(handlePen, startHandle.X, startHandle.Y, startHandle.Width, startHandle.Height);
+                        graphics.FillRectangle(handleBrush, endHandle);
+                        graphics.DrawRectangle(handlePen, endHandle.X, endHandle.Y, endHandle.Width, endHandle.Height);
                     }
 
                     if (TryGetArrowIconRects(arrowObject, out Dictionary<ArrowIconType, Rectangle> arrowIconRects))
@@ -15115,9 +15307,33 @@ namespace AnonPDF
                                  ReferenceEquals(selectedTextAnnotation, annotation) &&
                                  GetGroupSelectionCount() == 0;
 
-            using (Pen pen = new Pen(System.Drawing.Color.Green, 1f))
+            if (TryGetAnnotationTextFrameGeometry(
+                    annotation,
+                    graphics.DpiX,
+                    graphics.DpiY,
+                    out PointF[] textFrameCorners,
+                    out RectangleF textFrameBounds,
+                    out _,
+                    out _))
             {
-                graphics.DrawRectangle(pen, rect);
+                if (showTextTools)
+                {
+                    using (Pen boundPen = new Pen(System.Drawing.Color.Green, 1f))
+                    {
+                        graphics.DrawRectangle(boundPen, textFrameBounds.X, textFrameBounds.Y, textFrameBounds.Width, textFrameBounds.Height);
+                    }
+                }
+
+                System.Drawing.Color frameColor = (isSelectedAnnotation && !multiSelectionActive)
+                    ? System.Drawing.Color.Red
+                    : System.Drawing.Color.SteelBlue;
+                float frameWidth = (isSelectedAnnotation && !multiSelectionActive)
+                    ? SelectedObjectBorderWidth
+                    : 1f;
+                using (Pen textFramePen = new Pen(frameColor, frameWidth))
+                {
+                    graphics.DrawPolygon(textFramePen, textFrameCorners);
+                }
             }
 
             StringAlignment align;
@@ -15180,6 +15396,25 @@ namespace AnonPDF
             if (multiSelectionActive && isSelectedAnnotation)
             {
                 DrawGroupSelectionOutline(graphics, rect);
+            }
+
+            if (showTextTools &&
+                !annotation.AnnotationIsLocked &&
+                TryGetAnnotationRotationHandleRect(annotation, graphics.DpiX, graphics.DpiY, out RectangleF handleRect, out PointF connectorPoint))
+            {
+                PointF handleCenter = new PointF(
+                    handleRect.X + (handleRect.Width / 2f),
+                    handleRect.Y + (handleRect.Height / 2f));
+                using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
+                }
+                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                {
+                    graphics.FillEllipse(handleBrush, handleRect);
+                    graphics.DrawEllipse(handlePen, handleRect);
+                }
             }
 
             if (showTextTools && TryGetAnnotationIconRects(annotation, graphics.DpiX, graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
@@ -17581,6 +17816,21 @@ namespace AnonPDF
             rasterResizeStartRotation = 0;
         }
 
+        private void ResetTextRotationInteractionState()
+        {
+            if (isRotatingTextAnnotation)
+            {
+                this.Cursor = Cursors.Default;
+            }
+
+            isRotatingTextAnnotation = false;
+            textRotationInteractionChanged = false;
+            annotationToRotate = null;
+            textRotationStartValue = 0;
+            textRotationStartAngle = 0f;
+            textRotationStartCenterDoc = PointF.Empty;
+        }
+
         private void ResetArrowInteractionState()
         {
             if (isMovingArrowObject || isAdjustingArrowHandle)
@@ -17602,17 +17852,25 @@ namespace AnonPDF
 
         private void ResetVectorInteractionState()
         {
-            if (isMovingVectorShape)
+            if (isMovingVectorShape || isAdjustingVectorHandle || isRotatingVectorShape)
             {
                 this.Cursor = Cursors.Default;
             }
 
             vectorShapeToMove = null;
+            vectorShapeToAdjust = null;
+            vectorShapeToRotate = null;
             isMovingVectorShape = false;
+            isAdjustingVectorHandle = false;
+            isRotatingVectorShape = false;
             vectorMouseActionInProgress = false;
             vectorInteractionChanged = false;
+            vectorHandlePointIndex = -1;
             vectorMoveStartMouseDoc = PointF.Empty;
             vectorMoveInitialPoints.Clear();
+            vectorRotateInitialPoints.Clear();
+            vectorRotateCenterDoc = PointF.Empty;
+            vectorRotationStartAngle = 0f;
         }
 
         private static float NormalizeArrowThickness(float value)
@@ -17772,8 +18030,9 @@ namespace AnonPDF
                 case VectorShapeType.Rectangle:
                 case VectorShapeType.Ellipse:
                 case VectorShapeType.Triangle:
-                case VectorShapeType.Arc:
                     return 2;
+                case VectorShapeType.Arc:
+                    return 3;
                 default:
                     return 2;
             }
@@ -17793,6 +18052,13 @@ namespace AnonPDF
                    || type == VectorShapeType.Rectangle
                    || type == VectorShapeType.Ellipse
                    || type == VectorShapeType.Triangle;
+        }
+
+        private static bool ShapeTypeSupportsRotationHandle(VectorShapeType type)
+        {
+            return type != VectorShapeType.Rectangle
+                   && type != VectorShapeType.Ellipse
+                   && type != VectorShapeType.Triangle;
         }
 
         private static bool IsTwoPointConstrainedShape(VectorShapeType type)
@@ -17878,6 +18144,96 @@ namespace AnonPDF
             return RectangleF.FromLTRB(left, top, right, bottom);
         }
 
+        private static float NormalizeRadians(float angle)
+        {
+            const float twoPi = (float)(Math.PI * 2.0);
+            while (angle < 0f)
+            {
+                angle += twoPi;
+            }
+            while (angle >= twoPi)
+            {
+                angle -= twoPi;
+            }
+            return angle;
+        }
+
+        private static float PositiveAngleDelta(float from, float to)
+        {
+            float delta = NormalizeRadians(to) - NormalizeRadians(from);
+            if (delta < 0f)
+            {
+                delta += (float)(Math.PI * 2.0);
+            }
+            return delta;
+        }
+
+        private static List<PointF> BuildArcFromThreePoints(PointF start, PointF end, PointF through)
+        {
+            var result = new List<PointF>();
+            float ax = start.X;
+            float ay = start.Y;
+            float bx = end.X;
+            float by = end.Y;
+            float cx = through.X;
+            float cy = through.Y;
+
+            float d = 2f * ((ax * (by - cy)) + (bx * (cy - ay)) + (cx * (ay - by)));
+            if (Math.Abs(d) < 0.0001f)
+            {
+                result.Add(start);
+                if (DistanceBetweenPoints(start, through) > 0.0001f && DistanceBetweenPoints(end, through) > 0.0001f)
+                {
+                    result.Add(through);
+                }
+                if (DistanceBetweenPoints(start, end) > 0.0001f)
+                {
+                    result.Add(end);
+                }
+                return result;
+            }
+
+            float a2 = (ax * ax) + (ay * ay);
+            float b2 = (bx * bx) + (by * by);
+            float c2 = (cx * cx) + (cy * cy);
+            float ux = ((a2 * (by - cy)) + (b2 * (cy - ay)) + (c2 * (ay - by))) / d;
+            float uy = ((a2 * (cx - bx)) + (b2 * (ax - cx)) + (c2 * (bx - ax))) / d;
+
+            float radius = DistanceBetweenPoints(new PointF(ux, uy), start);
+            if (radius <= 0.0001f)
+            {
+                result.Add(start);
+                if (DistanceBetweenPoints(start, end) > 0.0001f)
+                {
+                    result.Add(end);
+                }
+                return result;
+            }
+
+            float angleStart = (float)Math.Atan2(start.Y - uy, start.X - ux);
+            float angleEnd = (float)Math.Atan2(end.Y - uy, end.X - ux);
+            float angleThrough = (float)Math.Atan2(through.Y - uy, through.X - ux);
+
+            float ccwStartToEnd = PositiveAngleDelta(angleStart, angleEnd);
+            float ccwStartToThrough = PositiveAngleDelta(angleStart, angleThrough);
+            bool throughOnCcwArc = ccwStartToThrough <= ccwStartToEnd;
+            float sweep = throughOnCcwArc
+                ? ccwStartToEnd
+                : -(float)((Math.PI * 2.0) - ccwStartToEnd);
+
+            int segments = Math.Max(24, (int)Math.Ceiling(Math.Abs(sweep) / (Math.PI / 18.0))); // ~10 deg per segment
+            for (int i = 0; i <= segments; i++)
+            {
+                float t = i / (float)segments;
+                float angle = angleStart + (sweep * t);
+                float x = ux + (radius * (float)Math.Cos(angle));
+                float y = uy + (radius * (float)Math.Sin(angle));
+                result.Add(new PointF(x, y));
+            }
+
+            return result;
+        }
+
         private static List<PointF> BuildVectorShapeRenderPoints(VectorShapeType shapeType, IList<PointF> points)
         {
             var result = new List<PointF>();
@@ -17933,7 +18289,6 @@ namespace AnonPDF
                 }
 
                 case VectorShapeType.Ellipse:
-                case VectorShapeType.Arc:
                 {
                     if (points.Count < 2)
                     {
@@ -17953,6 +18308,46 @@ namespace AnonPDF
                     int segments = shapeType == VectorShapeType.Ellipse ? 48 : 24;
                     float startAngle = shapeType == VectorShapeType.Ellipse ? 0f : 180f;
                     float sweepAngle = shapeType == VectorShapeType.Ellipse ? 360f : -180f;
+
+                    for (int i = 0; i <= segments; i++)
+                    {
+                        float t = i / (float)segments;
+                        float angleDeg = startAngle + (sweepAngle * t);
+                        float angleRad = (float)(Math.PI * angleDeg / 180.0);
+                        float x = centerX + (radiusX * (float)Math.Cos(angleRad));
+                        float y = centerY + (radiusY * (float)Math.Sin(angleRad));
+                        result.Add(new PointF(x, y));
+                    }
+
+                    return result;
+                }
+
+                case VectorShapeType.Arc:
+                {
+                    if (points.Count >= 3)
+                    {
+                        return BuildArcFromThreePoints(points[0], points[1], points[2]);
+                    }
+
+                    // Backward compatibility for older projects that stored arc as two points.
+                    if (points.Count < 2)
+                    {
+                        return result;
+                    }
+
+                    RectangleF rect = CreateNormalizedRectangle(points[0], points[points.Count - 1]);
+                    if (rect.Width <= 0.0001f || rect.Height <= 0.0001f)
+                    {
+                        return result;
+                    }
+
+                    float centerX = rect.Left + (rect.Width / 2f);
+                    float centerY = rect.Top + (rect.Height / 2f);
+                    float radiusX = rect.Width / 2f;
+                    float radiusY = rect.Height / 2f;
+                    const int segments = 24;
+                    const float startAngle = 180f;
+                    const float sweepAngle = -180f;
 
                     for (int i = 0; i <= segments; i++)
                     {
@@ -17997,6 +18392,11 @@ namespace AnonPDF
                 .Where(p => !float.IsNaN(p.X) && !float.IsInfinity(p.X) && !float.IsNaN(p.Y) && !float.IsInfinity(p.Y))
                 .ToList();
 
+            if (parsedType == VectorShapeType.Arc && vectorShape.Points.Count > 3)
+            {
+                vectorShape.Points = vectorShape.Points.Take(3).ToList();
+            }
+
             if (!ShapeTypeSupportsFill(parsedType))
             {
                 vectorShape.FillOpacity = 0f;
@@ -18011,6 +18411,70 @@ namespace AnonPDF
             return new PointF(viewPoint.X * scaleFactor, viewPoint.Y * scaleFactor);
         }
 
+        private bool TryGetVectorHandleRects(VectorShapeObject vectorShape, out Dictionary<int, RectangleF> handleRects)
+        {
+            handleRects = null;
+            if (vectorShape == null || vectorShape.PageNumber != currentPage || vectorShape.Points == null || vectorShape.Points.Count == 0)
+            {
+                return false;
+            }
+
+            var result = new Dictionary<int, RectangleF>();
+            for (int i = 0; i < vectorShape.Points.Count; i++)
+            {
+                PointF point = vectorShape.Points[i];
+                if (float.IsNaN(point.X) || float.IsInfinity(point.X) || float.IsNaN(point.Y) || float.IsInfinity(point.Y))
+                {
+                    continue;
+                }
+
+                PointF screenPoint = new PointF(point.X * scaleFactor, point.Y * scaleFactor);
+                result[i] = BuildHandleRect(screenPoint, RasterResizeHandleSize);
+            }
+
+            if (result.Count == 0)
+            {
+                return false;
+            }
+
+            handleRects = result;
+            return true;
+        }
+
+        private bool TryGetVectorHandleAtPoint(VectorShapeObject vectorShape, Point location, out int pointIndex)
+        {
+            pointIndex = -1;
+            if (!TryGetVectorHandleRects(vectorShape, out Dictionary<int, RectangleF> handleRects))
+            {
+                return false;
+            }
+
+            float bestDistanceSq = float.MaxValue;
+            foreach (var kvp in handleRects)
+            {
+                RectangleF hitRect = kvp.Value;
+                hitRect.Inflate(2f, 2f);
+                if (!hitRect.Contains(location))
+                {
+                    continue;
+                }
+
+                PointF center = new PointF(
+                    kvp.Value.X + (kvp.Value.Width / 2f),
+                    kvp.Value.Y + (kvp.Value.Height / 2f));
+                float dx = location.X - center.X;
+                float dy = location.Y - center.Y;
+                float distanceSq = (dx * dx) + (dy * dy);
+                if (distanceSq < bestDistanceSq)
+                {
+                    bestDistanceSq = distanceSq;
+                    pointIndex = kvp.Key;
+                }
+            }
+
+            return pointIndex >= 0;
+        }
+
         private bool TryGetArrowHandleAtPoint(ArrowObject arrowObject, Point location, out ArrowHandleType handleType)
         {
             handleType = ArrowHandleType.None;
@@ -18021,20 +18485,17 @@ namespace AnonPDF
 
             PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
             PointF endScreen = GetArrowScreenPoint(arrowObject.End);
-            float radius = ArrowHandleRadius + 2f;
-            float radiusSq = radius * radius;
-
-            float dxStart = location.X - startScreen.X;
-            float dyStart = location.Y - startScreen.Y;
-            if ((dxStart * dxStart) + (dyStart * dyStart) <= radiusSq)
+            RectangleF startHandle = BuildHandleRect(startScreen, RasterResizeHandleSize);
+            startHandle.Inflate(2f, 2f);
+            if (startHandle.Contains(location))
             {
                 handleType = ArrowHandleType.Start;
                 return true;
             }
 
-            float dxEnd = location.X - endScreen.X;
-            float dyEnd = location.Y - endScreen.Y;
-            if ((dxEnd * dxEnd) + (dyEnd * dyEnd) <= radiusSq)
+            RectangleF endHandle = BuildHandleRect(endScreen, RasterResizeHandleSize);
+            endHandle.Inflate(2f, 2f);
+            if (endHandle.Contains(location))
             {
                 handleType = ArrowHandleType.End;
                 return true;
@@ -18080,11 +18541,76 @@ namespace AnonPDF
             return distance <= tolerance;
         }
 
+        private Cursor GetVectorHandleCursor(VectorShapeObject vectorShape, int pointIndex)
+        {
+            if (vectorShape == null || vectorShape.Points == null || pointIndex < 0 || pointIndex >= vectorShape.Points.Count)
+            {
+                return Cursors.SizeAll;
+            }
+
+            PointF handle = vectorShape.Points[pointIndex];
+            PointF center = GetVectorShapeCenterDoc(vectorShape);
+            float dx = handle.X - center.X;
+            float dy = handle.Y - center.Y;
+            if (Math.Abs(dx) <= 0.0001f && Math.Abs(dy) <= 0.0001f)
+            {
+                return Cursors.SizeAll;
+            }
+
+            float angle = (float)(Math.Atan2(dy, dx) * (180d / Math.PI));
+            return GetDirectionalResizeCursor(angle);
+        }
+
+        private Cursor GetArrowHandleCursor(ArrowObject arrowObject, ArrowHandleType handleType)
+        {
+            if (arrowObject == null || handleType == ArrowHandleType.None)
+            {
+                return Cursors.SizeAll;
+            }
+
+            PointF a;
+            PointF b;
+            if (handleType == ArrowHandleType.Start)
+            {
+                a = arrowObject.End;
+                b = arrowObject.Start;
+            }
+            else
+            {
+                a = arrowObject.Start;
+                b = arrowObject.End;
+            }
+
+            float dx = b.X - a.X;
+            float dy = b.Y - a.Y;
+            if (Math.Abs(dx) <= 0.0001f && Math.Abs(dy) <= 0.0001f)
+            {
+                return Cursors.SizeAll;
+            }
+
+            float angle = (float)(Math.Atan2(dy, dx) * (180d / Math.PI));
+            return GetDirectionalResizeCursor(angle);
+        }
+
         private bool TryUpdateVectorHoverCursor(Point location)
         {
             if (selectedVectorShape == null || selectedVectorShape.PageNumber != currentPage)
             {
                 return false;
+            }
+
+            if (!selectedVectorShape.IsLocked && TryGetVectorHandleAtPoint(selectedVectorShape, location, out int handleIndex))
+            {
+                this.Cursor = GetVectorHandleCursor(selectedVectorShape, handleIndex);
+                return true;
+            }
+
+            if (!selectedVectorShape.IsLocked &&
+                TryGetVectorRotationHandleRect(selectedVectorShape, out RectangleF rotationHandleRect, out _) &&
+                rotationHandleRect.Contains(location))
+            {
+                this.Cursor = Cursors.Hand;
+                return true;
             }
 
             if (IsPointNearVectorShape(selectedVectorShape, location))
@@ -18103,9 +18629,9 @@ namespace AnonPDF
                 return false;
             }
 
-            if (!selectedArrowObject.IsLocked && TryGetArrowHandleAtPoint(selectedArrowObject, location, out _))
+            if (!selectedArrowObject.IsLocked && TryGetArrowHandleAtPoint(selectedArrowObject, location, out ArrowHandleType handleType))
             {
-                this.Cursor = Cursors.Hand;
+                this.Cursor = GetArrowHandleCursor(selectedArrowObject, handleType);
                 return true;
             }
 
@@ -18122,10 +18648,49 @@ namespace AnonPDF
         {
             if (selectedVectorShape != null && selectedVectorShape.PageNumber == currentPage && !selectedVectorShape.IsLocked)
             {
+                if (TryGetVectorHandleAtPoint(selectedVectorShape, location, out int selectedHandleIndex))
+                {
+                    vectorShapeToMove = null;
+                    vectorShapeToAdjust = selectedVectorShape;
+                    vectorShapeToRotate = null;
+                    isMovingVectorShape = false;
+                    isAdjustingVectorHandle = true;
+                    isRotatingVectorShape = false;
+                    vectorHandlePointIndex = selectedHandleIndex;
+                    vectorMouseActionInProgress = true;
+                    vectorInteractionChanged = false;
+                    vectorMoveInitialPoints = (selectedVectorShape.Points ?? new List<PointF>()).Select(p => p).ToList();
+                    this.Cursor = GetVectorHandleCursor(selectedVectorShape, selectedHandleIndex);
+                    return true;
+                }
+
+                if (TryGetVectorRotationHandleRect(selectedVectorShape, out RectangleF handleRect, out _) && handleRect.Contains(location))
+                {
+                    vectorShapeToMove = null;
+                    vectorShapeToAdjust = null;
+                    vectorShapeToRotate = selectedVectorShape;
+                    isMovingVectorShape = false;
+                    isAdjustingVectorHandle = false;
+                    isRotatingVectorShape = true;
+                    vectorHandlePointIndex = -1;
+                    vectorMouseActionInProgress = true;
+                    vectorInteractionChanged = false;
+                    vectorRotateInitialPoints = (selectedVectorShape.Points ?? new List<PointF>()).Select(p => p).ToList();
+                    vectorRotateCenterDoc = GetVectorShapeRotationCenterDoc(selectedVectorShape);
+                    vectorRotationStartAngle = GetAngleDegrees(new PointF(vectorRotateCenterDoc.X * scaleFactor, vectorRotateCenterDoc.Y * scaleFactor), location);
+                    this.Cursor = Cursors.Hand;
+                    return true;
+                }
+
                 if (IsPointNearVectorShape(selectedVectorShape, location))
                 {
                     vectorShapeToMove = selectedVectorShape;
+                    vectorShapeToAdjust = null;
+                    vectorShapeToRotate = null;
                     isMovingVectorShape = true;
+                    isAdjustingVectorHandle = false;
+                    isRotatingVectorShape = false;
+                    vectorHandlePointIndex = -1;
                     vectorMouseActionInProgress = true;
                     vectorInteractionChanged = false;
                     vectorMoveStartMouseDoc = new PointF(location.X / scaleFactor, location.Y / scaleFactor);
@@ -18149,8 +18714,47 @@ namespace AnonPDF
                 return true;
             }
 
+            if (TryGetVectorHandleAtPoint(hitVectorShape, location, out int handleIndex))
+            {
+                vectorShapeToMove = null;
+                vectorShapeToAdjust = hitVectorShape;
+                vectorShapeToRotate = null;
+                isMovingVectorShape = false;
+                isAdjustingVectorHandle = true;
+                isRotatingVectorShape = false;
+                vectorHandlePointIndex = handleIndex;
+                vectorMouseActionInProgress = true;
+                vectorInteractionChanged = false;
+                vectorMoveInitialPoints = (hitVectorShape.Points ?? new List<PointF>()).Select(p => p).ToList();
+                this.Cursor = GetVectorHandleCursor(hitVectorShape, handleIndex);
+                return true;
+            }
+
+            if (TryGetVectorRotationHandleRect(hitVectorShape, out RectangleF hitRotationHandleRect, out _) && hitRotationHandleRect.Contains(location))
+            {
+                vectorShapeToMove = null;
+                vectorShapeToAdjust = null;
+                vectorShapeToRotate = hitVectorShape;
+                isMovingVectorShape = false;
+                isAdjustingVectorHandle = false;
+                isRotatingVectorShape = true;
+                vectorHandlePointIndex = -1;
+                vectorMouseActionInProgress = true;
+                vectorInteractionChanged = false;
+                vectorRotateInitialPoints = (hitVectorShape.Points ?? new List<PointF>()).Select(p => p).ToList();
+                vectorRotateCenterDoc = GetVectorShapeRotationCenterDoc(hitVectorShape);
+                vectorRotationStartAngle = GetAngleDegrees(new PointF(vectorRotateCenterDoc.X * scaleFactor, vectorRotateCenterDoc.Y * scaleFactor), location);
+                this.Cursor = Cursors.Hand;
+                return true;
+            }
+
             vectorShapeToMove = hitVectorShape;
+            vectorShapeToAdjust = null;
+            vectorShapeToRotate = null;
             isMovingVectorShape = true;
+            isAdjustingVectorHandle = false;
+            isRotatingVectorShape = false;
+            vectorHandlePointIndex = -1;
             vectorMouseActionInProgress = true;
             vectorInteractionChanged = false;
             vectorMoveStartMouseDoc = new PointF(location.X / scaleFactor, location.Y / scaleFactor);
@@ -18170,7 +18774,7 @@ namespace AnonPDF
                     isAdjustingArrowHandle = true;
                     arrowHandleType = selectedHandle;
                     arrowInteractionChanged = false;
-                    this.Cursor = Cursors.Hand;
+                    this.Cursor = GetArrowHandleCursor(selectedArrowObject, selectedHandle);
                     return true;
                 }
             }
@@ -18203,7 +18807,7 @@ namespace AnonPDF
                 isAdjustingArrowHandle = true;
                 arrowHandleType = handleType;
                 arrowInteractionChanged = false;
-                this.Cursor = Cursors.Hand;
+                this.Cursor = GetArrowHandleCursor(hitArrow, handleType);
                 return true;
             }
 
@@ -18456,6 +19060,114 @@ namespace AnonPDF
         {
             RectangleF bounds = GetRasterObjectScreenBounds(rasterObject);
             return new PointF(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
+        }
+
+        private bool TryGetVectorShapeScreenBounds(VectorShapeObject vectorShape, out RectangleF bounds)
+        {
+            bounds = RectangleF.Empty;
+            if (vectorShape == null || vectorShape.PageNumber != currentPage || vectorShape.Points == null || vectorShape.Points.Count < 2)
+            {
+                return false;
+            }
+
+            PointF[] points = BuildVectorShapeRenderPoints(ParseVectorShapeType(vectorShape.ShapeType), vectorShape.Points)
+                .Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor))
+                .ToArray();
+            if (points.Length < 2)
+            {
+                return false;
+            }
+
+            float minX = points.Min(p => p.X);
+            float maxX = points.Max(p => p.X);
+            float minY = points.Min(p => p.Y);
+            float maxY = points.Max(p => p.Y);
+            float width = Math.Max(0f, maxX - minX);
+            float height = Math.Max(0f, maxY - minY);
+            if (width <= 0.0001f && height <= 0.0001f)
+            {
+                return false;
+            }
+
+            bounds = new RectangleF(minX, minY, Math.Max(1f, width), Math.Max(1f, height));
+            return true;
+        }
+
+        private bool TryGetVectorRotationHandleRect(VectorShapeObject vectorShape, out RectangleF handleRect, out PointF connectorPoint)
+        {
+            handleRect = RectangleF.Empty;
+            connectorPoint = PointF.Empty;
+            VectorShapeType shapeType = ParseVectorShapeType(vectorShape?.ShapeType);
+            if (!ShapeTypeSupportsRotationHandle(shapeType))
+            {
+                return false;
+            }
+
+            if (!TryGetVectorShapeScreenBounds(vectorShape, out RectangleF bounds))
+            {
+                return false;
+            }
+
+            PointF center = new PointF(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
+            connectorPoint = new PointF(center.X, bounds.Top);
+            PointF handleCenter = new PointF(center.X, bounds.Top - RasterRotateHandleOffset);
+            handleRect = new RectangleF(
+                handleCenter.X - (RasterRotateHandleSize / 2f),
+                handleCenter.Y - (RasterRotateHandleSize / 2f),
+                RasterRotateHandleSize,
+                RasterRotateHandleSize);
+            return true;
+        }
+
+        private static PointF GetVectorShapeCenterDoc(VectorShapeObject vectorShape)
+        {
+            if (vectorShape == null || vectorShape.Points == null || vectorShape.Points.Count == 0)
+            {
+                return PointF.Empty;
+            }
+
+            float minX = vectorShape.Points.Min(p => p.X);
+            float maxX = vectorShape.Points.Max(p => p.X);
+            float minY = vectorShape.Points.Min(p => p.Y);
+            float maxY = vectorShape.Points.Max(p => p.Y);
+            return new PointF((minX + maxX) / 2f, (minY + maxY) / 2f);
+        }
+
+        private static bool TryGetCircumcenter(PointF a, PointF b, PointF c, out PointF center)
+        {
+            center = PointF.Empty;
+            float d = 2f * ((a.X * (b.Y - c.Y)) + (b.X * (c.Y - a.Y)) + (c.X * (a.Y - b.Y)));
+            if (Math.Abs(d) < 0.0001f)
+            {
+                return false;
+            }
+
+            float a2 = (a.X * a.X) + (a.Y * a.Y);
+            float b2 = (b.X * b.X) + (b.Y * b.Y);
+            float c2 = (c.X * c.X) + (c.Y * c.Y);
+            float ux = ((a2 * (b.Y - c.Y)) + (b2 * (c.Y - a.Y)) + (c2 * (a.Y - b.Y))) / d;
+            float uy = ((a2 * (c.X - b.X)) + (b2 * (a.X - c.X)) + (c2 * (b.X - a.X))) / d;
+            center = new PointF(ux, uy);
+            return true;
+        }
+
+        private static PointF GetVectorShapeRotationCenterDoc(VectorShapeObject vectorShape)
+        {
+            if (vectorShape == null || vectorShape.Points == null || vectorShape.Points.Count == 0)
+            {
+                return PointF.Empty;
+            }
+
+            VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
+            if (shapeType == VectorShapeType.Arc && vectorShape.Points.Count >= 3)
+            {
+                if (TryGetCircumcenter(vectorShape.Points[0], vectorShape.Points[1], vectorShape.Points[2], out PointF arcCenter))
+                {
+                    return arcCenter;
+                }
+            }
+
+            return GetVectorShapeCenterDoc(vectorShape);
         }
 
         private bool IsPointInsideRasterObject(RasterObject rasterObject, Point location)
@@ -18895,24 +19607,15 @@ namespace AnonPDF
 
             PointF startScreen = GetArrowScreenPoint(selectedArrowObject.Start);
             PointF endScreen = GetArrowScreenPoint(selectedArrowObject.End);
-
-            RectangleF startHandle = new RectangleF(
-                startScreen.X - ArrowHandleRadius,
-                startScreen.Y - ArrowHandleRadius,
-                ArrowHandleRadius * 2f,
-                ArrowHandleRadius * 2f);
-            RectangleF endHandle = new RectangleF(
-                endScreen.X - ArrowHandleRadius,
-                endScreen.Y - ArrowHandleRadius,
-                ArrowHandleRadius * 2f,
-                ArrowHandleRadius * 2f);
+            RectangleF startHandle = BuildHandleRect(startScreen, RasterResizeHandleSize);
+            RectangleF endHandle = BuildHandleRect(endScreen, RasterResizeHandleSize);
             using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
-            using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+            using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
             {
-                graphics.FillEllipse(handleBrush, startHandle);
-                graphics.DrawEllipse(handlePen, startHandle);
-                graphics.FillEllipse(handleBrush, endHandle);
-                graphics.DrawEllipse(handlePen, endHandle);
+                graphics.FillRectangle(handleBrush, startHandle);
+                graphics.DrawRectangle(handlePen, startHandle.X, startHandle.Y, startHandle.Width, startHandle.Height);
+                graphics.FillRectangle(handleBrush, endHandle);
+                graphics.DrawRectangle(handlePen, endHandle.X, endHandle.Y, endHandle.Width, endHandle.Height);
             }
 
             if (TryGetArrowIconRects(selectedArrowObject, out Dictionary<ArrowIconType, Rectangle> arrowIconRects))
@@ -18935,6 +19638,72 @@ namespace AnonPDF
                 return;
             }
 
+            VectorShapeType selectedShapeType = ParseVectorShapeType(selectedVectorShape.ShapeType);
+
+            if (TryGetVectorShapeScreenBounds(selectedVectorShape, out RectangleF frameBounds))
+            {
+                using (var framePen = new Pen(System.Drawing.Color.Green, 1f))
+                {
+                    graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
+                }
+            }
+
+            if (selectedShapeType == VectorShapeType.Arc)
+            {
+                PointF rotationCenterDoc = GetVectorShapeRotationCenterDoc(selectedVectorShape);
+                PointF rotationCenterScreen = new PointF(rotationCenterDoc.X * scaleFactor, rotationCenterDoc.Y * scaleFactor);
+                const float centerMarkerSize = 8f;
+                RectangleF centerMarkerRect = BuildHandleRect(rotationCenterScreen, centerMarkerSize);
+                using (var centerBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var centerPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    graphics.FillEllipse(centerBrush, centerMarkerRect);
+                    graphics.DrawEllipse(centerPen, centerMarkerRect);
+                    graphics.DrawLine(
+                        centerPen,
+                        rotationCenterScreen.X - 4f,
+                        rotationCenterScreen.Y,
+                        rotationCenterScreen.X + 4f,
+                        rotationCenterScreen.Y);
+                    graphics.DrawLine(
+                        centerPen,
+                        rotationCenterScreen.X,
+                        rotationCenterScreen.Y - 4f,
+                        rotationCenterScreen.X,
+                        rotationCenterScreen.Y + 4f);
+                }
+            }
+
+            if (!selectedVectorShape.IsLocked && TryGetVectorRotationHandleRect(selectedVectorShape, out RectangleF handleRect, out PointF connectorPoint))
+            {
+                PointF handleCenter = new PointF(
+                    handleRect.X + (handleRect.Width / 2f),
+                    handleRect.Y + (handleRect.Height / 2f));
+                using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
+                }
+                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                {
+                    graphics.FillEllipse(handleBrush, handleRect);
+                    graphics.DrawEllipse(handlePen, handleRect);
+                }
+            }
+
+            if (!selectedVectorShape.IsLocked && TryGetVectorHandleRects(selectedVectorShape, out Dictionary<int, RectangleF> handleRects))
+            {
+                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    foreach (RectangleF rect in handleRects.Values)
+                    {
+                        graphics.FillRectangle(handleBrush, rect);
+                        graphics.DrawRectangle(handlePen, rect.X, rect.Y, rect.Width, rect.Height);
+                    }
+                }
+            }
+
             if (TryGetVectorIconRects(selectedVectorShape, out Dictionary<VectorIconType, Rectangle> vectorIconRects))
             {
                 DrawIconButton(graphics, vectorIconRects[VectorIconType.Edit], "\uE70F");
@@ -18955,6 +19724,121 @@ namespace AnonPDF
                 (int)(annotation.AnnotationBounds.Y * scaleFactor),
                 (int)(annotation.AnnotationBounds.Width * scaleFactor * 72f / dpiX),
                 (int)(annotation.AnnotationBounds.Height * scaleFactor * 72f / dpiY));
+        }
+
+        private PointF GetAnnotationScreenCenter(TextAnnotation annotation, float dpiX, float dpiY)
+        {
+            Rectangle rect = GetAnnotationScreenRect(annotation, dpiX, dpiY);
+            return new PointF(rect.Left + (rect.Width / 2f), rect.Top + (rect.Height / 2f));
+        }
+
+        private bool TryGetAnnotationTextFrameGeometry(
+            TextAnnotation annotation,
+            float dpiX,
+            float dpiY,
+            out PointF[] frameCorners,
+            out RectangleF frameBounds,
+            out PointF frameCenter,
+            out PointF frameTopMid)
+        {
+            frameCorners = null;
+            frameBounds = RectangleF.Empty;
+            frameCenter = PointF.Empty;
+            frameTopMid = PointF.Empty;
+
+            if (annotation == null || annotation.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            Rectangle rect = GetAnnotationScreenRect(annotation, dpiX, dpiY);
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                return false;
+            }
+
+            float dpiCorrection = 72f / dpiY;
+            int rotation = NormalizeRotation(annotation.AnnotationRotation);
+            SizeF baseSize = GetAnnotationSize(annotation.AnnotationText, annotation.AnnotationFont, 0);
+            float layoutWidth = baseSize.Width * scaleFactor * 72f / dpiX;
+            float layoutHeight = baseSize.Height * scaleFactor * dpiCorrection;
+            if (layoutWidth <= 0f || layoutHeight <= 0f)
+            {
+                return false;
+            }
+
+            PointF rotationOffset = GetRotationOffsetForBounds(rotation, layoutWidth, layoutHeight);
+            float translateX = rect.X + rotationOffset.X;
+            float translateY = rect.Y + rotationOffset.Y;
+            float angleRad = (float)(rotation * Math.PI / 180.0);
+            float cos = (float)Math.Cos(angleRad);
+            float sin = (float)Math.Sin(angleRad);
+
+            PointF Transform(float x, float y)
+            {
+                return new PointF(
+                    (x * cos) - (y * sin) + translateX,
+                    (x * sin) + (y * cos) + translateY);
+            }
+
+            PointF p0 = Transform(0f, 0f);
+            PointF p1 = Transform(layoutWidth, 0f);
+            PointF p2 = Transform(layoutWidth, layoutHeight);
+            PointF p3 = Transform(0f, layoutHeight);
+            frameCorners = new[] { p0, p1, p2, p3 };
+
+            float minX = frameCorners.Min(p => p.X);
+            float maxX = frameCorners.Max(p => p.X);
+            float minY = frameCorners.Min(p => p.Y);
+            float maxY = frameCorners.Max(p => p.Y);
+            frameBounds = new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY));
+
+            frameCenter = new PointF(
+                (p0.X + p1.X + p2.X + p3.X) / 4f,
+                (p0.Y + p1.Y + p2.Y + p3.Y) / 4f);
+            frameTopMid = new PointF(
+                (p0.X + p1.X) / 2f,
+                (p0.Y + p1.Y) / 2f);
+
+            return true;
+        }
+
+        private bool TryGetAnnotationRotationHandleRect(TextAnnotation annotation, float dpiX, float dpiY, out RectangleF handleRect, out PointF connectorPoint)
+        {
+            handleRect = RectangleF.Empty;
+            connectorPoint = PointF.Empty;
+            if (!TryGetAnnotationTextFrameGeometry(
+                    annotation,
+                    dpiX,
+                    dpiY,
+                    out _,
+                    out _,
+                    out PointF center,
+                    out PointF topMid))
+            {
+                return false;
+            }
+
+            float vx = topMid.X - center.X;
+            float vy = topMid.Y - center.Y;
+            float len = (float)Math.Sqrt((vx * vx) + (vy * vy));
+            if (len <= 0.0001f)
+            {
+                return false;
+            }
+
+            float ux = vx / len;
+            float uy = vy / len;
+            connectorPoint = topMid;
+            PointF handleCenter = new PointF(
+                connectorPoint.X + (ux * RasterRotateHandleOffset),
+                connectorPoint.Y + (uy * RasterRotateHandleOffset));
+            handleRect = new RectangleF(
+                handleCenter.X - (RasterRotateHandleSize / 2f),
+                handleCenter.Y - (RasterRotateHandleSize / 2f),
+                RasterRotateHandleSize,
+                RasterRotateHandleSize);
+            return true;
         }
 
         private bool TryGetAnnotationIconRects(TextAnnotation annotation, float dpiX, float dpiY, out Dictionary<IconType, Rectangle> iconRects)
@@ -18999,6 +19883,70 @@ namespace AnonPDF
                 [IconType.Duplicate] = duplicateIconRect,
                 [IconType.Delete] = deleteIconRect
             };
+            return true;
+        }
+
+        private bool TryUpdateTextHoverCursor(Point location, float dpiX, float dpiY)
+        {
+            if (selectedTextAnnotation == null || selectedTextAnnotation.PageNumber != currentPage)
+            {
+                return false;
+            }
+
+            if (!selectedTextAnnotation.AnnotationIsLocked &&
+                TryGetAnnotationRotationHandleRect(selectedTextAnnotation, dpiX, dpiY, out RectangleF handleRect, out _) &&
+                handleRect.Contains(location))
+            {
+                this.Cursor = Cursors.Hand;
+                return true;
+            }
+
+            Rectangle annotationRect = GetAnnotationScreenRect(selectedTextAnnotation, dpiX, dpiY);
+            if (annotationRect.Contains(location))
+            {
+                this.Cursor = selectedTextAnnotation.AnnotationIsLocked ? Cursors.Default : Cursors.SizeAll;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryHandleTextRotationMouseDown(Point location, float dpiX, float dpiY)
+        {
+            if (selectedTextAnnotation == null ||
+                selectedTextAnnotation.PageNumber != currentPage ||
+                selectedTextAnnotation.AnnotationIsLocked)
+            {
+                return false;
+            }
+
+            if (!TryGetAnnotationRotationHandleRect(selectedTextAnnotation, dpiX, dpiY, out RectangleF handleRect, out _) ||
+                !handleRect.Contains(location))
+            {
+                return false;
+            }
+
+            annotationToRotate = selectedTextAnnotation;
+            isRotatingTextAnnotation = true;
+            textRotationInteractionChanged = false;
+            textRotationStartValue = NormalizeRotation(selectedTextAnnotation.AnnotationRotation);
+            textRotationStartCenterDoc = new PointF(
+                selectedTextAnnotation.AnnotationBounds.X + (selectedTextAnnotation.AnnotationBounds.Width / 2f),
+                selectedTextAnnotation.AnnotationBounds.Y + (selectedTextAnnotation.AnnotationBounds.Height / 2f));
+            PointF center = GetAnnotationScreenCenter(selectedTextAnnotation, dpiX, dpiY);
+            if (TryGetAnnotationTextFrameGeometry(
+                    selectedTextAnnotation,
+                    dpiX,
+                    dpiY,
+                    out _,
+                    out _,
+                    out PointF frameCenter,
+                    out _))
+            {
+                center = frameCenter;
+            }
+            textRotationStartAngle = GetAngleDegrees(center, location);
+            this.Cursor = Cursors.Hand;
             return true;
         }
 
