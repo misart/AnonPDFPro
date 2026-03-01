@@ -16,6 +16,8 @@ License: GNU Affero General Public License v3.0 (AGPL-3.0)
 
 ## Apache-2.0 components
 - TesseractOCR 5.5.1 (.NET wrapper)
+- Material Design Icons Webfont (`materialdesignicons-subset.ttf`)
+  - Used for vector shape picker icons in the UI.
 License: Apache License 2.0
 
 ## PDFium / PDFiumSharp

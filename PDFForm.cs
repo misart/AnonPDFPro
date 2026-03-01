@@ -46,6 +46,15 @@ using iText.Kernel.Font;
 using iText.Layout;
 using TesseractOCR;
 using System.Data.SqlClient;
+using System.Drawing.Drawing2D;
+using MediaGlyphTypeface = System.Windows.Media.GlyphTypeface;
+using MediaDrawingVisual = System.Windows.Media.DrawingVisual;
+using MediaBrushes = System.Windows.Media.Brushes;
+using MediaPixelFormats = System.Windows.Media.PixelFormats;
+using MediaRenderTargetBitmap = System.Windows.Media.Imaging.RenderTargetBitmap;
+using MediaPngBitmapEncoder = System.Windows.Media.Imaging.PngBitmapEncoder;
+using MediaBitmapFrame = System.Windows.Media.Imaging.BitmapFrame;
+using WpfPoint = System.Windows.Point;
 
 
 // Suppress spell-check warning for project name 'AnonPDF'
@@ -98,8 +107,14 @@ namespace AnonPDF
         private const string ClassificationSourceAuto = "auto";
         private const string ClassificationSourceManual = "manual";
         private const float FootnoteMarkerGapPx = 2f;
+        private const string ShapeIconFontFileName = "materialdesignicons-subset.ttf";
+        private const string ShapeIconFontLegacyFileName = "materialdesignicons-webfont.ttf";
         private const string RasterSourceClipboard = "Clipboard";
         private const string RasterSourceFile = "File";
+        private readonly PrivateFontCollection shapeIconPrivateFontCollection = new PrivateFontCollection();
+        private string shapeIconPrivateFontFamilyName = string.Empty;
+        private string shapeIconPrivateFontPath = string.Empty;
+        private bool shapeIconPrivateFontChecked;
 
         private readonly float searchWidthCorrection = 1.0f;
         private float scaleFactor = 0;
@@ -216,6 +231,14 @@ namespace AnonPDF
         private readonly HashSet<TextAnnotation> selectedTextAnnotations = new HashSet<TextAnnotation>();
         private readonly HashSet<string> selectedRasterObjectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> selectedArrowObjectIds = new HashSet<string>(StringComparer.Ordinal);
+        private List<VectorShapeObject> vectorShapes = new List<VectorShapeObject>();
+        private bool isVectorShapeCreationMode;
+        private VectorShapeType activeVectorShapeType = VectorShapeType.Polyline;
+        private VectorShapeDefaults activeVectorShapeDefaults = VectorShapeDefaults.CreateDefault();
+        private readonly List<PointF> vectorShapeDraftPoints = new List<PointF>();
+        private PointF vectorShapeDraftHoverPoint;
+        private bool vectorShapeDraftHoverActive;
+        private List<ObjectLayerEntry> objectLayerOrder = new List<ObjectLayerEntry>();
         private bool isMovingObjectGroup;
         private bool groupMoveChanged;
         private PointF groupMoveStartMouseDoc;
@@ -284,6 +307,72 @@ namespace AnonPDF
             public RectangleF Bounds { get; set; }
             public PointF Start { get; set; }
             public PointF End { get; set; }
+        }
+
+        private enum LayerObjectType
+        {
+            Text,
+            Raster,
+            Arrow,
+            VectorShape
+        }
+
+        private sealed class ObjectLayerEntry
+        {
+            public LayerObjectType Type { get; set; }
+            public string Id { get; set; }
+        }
+
+        private enum VectorShapeType
+        {
+            Polyline,
+            Region,
+            Rectangle,
+            Ellipse,
+            Triangle,
+            Arc
+        }
+
+        private enum VectorShapeStrokeKind
+        {
+            Solid,
+            Dash
+        }
+
+        private sealed class VectorShapeDefaults
+        {
+            public VectorShapeType ShapeType { get; set; }
+            public int StrokeColorArgb { get; set; }
+            public float StrokeWidth { get; set; }
+            public int FillColorArgb { get; set; }
+            public float FillOpacity { get; set; }
+            public VectorShapeStrokeKind StrokeKind { get; set; }
+
+            public static VectorShapeDefaults CreateDefault()
+            {
+                return new VectorShapeDefaults
+                {
+                    ShapeType = VectorShapeType.Polyline,
+                    StrokeColorArgb = System.Drawing.Color.Blue.ToArgb(),
+                    StrokeWidth = 2f,
+                    FillColorArgb = System.Drawing.Color.Gold.ToArgb(),
+                    FillOpacity = 0.18f,
+                    StrokeKind = VectorShapeStrokeKind.Solid
+                };
+            }
+
+            public VectorShapeDefaults Clone()
+            {
+                return new VectorShapeDefaults
+                {
+                    ShapeType = ShapeType,
+                    StrokeColorArgb = StrokeColorArgb,
+                    StrokeWidth = StrokeWidth,
+                    FillColorArgb = FillColorArgb,
+                    FillOpacity = FillOpacity,
+                    StrokeKind = StrokeKind
+                };
+            }
         }
 
         private RasterResizeHandleType rasterResizeHandle = RasterResizeHandleType.None;
@@ -944,6 +1033,7 @@ namespace AnonPDF
                 Name = "addShapeToolStripMenuItem",
                 Enabled = false
             };
+            addShapeToolStripMenuItem.Click += AddShapeToolStripMenuItem_Click;
             addCommentToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addCommentToolStripMenuItem",
@@ -2254,6 +2344,330 @@ namespace AnonPDF
             {
                 arrowObject.Id = Guid.NewGuid().ToString("N");
             }
+        }
+
+        private static void EnsureVectorShapeId(VectorShapeObject vectorShape)
+        {
+            if (vectorShape == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(vectorShape.Id))
+            {
+                vectorShape.Id = Guid.NewGuid().ToString("N");
+            }
+        }
+
+        private static void EnsureTextAnnotationId(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(annotation.Id))
+            {
+                annotation.Id = Guid.NewGuid().ToString("N");
+            }
+        }
+
+        private void EnsureObjectLayerOrder()
+        {
+            if (objectLayerOrder == null)
+            {
+                objectLayerOrder = new List<ObjectLayerEntry>();
+            }
+
+            foreach (var annotation in textAnnotations)
+            {
+                EnsureTextAnnotationId(annotation);
+            }
+            foreach (var rasterObject in rasterObjects)
+            {
+                EnsureRasterObjectId(rasterObject);
+            }
+            foreach (var arrowObject in arrowObjects)
+            {
+                EnsureArrowObjectId(arrowObject);
+            }
+            foreach (var vectorShape in vectorShapes)
+            {
+                EnsureVectorShapeId(vectorShape);
+            }
+
+            var existingKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var annotation in textAnnotations.Where(a => a != null))
+            {
+                existingKeys.Add($"Text:{annotation.Id}");
+            }
+            foreach (var rasterObject in rasterObjects.Where(r => r != null))
+            {
+                existingKeys.Add($"Raster:{rasterObject.Id}");
+            }
+            foreach (var arrowObject in arrowObjects.Where(a => a != null))
+            {
+                existingKeys.Add($"Arrow:{arrowObject.Id}");
+            }
+            foreach (var vectorShape in vectorShapes.Where(v => v != null))
+            {
+                existingKeys.Add($"VectorShape:{vectorShape.Id}");
+            }
+
+            objectLayerOrder = objectLayerOrder
+                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.Id))
+                .Where(entry => existingKeys.Contains(GetLayerKey(entry.Type, entry.Id)))
+                .GroupBy(entry => GetLayerKey(entry.Type, entry.Id), StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToList();
+
+            var currentKeys = new HashSet<string>(
+                objectLayerOrder.Select(entry => GetLayerKey(entry.Type, entry.Id)),
+                StringComparer.Ordinal);
+
+            foreach (var rasterObject in rasterObjects.Where(r => r != null))
+            {
+                RegisterLayerIfMissing(LayerObjectType.Raster, rasterObject.Id, currentKeys);
+            }
+            foreach (var arrowObject in arrowObjects.Where(a => a != null))
+            {
+                RegisterLayerIfMissing(LayerObjectType.Arrow, arrowObject.Id, currentKeys);
+            }
+            foreach (var vectorShape in vectorShapes.Where(v => v != null))
+            {
+                RegisterLayerIfMissing(LayerObjectType.VectorShape, vectorShape.Id, currentKeys);
+            }
+            foreach (var annotation in textAnnotations.Where(a => a != null))
+            {
+                RegisterLayerIfMissing(LayerObjectType.Text, annotation.Id, currentKeys);
+            }
+        }
+
+        private void RegisterLayerIfMissing(LayerObjectType type, string id, ISet<string> currentKeys)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return;
+            }
+
+            string key = GetLayerKey(type, id);
+            if (currentKeys.Contains(key))
+            {
+                return;
+            }
+
+            objectLayerOrder.Add(new ObjectLayerEntry { Type = type, Id = id });
+            currentKeys.Add(key);
+        }
+
+        private static string GetLayerKey(LayerObjectType type, string id)
+        {
+            return $"{type}:{id?.Trim()}";
+        }
+
+        private int GetLayerIndex(LayerObjectType type, string id)
+        {
+            EnsureObjectLayerOrder();
+            string key = GetLayerKey(type, id);
+            for (int i = 0; i < objectLayerOrder.Count; i++)
+            {
+                if (string.Equals(GetLayerKey(objectLayerOrder[i].Type, objectLayerOrder[i].Id), key, StringComparison.Ordinal))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private bool BringLayerToFront(LayerObjectType type, string id)
+        {
+            int index = GetLayerIndex(type, id);
+            if (index < 0 || index == objectLayerOrder.Count - 1)
+            {
+                return false;
+            }
+
+            var entry = objectLayerOrder[index];
+            objectLayerOrder.RemoveAt(index);
+            objectLayerOrder.Add(entry);
+            return true;
+        }
+
+        private bool SendLayerToBack(LayerObjectType type, string id)
+        {
+            int index = GetLayerIndex(type, id);
+            if (index <= 0)
+            {
+                return false;
+            }
+
+            var entry = objectLayerOrder[index];
+            objectLayerOrder.RemoveAt(index);
+            objectLayerOrder.Insert(0, entry);
+            return true;
+        }
+
+        private bool MoveLayerForward(LayerObjectType type, string id)
+        {
+            int index = GetLayerIndex(type, id);
+            if (index < 0 || index >= objectLayerOrder.Count - 1)
+            {
+                return false;
+            }
+
+            var entry = objectLayerOrder[index];
+            objectLayerOrder.RemoveAt(index);
+            objectLayerOrder.Insert(index + 1, entry);
+            return true;
+        }
+
+        private bool MoveLayerBackward(LayerObjectType type, string id)
+        {
+            int index = GetLayerIndex(type, id);
+            if (index <= 0)
+            {
+                return false;
+            }
+
+            var entry = objectLayerOrder[index];
+            objectLayerOrder.RemoveAt(index);
+            objectLayerOrder.Insert(index - 1, entry);
+            return true;
+        }
+
+        private IEnumerable<object> GetOrderedObjectsForCurrentPage()
+        {
+            EnsureObjectLayerOrder();
+            foreach (var entry in objectLayerOrder)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Id))
+                {
+                    continue;
+                }
+
+                switch (entry.Type)
+                {
+                    case LayerObjectType.Text:
+                    {
+                        var annotation = textAnnotations.FirstOrDefault(a => a != null && a.PageNumber == currentPage && string.Equals(a.Id, entry.Id, StringComparison.Ordinal));
+                        if (annotation != null)
+                        {
+                            yield return annotation;
+                        }
+                        break;
+                    }
+                    case LayerObjectType.Raster:
+                    {
+                        var rasterObject = rasterObjects.FirstOrDefault(r => r != null && r.PageNumber == currentPage && string.Equals(r.Id, entry.Id, StringComparison.Ordinal));
+                        if (rasterObject != null)
+                        {
+                            yield return rasterObject;
+                        }
+                        break;
+                    }
+                    case LayerObjectType.Arrow:
+                    {
+                        var arrowObject = arrowObjects.FirstOrDefault(a => a != null && a.PageNumber == currentPage && string.Equals(a.Id, entry.Id, StringComparison.Ordinal));
+                        if (arrowObject != null)
+                        {
+                            yield return arrowObject;
+                        }
+                        break;
+                    }
+                    case LayerObjectType.VectorShape:
+                    {
+                        var vectorShape = vectorShapes.FirstOrDefault(v => v != null && v.PageNumber == currentPage && string.Equals(v.Id, entry.Id, StringComparison.Ordinal));
+                        if (vectorShape != null)
+                        {
+                            yield return vectorShape;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<object> GetOrderedGraphicObjectsForExport()
+        {
+            EnsureObjectLayerOrder();
+            foreach (var entry in objectLayerOrder)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Id))
+                {
+                    continue;
+                }
+
+                if (entry.Type == LayerObjectType.Raster)
+                {
+                    var rasterObject = rasterObjects.FirstOrDefault(r => r != null && string.Equals(r.Id, entry.Id, StringComparison.Ordinal));
+                    if (rasterObject != null)
+                    {
+                        yield return rasterObject;
+                    }
+                }
+                else if (entry.Type == LayerObjectType.Arrow)
+                {
+                    var arrowObject = arrowObjects.FirstOrDefault(a => a != null && string.Equals(a.Id, entry.Id, StringComparison.Ordinal));
+                    if (arrowObject != null)
+                    {
+                        yield return arrowObject;
+                    }
+                }
+                else if (entry.Type == LayerObjectType.VectorShape)
+                {
+                    var vectorShape = vectorShapes.FirstOrDefault(v => v != null && string.Equals(v.Id, entry.Id, StringComparison.Ordinal));
+                    if (vectorShape != null)
+                    {
+                        yield return vectorShape;
+                    }
+                }
+            }
+        }
+
+        private List<ProjectObjectLayer> BuildProjectObjectLayersSnapshot()
+        {
+            EnsureObjectLayerOrder();
+            return objectLayerOrder
+                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.Id))
+                .Select(entry => new ProjectObjectLayer
+                {
+                    Type = entry.Type.ToString(),
+                    Id = entry.Id
+                })
+                .ToList();
+        }
+
+        private void LoadProjectObjectLayerOrder(List<ProjectObjectLayer> layers)
+        {
+            if (layers == null)
+            {
+                objectLayerOrder = new List<ObjectLayerEntry>();
+                EnsureObjectLayerOrder();
+                return;
+            }
+
+            objectLayerOrder = layers
+                .Where(layer => layer != null && !string.IsNullOrWhiteSpace(layer.Id))
+                .Select(layer => new ObjectLayerEntry
+                {
+                    Type = ParseLayerObjectType(layer.Type),
+                    Id = layer.Id.Trim()
+                })
+                .ToList();
+
+            EnsureObjectLayerOrder();
+        }
+
+        private static LayerObjectType ParseLayerObjectType(string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value) &&
+                Enum.TryParse(value.Trim(), true, out LayerObjectType parsed))
+            {
+                return parsed;
+            }
+
+            return LayerObjectType.Raster;
         }
 
         private int GetTotalSelectedObjectsCount()
@@ -4525,6 +4939,8 @@ namespace AnonPDF
                     TextAnnotations = textAnnotations ?? new List<TextAnnotation>(),
                     RasterObjects = rasterObjects ?? new List<RasterObject>(),
                     ArrowObjects = arrowObjects ?? new List<ArrowObject>(),
+                    VectorShapes = vectorShapes ?? new List<VectorShapeObject>(),
+                    ObjectLayers = BuildProjectObjectLayersSnapshot(),
                     PageRotationOffsets = pageRotationOffsets == null
                         ? new Dictionary<int, int>()
                         : new Dictionary<int, int>(pageRotationOffsets),
@@ -7889,152 +8305,20 @@ namespace AnonPDF
                 }
                 // --- End of caption rendering section ---
 
-                // Render raster objects
-                foreach (var rasterObject in rasterObjects)
+                foreach (object drawable in GetOrderedGraphicObjectsForExport())
                 {
-                    if (rasterObject == null)
+                    if (drawable is RasterObject rasterObject)
                     {
-                        continue;
+                        RenderRasterObjectToPdf(pdfDoc, pagesWithBakedRotation, rasterObject);
                     }
-
-                    int pageNumber = rasterObject.PageNumber;
-                    if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
+                    else if (drawable is ArrowObject arrowObject)
                     {
-                        continue;
+                        RenderArrowObjectToPdf(pdfDoc, pagesWithBakedRotation, arrowObject);
                     }
-
-                    if (!TryCreateRasterImageData(rasterObject, out iText.IO.Image.ImageData imageData))
+                    else if (drawable is VectorShapeObject vectorShape)
                     {
-                        continue;
+                        RenderVectorShapesToPdf(pdfDoc, pagesWithBakedRotation, new[] { vectorShape });
                     }
-
-                    bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
-                    int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
-                    var page = pdfDoc.GetPage(pageNumber);
-                    var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
-                    RectangleF viewBounds = rasterObject.Bounds;
-                    if (viewBounds.Width <= 0f || viewBounds.Height <= 0f)
-                    {
-                        continue;
-                    }
-
-                    PointF centerView = new PointF(
-                        viewBounds.X + (viewBounds.Width / 2f),
-                        viewBounds.Y + (viewBounds.Height / 2f));
-                    PointF halfWidthVector = RotateVector(new PointF(viewBounds.Width / 2f, 0f), NormalizeRotation(rasterObject.Rotation));
-                    PointF halfHeightVector = RotateVector(new PointF(0f, viewBounds.Height / 2f), NormalizeRotation(rasterObject.Rotation));
-
-                    PointF topLeftView = new PointF(
-                        centerView.X - halfWidthVector.X - halfHeightVector.X,
-                        centerView.Y - halfWidthVector.Y - halfHeightVector.Y);
-                    PointF topRightView = new PointF(
-                        centerView.X + halfWidthVector.X - halfHeightVector.X,
-                        centerView.Y + halfWidthVector.Y - halfHeightVector.Y);
-                    PointF bottomLeftView = new PointF(
-                        centerView.X - halfWidthVector.X + halfHeightVector.X,
-                        centerView.Y - halfWidthVector.Y + halfHeightVector.Y);
-                    PointF bottomRightView = new PointF(
-                        centerView.X + halfWidthVector.X + halfHeightVector.X,
-                        centerView.Y + halfWidthVector.Y + halfHeightVector.Y);
-
-                    PointF topLeftPdf = ConvertPointToPdfCoordinates(topLeftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-                    PointF topRightPdf = ConvertPointToPdfCoordinates(topRightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-                    PointF bottomLeftPdf = ConvertPointToPdfCoordinates(bottomLeftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-                    PointF bottomRightPdf = ConvertPointToPdfCoordinates(bottomRightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-
-                    // PDF image space has origin in bottom-left. Build matrix from bottom-left anchor
-                    // to avoid mirrored content while preserving object rotation and dimensions.
-                    float a = bottomRightPdf.X - bottomLeftPdf.X;
-                    float b = bottomRightPdf.Y - bottomLeftPdf.Y;
-                    float c = topLeftPdf.X - bottomLeftPdf.X;
-                    float d = topLeftPdf.Y - bottomLeftPdf.Y;
-                    float e = bottomLeftPdf.X;
-                    float f = bottomLeftPdf.Y;
-
-                    if (DebugLogEnabled)
-                    {
-                        LogDebug(
-                            $"RasterExport page={pageNumber} bounds={viewBounds} rotObj={NormalizeRotation(rasterObject.Rotation)} pageRot={rotation} " +
-                            $"tl={topLeftPdf.X:0.###},{topLeftPdf.Y:0.###} tr={topRightPdf.X:0.###},{topRightPdf.Y:0.###} bl={bottomLeftPdf.X:0.###},{bottomLeftPdf.Y:0.###} br={bottomRightPdf.X:0.###},{bottomRightPdf.Y:0.###} " +
-                            $"matrix=[{a:0.#####} {b:0.#####} {c:0.#####} {d:0.#####} {e:0.###} {f:0.###}]");
-                    }
-
-                    float opacity = NormalizeOpacity(rasterObject.Opacity);
-                    if (opacity >= 0.999f)
-                    {
-                        pdfCanvas.AddImageWithTransformationMatrix(imageData, a, b, c, d, e, f, false);
-                    }
-                    else
-                    {
-                        var extGState = new PdfExtGState()
-                            .SetFillOpacity(opacity)
-                            .SetStrokeOpacity(opacity);
-                        pdfCanvas.SaveState();
-                        pdfCanvas.SetExtGState(extGState);
-                        pdfCanvas.AddImageWithTransformationMatrix(imageData, a, b, c, d, e, f, false);
-                        pdfCanvas.RestoreState();
-                    }
-                }
-
-                // Render arrow objects
-                foreach (var arrowObject in arrowObjects)
-                {
-                    if (arrowObject == null)
-                    {
-                        continue;
-                    }
-
-                    int pageNumber = arrowObject.PageNumber;
-                    if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
-                    {
-                        continue;
-                    }
-
-                    bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
-                    int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
-                    var page = pdfDoc.GetPage(pageNumber);
-                    var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
-                    PointF startView = arrowObject.Start;
-                    PointF endView = arrowObject.End;
-                    PointF startPdf = ConvertPointToPdfCoordinates(startView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-                    PointF endPdf = ConvertPointToPdfCoordinates(endView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-
-                    float thickness = NormalizeArrowThickness(arrowObject.Thickness);
-                    float headLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
-                    float headWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
-                    System.Drawing.Color lineColor = GetArrowColor(arrowObject);
-                    var deviceColor = new DeviceRgb(lineColor.R, lineColor.G, lineColor.B);
-
-                    pdfCanvas.SaveState();
-                    pdfCanvas.SetLineWidth(thickness);
-                    pdfCanvas.SetLineCapStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineCapStyle.ROUND);
-                    pdfCanvas.SetLineJoinStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineJoinStyle.ROUND);
-                    pdfCanvas.SetStrokeColor(deviceColor);
-                    pdfCanvas.SetFillColor(deviceColor);
-
-                    if (TryBuildArrowHead(startView, endView, headLength, headWidth, out PointF leftView, out PointF rightView, out PointF lineEndView))
-                    {
-                        PointF lineEndPdf = ConvertPointToPdfCoordinates(lineEndView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-                        PointF leftPdf = ConvertPointToPdfCoordinates(leftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-                        PointF rightPdf = ConvertPointToPdfCoordinates(rightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
-
-                        pdfCanvas.MoveTo(startPdf.X, startPdf.Y);
-                        pdfCanvas.LineTo(lineEndPdf.X, lineEndPdf.Y);
-                        pdfCanvas.Stroke();
-
-                        pdfCanvas.MoveTo(endPdf.X, endPdf.Y);
-                        pdfCanvas.LineTo(leftPdf.X, leftPdf.Y);
-                        pdfCanvas.LineTo(rightPdf.X, rightPdf.Y);
-                        pdfCanvas.Fill();
-                    }
-                    else
-                    {
-                        pdfCanvas.MoveTo(startPdf.X, startPdf.Y);
-                        pdfCanvas.LineTo(endPdf.X, endPdf.Y);
-                        pdfCanvas.Stroke();
-                    }
-
-                    pdfCanvas.RestoreState();
                 }
 
                 List<RedactionBlock> footnoteBlocksForExport = redactionBlocks
@@ -8320,6 +8604,17 @@ namespace AnonPDF
             pdfViewer.Invalidate();
         }
 
+        private void ClearVectorShapes()
+        {
+            vectorShapes.Clear();
+            objectLayerOrder.RemoveAll(entry => entry != null && entry.Type == LayerObjectType.VectorShape);
+            vectorShapeDraftPoints.Clear();
+            vectorShapeDraftHoverActive = false;
+            isVectorShapeCreationMode = false;
+            ResetGroupMoveState();
+            pdfViewer.Invalidate();
+        }
+
         private string PromptForPassword(string pwd = "", bool iChangeRemoveDialog = false)
         {
             bool shouldRestoreBusyCursor = busyCursorDepth > 0;
@@ -8463,6 +8758,7 @@ namespace AnonPDF
             ClearTextAnnotations();
             ClearRasterObjects();
             ClearArrowObjects();
+            ClearVectorShapes();
             PdfTextSearcher.ClearCache();
             signaturesToRemove.Clear();
             hasCustomSignatureSelection = false;
@@ -8551,6 +8847,10 @@ namespace AnonPDF
             if (addArrowToolStripMenuItem != null)
             {
                 addArrowToolStripMenuItem.Enabled = true;
+            }
+            if (addShapeToolStripMenuItem != null)
+            {
+                addShapeToolStripMenuItem.Enabled = true;
             }
             ApplyAutomaticFootnotesMenuState();
             deletePageMenuItem.Enabled = true;
@@ -8677,6 +8977,7 @@ namespace AnonPDF
                 || textAnnotations.Count > 0
                 || rasterObjects.Count > 0
                 || arrowObjects.Count > 0
+                || vectorShapes.Count > 0
                 || pagesToRemove.Count > 0
                 || pageRotationOffsets.Count > 0
                 || hasCustomSignatureSelection;
@@ -8989,7 +9290,8 @@ namespace AnonPDF
         {
             return textAnnotations.Any(a => a.PageNumber == pageNumber)
                 || rasterObjects.Any(r => r.PageNumber == pageNumber)
-                || arrowObjects.Any(a => a.PageNumber == pageNumber);
+                || arrowObjects.Any(a => a.PageNumber == pageNumber)
+                || vectorShapes.Any(v => v != null && v.PageNumber == pageNumber);
         }
 
         private void OpenPdfFromPath(string filePath)
@@ -9048,6 +9350,7 @@ namespace AnonPDF
             ClearTextAnnotations();
             ClearRasterObjects();
             ClearArrowObjects();
+            ClearVectorShapes();
             PdfTextSearcher.ClearCache();
             signaturesToRemove.Clear();
             hasCustomSignatureSelection = false;
@@ -9103,6 +9406,10 @@ namespace AnonPDF
             if (addArrowToolStripMenuItem != null)
             {
                 addArrowToolStripMenuItem.Enabled = false;
+            }
+            if (addShapeToolStripMenuItem != null)
+            {
+                addShapeToolStripMenuItem.Enabled = false;
             }
             ApplyAutomaticFootnotesMenuState();
             deletePageMenuItem.Enabled = false;
@@ -9182,6 +9489,10 @@ namespace AnonPDF
             if (addArrowToolStripMenuItem != null)
             {
                 addArrowToolStripMenuItem.Enabled = canEditCurrentPage;
+            }
+            if (addShapeToolStripMenuItem != null)
+            {
+                addShapeToolStripMenuItem.Enabled = canEditCurrentPage;
             }
             rotatePageMenuItem.Enabled = canEditCurrentPage;
             searchToSelectionButton.Enabled = canEditCurrentPage && groupBoxSearch.Enabled;
@@ -10132,6 +10443,8 @@ namespace AnonPDF
             return redactionBlocks.Count > 0
                 || textAnnotations.Count > 0
                 || rasterObjects.Count > 0
+                || arrowObjects.Count > 0
+                || vectorShapes.Count > 0
                 || pagesToRemove.Count > 0
                 || pageRotationOffsets.Count > 0
                 || hasCustomSignatureSelection;
@@ -10158,6 +10471,8 @@ namespace AnonPDF
                 TextAnnotations = textAnnotations ?? new List<TextAnnotation>(),
                 RasterObjects = rasterObjects ?? new List<RasterObject>(),
                 ArrowObjects = arrowObjects ?? new List<ArrowObject>(),
+                VectorShapes = vectorShapes ?? new List<VectorShapeObject>(),
+                ObjectLayers = BuildProjectObjectLayersSnapshot(),
                 PageRotationOffsets = pageRotationOffsets == null
                     ? new Dictionary<int, int>()
                     : new Dictionary<int, int>(pageRotationOffsets),
@@ -10472,6 +10787,639 @@ namespace AnonPDF
             }
         }
 
+        private string GetShapeTypeDisplayName(VectorShapeType shapeType)
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            bool isPl = string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase);
+            bool isDe = string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase);
+            switch (shapeType)
+            {
+                case VectorShapeType.Region:
+                    return isPl ? "Region" : isDe ? "Region" : "Region";
+                case VectorShapeType.Polyline:
+                    return isPl ? "Linia łamana" : isDe ? "Polylinie" : "Polyline";
+                case VectorShapeType.Rectangle:
+                    return isPl ? "Prostokąt" : isDe ? "Rechteck" : "Rectangle";
+                case VectorShapeType.Ellipse:
+                    return isPl ? "Elipsa" : isDe ? "Ellipse" : "Ellipse";
+                case VectorShapeType.Triangle:
+                    return isPl ? "Trójkąt" : isDe ? "Dreieck" : "Triangle";
+                case VectorShapeType.Arc:
+                    return isPl ? "Łuk" : isDe ? "Bogen" : "Arc";
+                default:
+                    return shapeType.ToString();
+            }
+        }
+
+        private string GetShapeToolDialogTitle()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Dodaj kształt";
+            }
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Form hinzufügen";
+            }
+            return "Add shape";
+        }
+
+        private string GetShapeToolInfoText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Tryb dodawania kształtu aktywny. LPM dodaje punkt, PPM kończy.";
+            }
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Formmodus aktiv. Linksklick fügt Punkte hinzu, Rechtsklick beendet.";
+            }
+            return "Shape mode active. Left-click adds points, right-click finishes.";
+        }
+
+        private bool TryGetShapeIconFontFamily(out string familyName)
+        {
+            familyName = shapeIconPrivateFontFamilyName;
+            if (shapeIconPrivateFontChecked)
+            {
+                return !string.IsNullOrWhiteSpace(familyName);
+            }
+
+            shapeIconPrivateFontChecked = true;
+            try
+            {
+                string[] baseDirCandidates = new[]
+                {
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    Application.StartupPath,
+                    Environment.CurrentDirectory
+                }
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+                var fontPathCandidates = new List<string>();
+                foreach (string baseDir in baseDirCandidates)
+                {
+                    string current = baseDir;
+                    for (int depth = 0; depth < 5 && !string.IsNullOrWhiteSpace(current); depth++)
+                    {
+                        fontPathCandidates.Add(Path.Combine(current, ShapeIconFontFileName));
+                        fontPathCandidates.Add(Path.Combine(current, ShapeIconFontLegacyFileName));
+                        current = Path.GetDirectoryName(current);
+                    }
+                }
+
+                string fontPath = fontPathCandidates
+                    .Select(path =>
+                    {
+                        try
+                        {
+                            return Path.GetFullPath(path);
+                        }
+                        catch
+                        {
+                            return null;
+                        }
+                    })
+                    .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+
+                if (!string.IsNullOrWhiteSpace(fontPath))
+                {
+                    shapeIconPrivateFontCollection.AddFontFile(fontPath);
+                    if (shapeIconPrivateFontCollection.Families.Length > 0)
+                    {
+                        shapeIconPrivateFontPath = fontPath;
+                        shapeIconPrivateFontFamilyName = shapeIconPrivateFontCollection.Families[0].Name;
+                        familyName = shapeIconPrivateFontFamilyName;
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore and fall back to system fonts.
+            }
+
+            familyName = string.Empty;
+            return false;
+        }
+
+        private Font CreateShapeIconFont(float size)
+        {
+            if (TryGetShapeIconFontFamily(out string customFamily))
+            {
+                try
+                {
+                    return new Font(customFamily, size, FontStyle.Regular, GraphicsUnit.Point);
+                }
+                catch
+                {
+                    // Ignore and try system fonts.
+                }
+            }
+
+            string[] preferredFamilies = { "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe UI Symbol" };
+            foreach (string family in preferredFamilies)
+            {
+                try
+                {
+                    using (var probe = new Font(family, size, FontStyle.Regular, GraphicsUnit.Point))
+                    {
+                        if (string.Equals(probe.FontFamily.Name, family, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return new Font(family, size, FontStyle.Regular, GraphicsUnit.Point);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore and try the next family.
+                }
+            }
+
+            return new Font(this.Font.FontFamily, size, FontStyle.Regular, GraphicsUnit.Point);
+        }
+
+        private static string GetShapeButtonIcon(VectorShapeType shapeType, bool useMaterialIcons)
+        {
+            if (useMaterialIcons)
+            {
+                switch (shapeType)
+                {
+                    case VectorShapeType.Region:
+                        return char.ConvertFromUtf32(0xF0560);
+                    case VectorShapeType.Polyline:
+                        return char.ConvertFromUtf32(0xF0561);
+                    case VectorShapeType.Rectangle:
+                        return char.ConvertFromUtf32(0xF05C6);
+                    case VectorShapeType.Ellipse:
+                        return char.ConvertFromUtf32(0xF0EA1);
+                    case VectorShapeType.Arc:
+                        return char.ConvertFromUtf32(0xF0559);
+                    case VectorShapeType.Triangle:
+                        return char.ConvertFromUtf32(0xF0563);
+                    default:
+                        return "•";
+                }
+            }
+
+            switch (shapeType)
+            {
+                case VectorShapeType.Region:
+                    return "⬠";
+                case VectorShapeType.Polyline:
+                    return "〰";
+                case VectorShapeType.Rectangle:
+                    return "▭";
+                case VectorShapeType.Ellipse:
+                    return "◯";
+                case VectorShapeType.Triangle:
+                    return "△";
+                case VectorShapeType.Arc:
+                    return "◜";
+                default:
+                    return "•";
+            }
+        }
+
+        private static int? GetShapeButtonIconCodePoint(VectorShapeType shapeType)
+        {
+            switch (shapeType)
+            {
+                case VectorShapeType.Region:
+                    return 0xF0560;
+                case VectorShapeType.Polyline:
+                    return 0xF0561;
+                case VectorShapeType.Rectangle:
+                    return 0xF05C6;
+                case VectorShapeType.Ellipse:
+                    return 0xF0EA1;
+                case VectorShapeType.Arc:
+                    return 0xF0559;
+                case VectorShapeType.Triangle:
+                    return 0xF0563;
+                default:
+                    return null;
+            }
+        }
+
+        private static Bitmap TrimTransparentBitmap(Bitmap source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            int minX = source.Width;
+            int minY = source.Height;
+            int maxX = -1;
+            int maxY = -1;
+
+            for (int y = 0; y < source.Height; y++)
+            {
+                for (int x = 0; x < source.Width; x++)
+                {
+                    if (source.GetPixel(x, y).A == 0)
+                    {
+                        continue;
+                    }
+
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+            {
+                return new Bitmap(source);
+            }
+
+            var rect = new System.Drawing.Rectangle(minX, minY, (maxX - minX) + 1, (maxY - minY) + 1);
+            return source.Clone(rect, PixelFormat.Format32bppArgb);
+        }
+
+        private bool TryCreateShapeIconBitmap(VectorShapeType shapeType, int pixelSize, out Bitmap bitmap)
+        {
+            bitmap = null;
+            if (pixelSize < 8)
+            {
+                pixelSize = 8;
+            }
+
+            int? codePoint = GetShapeButtonIconCodePoint(shapeType);
+            if (!codePoint.HasValue)
+            {
+                return false;
+            }
+
+            if (!TryGetShapeIconFontFamily(out _))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(shapeIconPrivateFontPath) || !File.Exists(shapeIconPrivateFontPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                var glyphTypeface = new MediaGlyphTypeface(new Uri(shapeIconPrivateFontPath, UriKind.Absolute));
+                if (!glyphTypeface.CharacterToGlyphMap.TryGetValue(codePoint.Value, out ushort glyphIndex))
+                {
+                    return false;
+                }
+
+                double emSize = pixelSize;
+                double advance = glyphTypeface.AdvanceWidths[glyphIndex] * emSize;
+                double descent = glyphTypeface.Height * emSize;
+                double baseline = glyphTypeface.Baseline * emSize;
+                int width = Math.Max(16, (int)Math.Ceiling(advance) + 6);
+                int height = Math.Max(16, (int)Math.Ceiling(descent) + 6);
+
+                var glyphRun = new System.Windows.Media.GlyphRun(
+                    glyphTypeface,
+                    0,
+                    false,
+                    emSize,
+                    1.0f,
+                    new[] { glyphIndex },
+                    new WpfPoint(3, baseline + 1),
+                    new[] { advance },
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+
+                var visual = new MediaDrawingVisual();
+                using (System.Windows.Media.DrawingContext dc = visual.RenderOpen())
+                {
+                    dc.DrawGlyphRun(MediaBrushes.Black, glyphRun);
+                }
+
+                var renderTarget = new MediaRenderTargetBitmap(width, height, 96, 96, MediaPixelFormats.Pbgra32);
+                renderTarget.Render(visual);
+
+                using (var ms = new MemoryStream())
+                {
+                    var encoder = new MediaPngBitmapEncoder();
+                    encoder.Frames.Add(MediaBitmapFrame.Create(renderTarget));
+                    encoder.Save(ms);
+                    ms.Position = 0;
+                    using (var loaded = new Bitmap(ms))
+                    {
+                        using (var rawBitmap = new Bitmap(loaded))
+                        {
+                            bitmap = TrimTransparentBitmap(rawBitmap);
+                        }
+                    }
+                }
+
+                return bitmap != null;
+            }
+            catch
+            {
+                bitmap?.Dispose();
+                bitmap = null;
+                return false;
+            }
+        }
+
+        private bool TryPromptShapeDefaults(out VectorShapeDefaults selectedDefaults)
+        {
+            selectedDefaults = null;
+            VectorShapeDefaults working = activeVectorShapeDefaults?.Clone() ?? VectorShapeDefaults.CreateDefault();
+            VectorShapeType selectedShape = working.ShapeType;
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            bool isPl = string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase);
+            bool isDe = string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase);
+
+            using (var prompt = new Form())
+            {
+                prompt.Text = GetShapeToolDialogTitle();
+                prompt.StartPosition = FormStartPosition.CenterParent;
+                prompt.FormBorderStyle = FormBorderStyle.FixedDialog;
+                prompt.MinimizeBox = false;
+                prompt.MaximizeBox = false;
+                prompt.ShowInTaskbar = false;
+                prompt.Width = 620;
+                prompt.Height = 305;
+
+                var shapeButtons = new Dictionary<VectorShapeType, Button>();
+
+                var labelShapes = new Label
+                {
+                    Left = 12,
+                    Top = 12,
+                    Width = 560,
+                    Text = isPl ? "Kształt:" : isDe ? "Form:" : "Shape:"
+                };
+
+                var shapesPanel = new FlowLayoutPanel
+                {
+                    Left = 12,
+                    Top = 34,
+                    Width = 584,
+                    Height = 74,
+                    WrapContents = false,
+                    Padding = new Padding(0)
+                };
+
+                string ignoredShapeIconFamily;
+                bool useMaterialIcons = TryGetShapeIconFontFamily(out ignoredShapeIconFamily);
+                var shapeButtonToolTip = new ToolTip();
+                var shapeButtonImages = new List<Image>();
+                prompt.Disposed += (_, __) => shapeButtonToolTip?.Dispose();
+                prompt.Disposed += (_, __) =>
+                {
+                    foreach (var img in shapeButtonImages)
+                    {
+                        img?.Dispose();
+                    }
+                };
+                foreach (VectorShapeType shapeType in Enum.GetValues(typeof(VectorShapeType)))
+                {
+                    var button = new Button
+                    {
+                        Width = 60,
+                        Height = 60,
+                        Margin = new Padding(2),
+                        Padding = new Padding(0),
+                        Text = string.Empty,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        TextImageRelation = TextImageRelation.Overlay,
+                        Tag = shapeType,
+                        UseCompatibleTextRendering = true
+                    };
+                    shapeButtonToolTip.SetToolTip(button, GetShapeTypeDisplayName(shapeType));
+                    if (useMaterialIcons && TryCreateShapeIconBitmap(shapeType, 30, out Bitmap iconBitmap))
+                    {
+                        button.Image = iconBitmap;
+                        button.ImageAlign = ContentAlignment.MiddleCenter;
+                        shapeButtonImages.Add(iconBitmap);
+                    }
+                    else
+                    {
+                        button.Text = GetShapeTypeDisplayName(shapeType);
+                    }
+
+                    button.Click += (_, __) =>
+                    {
+                        selectedShape = shapeType;
+                        foreach (var pair in shapeButtons)
+                        {
+                            pair.Value.BackColor = pair.Key == selectedShape
+                                ? System.Drawing.Color.FromArgb(220, 240, 255)
+                                : SystemColors.Control;
+                        }
+                    };
+
+                    shapeButtons[shapeType] = button;
+                    shapesPanel.Controls.Add(button);
+                }
+
+                var labelStrokeColor = new Label { Left = 12, Top = 120, Width = 120, Text = isPl ? "Kolor linii:" : isDe ? "Linienfarbe:" : "Line color:" };
+                var buttonStrokeColor = new Button { Left = 140, Top = 116, Width = 140, Height = 26, BackColor = System.Drawing.Color.FromArgb(working.StrokeColorArgb) };
+                buttonStrokeColor.Click += (_, __) =>
+                {
+                    using (var dlg = new ColorDialog())
+                    {
+                        dlg.Color = buttonStrokeColor.BackColor;
+                        dlg.FullOpen = true;
+                        if (dlg.ShowDialog(this) == DialogResult.OK)
+                        {
+                            buttonStrokeColor.BackColor = dlg.Color;
+                        }
+                    }
+                };
+
+                var labelStrokeWidth = new Label { Left = 300, Top = 120, Width = 95, Text = isPl ? "Grubość:" : isDe ? "Stärke:" : "Width:" };
+                var numericStrokeWidth = new NumericUpDown
+                {
+                    Left = 398,
+                    Top = 116,
+                    Width = 70,
+                    DecimalPlaces = 1,
+                    Minimum = 1,
+                    Maximum = 24,
+                    Increment = 0.5m,
+                    Value = (decimal)NormalizeVectorStrokeWidth(working.StrokeWidth)
+                };
+
+                var labelStrokeStyle = new Label { Left = 482, Top = 120, Width = 60, Text = isPl ? "Linia:" : isDe ? "Stil:" : "Style:" };
+                var comboStrokeStyle = new ComboBox
+                {
+                    Left = 540,
+                    Top = 116,
+                    Width = 56,
+                    DropDownStyle = ComboBoxStyle.DropDownList
+                };
+                comboStrokeStyle.Items.Add(isPl ? "Ciągła" : isDe ? "Durchgezogen" : "Solid");
+                comboStrokeStyle.Items.Add(isPl ? "Przerywana" : isDe ? "Gestrichelt" : "Dash");
+                comboStrokeStyle.SelectedIndex = working.StrokeKind == VectorShapeStrokeKind.Dash ? 1 : 0;
+
+                var labelFillColor = new Label { Left = 12, Top = 156, Width = 120, Text = isPl ? "Kolor wypełnienia:" : isDe ? "Füllfarbe:" : "Fill color:" };
+                var buttonFillColor = new Button { Left = 140, Top = 152, Width = 140, Height = 26, BackColor = System.Drawing.Color.FromArgb(working.FillColorArgb) };
+                buttonFillColor.Click += (_, __) =>
+                {
+                    using (var dlg = new ColorDialog())
+                    {
+                        dlg.Color = buttonFillColor.BackColor;
+                        dlg.FullOpen = true;
+                        if (dlg.ShowDialog(this) == DialogResult.OK)
+                        {
+                            buttonFillColor.BackColor = dlg.Color;
+                        }
+                    }
+                };
+
+                var labelFillOpacity = new Label { Left = 300, Top = 156, Width = 95, Text = isPl ? "Wypełnienie (%):" : isDe ? "Füllung (%):" : "Fill (%):" };
+                var numericFillOpacity = new NumericUpDown
+                {
+                    Left = 398,
+                    Top = 152,
+                    Width = 70,
+                    DecimalPlaces = 0,
+                    Minimum = 0,
+                    Maximum = 100,
+                    Increment = 5,
+                    Value = (decimal)Math.Round(NormalizeVectorFillOpacity(working.FillOpacity) * 100f)
+                };
+
+                var buttonOk = new Button { Left = 364, Top = 224, Width = 110, Text = "OK", DialogResult = DialogResult.OK };
+                var buttonCancel = new Button { Left = 486, Top = 224, Width = 110, Text = isPl ? "Anuluj" : isDe ? "Abbrechen" : "Cancel", DialogResult = DialogResult.Cancel };
+
+                prompt.Controls.Add(labelShapes);
+                prompt.Controls.Add(shapesPanel);
+                prompt.Controls.Add(labelStrokeColor);
+                prompt.Controls.Add(buttonStrokeColor);
+                prompt.Controls.Add(labelStrokeWidth);
+                prompt.Controls.Add(numericStrokeWidth);
+                prompt.Controls.Add(labelStrokeStyle);
+                prompt.Controls.Add(comboStrokeStyle);
+                prompt.Controls.Add(labelFillColor);
+                prompt.Controls.Add(buttonFillColor);
+                prompt.Controls.Add(labelFillOpacity);
+                prompt.Controls.Add(numericFillOpacity);
+                prompt.Controls.Add(buttonOk);
+                prompt.Controls.Add(buttonCancel);
+                prompt.AcceptButton = buttonOk;
+                prompt.CancelButton = buttonCancel;
+
+                if (shapeButtons.TryGetValue(selectedShape, out Button selectedButton))
+                {
+                    selectedButton.PerformClick();
+                }
+
+                if (prompt.ShowDialog(this) != DialogResult.OK)
+                {
+                    return false;
+                }
+
+                working.ShapeType = selectedShape;
+                working.StrokeColorArgb = buttonStrokeColor.BackColor.ToArgb();
+                working.StrokeWidth = NormalizeVectorStrokeWidth((float)numericStrokeWidth.Value);
+                working.FillColorArgb = buttonFillColor.BackColor.ToArgb();
+                working.FillOpacity = NormalizeVectorFillOpacity((float)(numericFillOpacity.Value / 100m));
+                working.StrokeKind = comboStrokeStyle.SelectedIndex == 1 ? VectorShapeStrokeKind.Dash : VectorShapeStrokeKind.Solid;
+
+                selectedDefaults = working;
+                return true;
+            }
+        }
+
+        private void BeginVectorShapeCreation(VectorShapeDefaults selectedDefaults)
+        {
+            if (selectedDefaults == null)
+            {
+                return;
+            }
+
+            activeVectorShapeDefaults = selectedDefaults.Clone();
+            activeVectorShapeType = activeVectorShapeDefaults.ShapeType;
+            isVectorShapeCreationMode = true;
+            vectorShapeDraftPoints.Clear();
+            vectorShapeDraftHoverActive = false;
+            this.Cursor = Cursors.Cross;
+            ShowInfoMessage(GetShapeToolInfoText());
+            pdfViewer.Invalidate();
+        }
+
+        private void EndVectorShapeCreationMode(bool keepDefaults = true)
+        {
+            isVectorShapeCreationMode = false;
+            vectorShapeDraftPoints.Clear();
+            vectorShapeDraftHoverActive = false;
+            this.Cursor = Cursors.Default;
+            if (!keepDefaults)
+            {
+                activeVectorShapeDefaults = VectorShapeDefaults.CreateDefault();
+                activeVectorShapeType = activeVectorShapeDefaults.ShapeType;
+            }
+        }
+
+        private bool TryFinalizeVectorShapeDraft()
+        {
+            int requiredPoints = GetRequiredPointsForShape(activeVectorShapeType);
+            if (vectorShapeDraftPoints.Count < requiredPoints)
+            {
+                return false;
+            }
+
+            var shape = new VectorShapeObject
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                PageNumber = currentPage,
+                ShapeType = activeVectorShapeType.ToString(),
+                Points = vectorShapeDraftPoints.ToList(),
+                StrokeColorArgb = activeVectorShapeDefaults.StrokeColorArgb,
+                StrokeWidth = NormalizeVectorStrokeWidth(activeVectorShapeDefaults.StrokeWidth),
+                FillColorArgb = activeVectorShapeDefaults.FillColorArgb,
+                FillOpacity = NormalizeVectorFillOpacity(activeVectorShapeDefaults.FillOpacity),
+                StrokeStyle = activeVectorShapeDefaults.StrokeKind.ToString(),
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            NormalizeVectorShape(shape);
+
+            vectorShapes.Add(shape);
+            vectorShapeDraftPoints.Clear();
+            vectorShapeDraftHoverActive = false;
+
+            PageItemStatus status = allPageStatuses[currentPage - 1];
+            status.HasObjects = true;
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                pagesListView.Invalidate(currentItem.Bounds);
+            }
+            else
+            {
+                ApplyFilter((string)filterComboBox.SelectedItem);
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private static float DistanceBetweenPoints(PointF a, PointF b)
+        {
+            float dx = a.X - b.X;
+            float dy = a.Y - b.Y;
+            return (float)Math.Sqrt((dx * dx) + (dy * dy));
+        }
+
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
             if (pdf == null)
@@ -10497,6 +11445,55 @@ namespace AnonPDF
                 ClearArrowIconClickState();
                 TryBeginMiddleMousePan();
                 return;
+            }
+
+            if (isVectorShapeCreationMode)
+            {
+                if (!EnsureCurrentPageEditable(true))
+                {
+                    EndVectorShapeCreationMode();
+                    return;
+                }
+
+                PointF docPoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                if (e.Button == MouseButtons.Left)
+                {
+                    if (e.Clicks > 1)
+                    {
+                        if (vectorShapeDraftPoints.Count == 0 || DistanceBetweenPoints(vectorShapeDraftPoints.Last(), docPoint) > 0.5f)
+                        {
+                            vectorShapeDraftPoints.Add(docPoint);
+                        }
+                        TryFinalizeVectorShapeDraft();
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
+                    vectorShapeDraftPoints.Add(docPoint);
+                    vectorShapeDraftHoverPoint = docPoint;
+                    vectorShapeDraftHoverActive = true;
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (e.Button == MouseButtons.Right)
+                {
+                    if (!TryFinalizeVectorShapeDraft())
+                    {
+                        if (vectorShapeDraftPoints.Count > 0)
+                        {
+                            vectorShapeDraftPoints.Clear();
+                            vectorShapeDraftHoverActive = false;
+                        }
+                        else
+                        {
+                            EndVectorShapeCreationMode();
+                        }
+                    }
+
+                    pdfViewer.Invalidate();
+                    return;
+                }
             }
 
             // Reset icon click flag
@@ -10570,60 +11567,6 @@ namespace AnonPDF
                     ResetGroupMoveState();
                 }
 
-                if (TryHandleArrowIconMouseDown(e.Location))
-                {
-                    selectedTextAnnotation = null;
-                    selectedRasterObject = null;
-                    ResetRasterInteractionState();
-                    isDrawing = false;
-                    isMoving = false;
-                    annotationToMove = null;
-                    pdfViewer.Invalidate();
-                    return;
-                }
-
-                if (TryHandleArrowMouseDown(e.Location))
-                {
-                    selectedTextAnnotation = null;
-                    selectedRasterObject = null;
-                    ResetRasterInteractionState();
-                    ClearArrowIconClickState();
-                    arrowMouseActionInProgress = true;
-                    arrowInteractionChanged = false;
-                    isDrawing = false;
-                    isMoving = false;
-                    annotationToMove = null;
-                    pdfViewer.Invalidate();
-                    return;
-                }
-
-                if (TryHandleRasterIconMouseDown(e.Location))
-                {
-                    selectedArrowObject = null;
-                    ResetArrowInteractionState();
-                    ClearArrowIconClickState();
-                    selectedTextAnnotation = null;
-                    isDrawing = false;
-                    isMoving = false;
-                    annotationToMove = null;
-                    pdfViewer.Invalidate();
-                    return;
-                }
-
-                if (TryHandleRasterMouseDown(e.Location))
-                {
-                    selectedArrowObject = null;
-                    ResetArrowInteractionState();
-                    ClearArrowIconClickState();
-                    selectedTextAnnotation = null;
-                    rasterMouseActionInProgress = true;
-                    isDrawing = false;
-                    isMoving = false;
-                    annotationToMove = null;
-                    pdfViewer.Invalidate();
-                    return;
-                }
-
                 if (TryHandleAnnotationIconMouseDown(e.Location, dpiX, dpiY))
                 {
                     selectedArrowObject = null;
@@ -10672,6 +11615,60 @@ namespace AnonPDF
                 }
                 else
                 {
+                    if (TryHandleArrowIconMouseDown(e.Location))
+                    {
+                        selectedTextAnnotation = null;
+                        selectedRasterObject = null;
+                        ResetRasterInteractionState();
+                        isDrawing = false;
+                        isMoving = false;
+                        annotationToMove = null;
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
+                    if (TryHandleArrowMouseDown(e.Location))
+                    {
+                        selectedTextAnnotation = null;
+                        selectedRasterObject = null;
+                        ResetRasterInteractionState();
+                        ClearArrowIconClickState();
+                        arrowMouseActionInProgress = true;
+                        arrowInteractionChanged = false;
+                        isDrawing = false;
+                        isMoving = false;
+                        annotationToMove = null;
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
+                    if (TryHandleRasterIconMouseDown(e.Location))
+                    {
+                        selectedArrowObject = null;
+                        ResetArrowInteractionState();
+                        ClearArrowIconClickState();
+                        selectedTextAnnotation = null;
+                        isDrawing = false;
+                        isMoving = false;
+                        annotationToMove = null;
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
+                    if (TryHandleRasterMouseDown(e.Location))
+                    {
+                        selectedArrowObject = null;
+                        ResetArrowInteractionState();
+                        ClearArrowIconClickState();
+                        selectedTextAnnotation = null;
+                        rasterMouseActionInProgress = true;
+                        isDrawing = false;
+                        isMoving = false;
+                        annotationToMove = null;
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
                     selectedArrowObject = null;
                     ResetArrowInteractionState();
                     ClearArrowIconClickState();
@@ -10707,6 +11704,14 @@ namespace AnonPDF
                 ResetRasterInteractionState();
                 ResetArrowInteractionState();
                 ResetGroupMoveState();
+                return;
+            }
+
+            if (isVectorShapeCreationMode)
+            {
+                vectorShapeDraftHoverPoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                vectorShapeDraftHoverActive = true;
+                pdfViewer.Invalidate();
                 return;
             }
 
@@ -11146,6 +12151,11 @@ namespace AnonPDF
             if (e.Button == MouseButtons.Middle)
             {
                 EndMiddleMousePan();
+                return;
+            }
+
+            if (isVectorShapeCreationMode)
+            {
                 return;
             }
 
@@ -12172,6 +13182,239 @@ namespace AnonPDF
             pdfCanvas.RestoreState();
         }
 
+        private void RenderVectorShapesToPdf(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            ISet<int> pagesWithBakedRotation,
+            IEnumerable<VectorShapeObject> shapes)
+        {
+            if (pdfDoc == null || shapes == null)
+            {
+                return;
+            }
+
+            foreach (var vectorShape in shapes)
+            {
+                if (vectorShape == null || vectorShape.Points == null || vectorShape.Points.Count < 2)
+                {
+                    continue;
+                }
+
+                int pageNumber = vectorShape.PageNumber;
+                if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
+                {
+                    continue;
+                }
+
+                bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
+                int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
+                bool includeBaseRotation = !baseRotationBaked;
+                var page = pdfDoc.GetPage(pageNumber);
+                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+
+                VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
+                VectorShapeStrokeKind strokeKind = ParseVectorStrokeKind(vectorShape.StrokeStyle);
+                List<PointF> pdfPoints = vectorShape.Points
+                    .Select(point => ConvertPointToPdfCoordinates(point, pageNumber, rotation, includeBaseRotation))
+                    .ToList();
+                if (pdfPoints.Count < 2)
+                {
+                    continue;
+                }
+
+                System.Drawing.Color strokeColor = System.Drawing.Color.FromArgb(vectorShape.StrokeColorArgb);
+                float strokeWidth = NormalizeVectorStrokeWidth(vectorShape.StrokeWidth);
+
+                pdfCanvas.SaveState();
+                pdfCanvas.SetStrokeColor(new DeviceRgb(strokeColor.R, strokeColor.G, strokeColor.B));
+                pdfCanvas.SetLineWidth(strokeWidth);
+                pdfCanvas.SetLineJoinStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineJoinStyle.ROUND);
+                pdfCanvas.SetLineCapStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineCapStyle.ROUND);
+                if (strokeKind == VectorShapeStrokeKind.Dash)
+                {
+                    pdfCanvas.SetLineDash(6f, 4f);
+                }
+
+                pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
+                for (int i = 1; i < pdfPoints.Count; i++)
+                {
+                    pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
+                }
+
+                if (shapeType == VectorShapeType.Region && pdfPoints.Count >= 3)
+                {
+                    System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
+                    float fillOpacity = NormalizeVectorFillOpacity(vectorShape.FillOpacity);
+                    if (fillOpacity > 0f)
+                    {
+                        pdfCanvas.SetFillColor(new DeviceRgb(fillColor.R, fillColor.G, fillColor.B));
+                        var fillState = new PdfExtGState().SetFillOpacity(fillOpacity);
+                        pdfCanvas.SetExtGState(fillState);
+                        pdfCanvas.ClosePathFillStroke();
+                    }
+                    else
+                    {
+                        pdfCanvas.ClosePathStroke();
+                    }
+                }
+                else
+                {
+                    pdfCanvas.Stroke();
+                }
+
+                pdfCanvas.RestoreState();
+            }
+        }
+
+        private void RenderRasterObjectToPdf(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            ISet<int> pagesWithBakedRotation,
+            RasterObject rasterObject)
+        {
+            if (pdfDoc == null || rasterObject == null)
+            {
+                return;
+            }
+
+            int pageNumber = rasterObject.PageNumber;
+            if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
+            {
+                return;
+            }
+
+            if (!TryCreateRasterImageData(rasterObject, out iText.IO.Image.ImageData imageData))
+            {
+                return;
+            }
+
+            bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
+            int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
+            var page = pdfDoc.GetPage(pageNumber);
+            var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+            RectangleF viewBounds = rasterObject.Bounds;
+            if (viewBounds.Width <= 0f || viewBounds.Height <= 0f)
+            {
+                return;
+            }
+
+            PointF centerView = new PointF(
+                viewBounds.X + (viewBounds.Width / 2f),
+                viewBounds.Y + (viewBounds.Height / 2f));
+            PointF halfWidthVector = RotateVector(new PointF(viewBounds.Width / 2f, 0f), NormalizeRotation(rasterObject.Rotation));
+            PointF halfHeightVector = RotateVector(new PointF(0f, viewBounds.Height / 2f), NormalizeRotation(rasterObject.Rotation));
+
+            PointF topLeftView = new PointF(
+                centerView.X - halfWidthVector.X - halfHeightVector.X,
+                centerView.Y - halfWidthVector.Y - halfHeightVector.Y);
+            PointF topRightView = new PointF(
+                centerView.X + halfWidthVector.X - halfHeightVector.X,
+                centerView.Y + halfWidthVector.Y - halfHeightVector.Y);
+            PointF bottomLeftView = new PointF(
+                centerView.X - halfWidthVector.X + halfHeightVector.X,
+                centerView.Y - halfWidthVector.Y + halfHeightVector.Y);
+            PointF bottomRightView = new PointF(
+                centerView.X + halfWidthVector.X + halfHeightVector.X,
+                centerView.Y + halfWidthVector.Y + halfHeightVector.Y);
+
+            PointF topLeftPdf = ConvertPointToPdfCoordinates(topLeftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+            PointF topRightPdf = ConvertPointToPdfCoordinates(topRightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+            PointF bottomLeftPdf = ConvertPointToPdfCoordinates(bottomLeftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+            PointF bottomRightPdf = ConvertPointToPdfCoordinates(bottomRightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+
+            float a = bottomRightPdf.X - bottomLeftPdf.X;
+            float b = bottomRightPdf.Y - bottomLeftPdf.Y;
+            float c = topLeftPdf.X - bottomLeftPdf.X;
+            float d = topLeftPdf.Y - bottomLeftPdf.Y;
+            float e = bottomLeftPdf.X;
+            float f = bottomLeftPdf.Y;
+
+            if (DebugLogEnabled)
+            {
+                LogDebug(
+                    $"RasterExport page={pageNumber} bounds={viewBounds} rotObj={NormalizeRotation(rasterObject.Rotation)} pageRot={rotation} " +
+                    $"tl={topLeftPdf.X:0.###},{topLeftPdf.Y:0.###} tr={topRightPdf.X:0.###},{topRightPdf.Y:0.###} bl={bottomLeftPdf.X:0.###},{bottomLeftPdf.Y:0.###} br={bottomRightPdf.X:0.###},{bottomRightPdf.Y:0.###} " +
+                    $"matrix=[{a:0.#####} {b:0.#####} {c:0.#####} {d:0.#####} {e:0.###} {f:0.###}]");
+            }
+
+            float opacity = NormalizeOpacity(rasterObject.Opacity);
+            if (opacity >= 0.999f)
+            {
+                pdfCanvas.AddImageWithTransformationMatrix(imageData, a, b, c, d, e, f, false);
+            }
+            else
+            {
+                var extGState = new PdfExtGState()
+                    .SetFillOpacity(opacity)
+                    .SetStrokeOpacity(opacity);
+                pdfCanvas.SaveState();
+                pdfCanvas.SetExtGState(extGState);
+                pdfCanvas.AddImageWithTransformationMatrix(imageData, a, b, c, d, e, f, false);
+                pdfCanvas.RestoreState();
+            }
+        }
+
+        private void RenderArrowObjectToPdf(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            ISet<int> pagesWithBakedRotation,
+            ArrowObject arrowObject)
+        {
+            if (pdfDoc == null || arrowObject == null)
+            {
+                return;
+            }
+
+            int pageNumber = arrowObject.PageNumber;
+            if (pageNumber < 1 || pageNumber > pdfDoc.GetNumberOfPages())
+            {
+                return;
+            }
+
+            bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
+            int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
+            var page = pdfDoc.GetPage(pageNumber);
+            var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+            PointF startView = arrowObject.Start;
+            PointF endView = arrowObject.End;
+            PointF startPdf = ConvertPointToPdfCoordinates(startView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+            PointF endPdf = ConvertPointToPdfCoordinates(endView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+
+            float thickness = NormalizeArrowThickness(arrowObject.Thickness);
+            float headLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
+            float headWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+            System.Drawing.Color lineColor = GetArrowColor(arrowObject);
+            var deviceColor = new DeviceRgb(lineColor.R, lineColor.G, lineColor.B);
+
+            pdfCanvas.SaveState();
+            pdfCanvas.SetLineWidth(thickness);
+            pdfCanvas.SetLineCapStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineCapStyle.ROUND);
+            pdfCanvas.SetLineJoinStyle(iText.Kernel.Pdf.Canvas.PdfCanvasConstants.LineJoinStyle.ROUND);
+            pdfCanvas.SetStrokeColor(deviceColor);
+            pdfCanvas.SetFillColor(deviceColor);
+
+            if (TryBuildArrowHead(startView, endView, headLength, headWidth, out PointF leftView, out PointF rightView, out PointF lineEndView))
+            {
+                PointF lineEndPdf = ConvertPointToPdfCoordinates(lineEndView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+                PointF leftPdf = ConvertPointToPdfCoordinates(leftView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+                PointF rightPdf = ConvertPointToPdfCoordinates(rightView, pageNumber, rotation, includeBaseRotation: !baseRotationBaked);
+
+                pdfCanvas.MoveTo(startPdf.X, startPdf.Y);
+                pdfCanvas.LineTo(lineEndPdf.X, lineEndPdf.Y);
+                pdfCanvas.Stroke();
+
+                pdfCanvas.MoveTo(endPdf.X, endPdf.Y);
+                pdfCanvas.LineTo(leftPdf.X, leftPdf.Y);
+                pdfCanvas.LineTo(rightPdf.X, rightPdf.Y);
+                pdfCanvas.Fill();
+            }
+            else
+            {
+                pdfCanvas.MoveTo(startPdf.X, startPdf.Y);
+                pdfCanvas.LineTo(endPdf.X, endPdf.Y);
+                pdfCanvas.Stroke();
+            }
+
+            pdfCanvas.RestoreState();
+        }
+
         private Dictionary<string, int> BuildLegalBasisFootnoteNumberMap(IEnumerable<RedactionBlock> blocks = null)
         {
             var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -12637,6 +13880,438 @@ namespace AnonPDF
                 $"topDelta={topDelta.ToString("0.###", CultureInfo.InvariantCulture)} comp={rotationCompensation.ToString("0.###", CultureInfo.InvariantCulture)} scale={scaleFactor.ToString("0.###", CultureInfo.InvariantCulture)}");
         }
 
+        private void DrawVectorShapeOnPreview(Graphics graphics, VectorShapeObject vectorShape)
+        {
+            if (graphics == null || vectorShape == null || vectorShape.PageNumber != currentPage || vectorShape.Points == null || vectorShape.Points.Count < 2)
+            {
+                return;
+            }
+
+            VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
+            VectorShapeStrokeKind strokeKind = ParseVectorStrokeKind(vectorShape.StrokeStyle);
+            PointF[] points = vectorShape.Points
+                .Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor))
+                .ToArray();
+            if (points.Length < 2)
+            {
+                return;
+            }
+
+            using (var pen = new Pen(System.Drawing.Color.FromArgb(vectorShape.StrokeColorArgb), NormalizeVectorStrokeWidth(vectorShape.StrokeWidth) * scaleFactor))
+            {
+                pen.DashStyle = strokeKind == VectorShapeStrokeKind.Dash ? DashStyle.Dash : DashStyle.Solid;
+                pen.LineJoin = LineJoin.Round;
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+
+                if (shapeType == VectorShapeType.Region && points.Length >= 3)
+                {
+                    int alpha = (int)(NormalizeVectorFillOpacity(vectorShape.FillOpacity) * 255f);
+                    alpha = Math.Max(0, Math.Min(255, alpha));
+                    System.Drawing.Color fillBase = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
+                    using (var fillBrush = new SolidBrush(System.Drawing.Color.FromArgb(alpha, fillBase.R, fillBase.G, fillBase.B)))
+                    {
+                        graphics.FillPolygon(fillBrush, points);
+                    }
+                    graphics.DrawPolygon(pen, points);
+                }
+                else
+                {
+                    graphics.DrawLines(pen, points);
+                }
+            }
+        }
+
+        private void DrawVectorShapeDraftOnPreview(Graphics graphics)
+        {
+            if (graphics == null || !isVectorShapeCreationMode || vectorShapeDraftPoints.Count == 0)
+            {
+                return;
+            }
+
+            var draftPoints = vectorShapeDraftPoints
+                .Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor))
+                .ToList();
+            if (vectorShapeDraftHoverActive)
+            {
+                draftPoints.Add(new PointF(vectorShapeDraftHoverPoint.X * scaleFactor, vectorShapeDraftHoverPoint.Y * scaleFactor));
+            }
+
+            if (draftPoints.Count < 2)
+            {
+                return;
+            }
+
+            using (var pen = new Pen(System.Drawing.Color.DarkOrange, Math.Max(1f, activeVectorShapeDefaults.StrokeWidth * scaleFactor)))
+            {
+                pen.DashStyle = DashStyle.Dash;
+                pen.LineJoin = LineJoin.Round;
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+
+                if (activeVectorShapeType == VectorShapeType.Region && draftPoints.Count >= 3)
+                {
+                    graphics.DrawPolygon(pen, draftPoints.ToArray());
+                }
+                else
+                {
+                    graphics.DrawLines(pen, draftPoints.ToArray());
+                }
+            }
+
+            foreach (PointF point in draftPoints.Take(vectorShapeDraftPoints.Count))
+            {
+                float size = 6f;
+                graphics.FillEllipse(Brushes.DarkOrange, point.X - (size / 2f), point.Y - (size / 2f), size, size);
+            }
+        }
+
+        private void DrawRasterObjectOnPreview(Graphics graphics, RasterObject rasterObject, bool multiSelectionActive)
+        {
+            if (graphics == null || rasterObject == null || rasterObject.PageNumber != currentPage)
+            {
+                return;
+            }
+
+            if (!TryCreateRasterPreviewImage(rasterObject, out DrawingImage previewImage))
+            {
+                return;
+            }
+
+            using (previewImage)
+            {
+                bool isSelectedRaster = IsRasterObjectSelected(rasterObject);
+                bool showRasterTools = selectedRasterObject != null &&
+                                       selectedRasterObject.Id == rasterObject.Id &&
+                                       GetGroupSelectionCount() == 0;
+                RectangleF scaledBounds = new RectangleF(
+                    rasterObject.Bounds.X * scaleFactor,
+                    rasterObject.Bounds.Y * scaleFactor,
+                    rasterObject.Bounds.Width * scaleFactor,
+                    rasterObject.Bounds.Height * scaleFactor);
+
+                var state = graphics.Save();
+                try
+                {
+                    graphics.TranslateTransform(
+                        scaledBounds.X + (scaledBounds.Width / 2f),
+                        scaledBounds.Y + (scaledBounds.Height / 2f));
+                    graphics.RotateTransform(rasterObject.Rotation);
+                    graphics.TranslateTransform(-(scaledBounds.Width / 2f), -(scaledBounds.Height / 2f));
+                    float opacity = NormalizeOpacity(rasterObject.Opacity);
+                    if (opacity >= 0.999f)
+                    {
+                        graphics.DrawImage(previewImage, new RectangleF(0f, 0f, scaledBounds.Width, scaledBounds.Height));
+                    }
+                    else
+                    {
+                        using (var imageAttributes = new ImageAttributes())
+                        {
+                            var colorMatrix = new ColorMatrix
+                            {
+                                Matrix33 = opacity
+                            };
+                            imageAttributes.SetColorMatrix(colorMatrix, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+                            var drawRect = new Rectangle(
+                                0,
+                                0,
+                                Math.Max(1, (int)Math.Round(scaledBounds.Width)),
+                                Math.Max(1, (int)Math.Round(scaledBounds.Height)));
+                            graphics.DrawImage(
+                                previewImage,
+                                drawRect,
+                                0,
+                                0,
+                                previewImage.Width,
+                                previewImage.Height,
+                                GraphicsUnit.Pixel,
+                                imageAttributes);
+                        }
+                    }
+                    System.Drawing.Color borderColor = (isSelectedRaster && !multiSelectionActive)
+                        ? System.Drawing.Color.Red
+                        : System.Drawing.Color.SteelBlue;
+                    float borderWidth = (isSelectedRaster && !multiSelectionActive) ? 2f : 1f;
+                    using (var borderPen = new Pen(borderColor, borderWidth))
+                    {
+                        graphics.DrawRectangle(borderPen, 0f, 0f, scaledBounds.Width, scaledBounds.Height);
+                    }
+                }
+                finally
+                {
+                    graphics.Restore(state);
+                }
+
+                RectangleF frameBounds = GetRasterObjectScreenFrameBounds(rasterObject);
+                if (frameBounds.Width > 0f && frameBounds.Height > 0f)
+                {
+                    using (var framePen = new Pen(System.Drawing.Color.Green, 1f))
+                    {
+                        graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
+                    }
+
+                    if (multiSelectionActive && isSelectedRaster)
+                    {
+                        DrawGroupSelectionOutline(graphics, frameBounds);
+                    }
+                }
+
+                if (showRasterTools && TryGetRasterRotationHandleRect(rasterObject, out RectangleF handleRect, out PointF connectorPoint))
+                {
+                    PointF handleCenter = new PointF(
+                        handleRect.X + (handleRect.Width / 2f),
+                        handleRect.Y + (handleRect.Height / 2f));
+                    using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                    {
+                        graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
+                    }
+                    using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                    using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                    {
+                        graphics.FillEllipse(handleBrush, handleRect);
+                        graphics.DrawEllipse(handlePen, handleRect);
+                    }
+                }
+
+                if (showRasterTools && TryGetRasterResizeHandleRects(rasterObject, out Dictionary<RasterResizeHandleType, RectangleF> resizeHandles))
+                {
+                    using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                    using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                    {
+                        foreach (var kvp in resizeHandles)
+                        {
+                            if (kvp.Key == RasterResizeHandleType.None)
+                            {
+                                continue;
+                            }
+
+                            graphics.FillRectangle(handleBrush, kvp.Value);
+                            graphics.DrawRectangle(handlePen, kvp.Value.X, kvp.Value.Y, kvp.Value.Width, kvp.Value.Height);
+                        }
+                    }
+                }
+
+                if (showRasterTools && TryGetRasterIconRects(rasterObject, out Dictionary<RasterIconType, Rectangle> iconRects))
+                {
+                    DrawIconButton(graphics, iconRects[RasterIconType.Edit], "\uE70F");
+                    DrawIconButton(
+                        graphics,
+                        iconRects[RasterIconType.Lock],
+                        rasterObject.IsLocked ? "\uE72E" : "\uE785");
+                    DrawIconButton(graphics, iconRects[RasterIconType.Duplicate], "\uE8C8");
+                    DrawIconButton(graphics, iconRects[RasterIconType.Order], "\u2630");
+                    DrawIconButton(graphics, iconRects[RasterIconType.ResetSize], "\uE777");
+                    DrawIconButton(graphics, iconRects[RasterIconType.Delete], "\uE74D");
+                }
+            }
+        }
+
+        private void DrawArrowObjectOnPreview(Graphics graphics, ArrowObject arrowObject, bool multiSelectionActive)
+        {
+            if (graphics == null || arrowObject == null || arrowObject.PageNumber != currentPage)
+            {
+                return;
+            }
+
+            arrowObject.Thickness = NormalizeArrowThickness(arrowObject.Thickness);
+            arrowObject.HeadLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
+            arrowObject.HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
+            if (!IsArrowColorValid(arrowObject))
+            {
+                arrowObject.LineColorArgb = DefaultArrowColor.ToArgb();
+            }
+
+            bool isSelectedArrow = IsArrowObjectSelected(arrowObject);
+            bool showArrowTools = selectedArrowObject != null &&
+                                  selectedArrowObject.Id == arrowObject.Id &&
+                                  GetGroupSelectionCount() == 0;
+            System.Drawing.Color baseColor = (isSelectedArrow && !multiSelectionActive)
+                ? System.Drawing.Color.Red
+                : GetArrowColor(arrowObject);
+            PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
+            PointF endScreen = GetArrowScreenPoint(arrowObject.End);
+            float thicknessPx = Math.Max(1f, arrowObject.Thickness * scaleFactor);
+            float headLengthPx = Math.Max(4f, arrowObject.HeadLength * scaleFactor);
+            float headWidthPx = Math.Max(4f, arrowObject.HeadWidth * scaleFactor);
+
+            var state = graphics.Save();
+            try
+            {
+                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                if (TryBuildArrowHead(startScreen, endScreen, headLengthPx, headWidthPx, out PointF leftPoint, out PointF rightPoint, out PointF lineEndPoint))
+                {
+                    using (var pen = new Pen(baseColor, thicknessPx))
+                    {
+                        pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                        pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
+                        graphics.DrawLine(pen, startScreen, lineEndPoint);
+                    }
+
+                    using (var brush = new SolidBrush(baseColor))
+                    {
+                        graphics.FillPolygon(brush, new[] { endScreen, leftPoint, rightPoint });
+                    }
+                }
+                else
+                {
+                    using (var pen = new Pen(baseColor, thicknessPx))
+                    {
+                        pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                        pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
+                        graphics.DrawLine(pen, startScreen, endScreen);
+                    }
+                }
+
+                if (multiSelectionActive && isSelectedArrow)
+                {
+                    float minX = Math.Min(startScreen.X, endScreen.X);
+                    float maxX = Math.Max(startScreen.X, endScreen.X);
+                    float minY = Math.Min(startScreen.Y, endScreen.Y);
+                    float maxY = Math.Max(startScreen.Y, endScreen.Y);
+                    RectangleF arrowBounds = new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY));
+                    DrawGroupSelectionOutline(graphics, arrowBounds);
+                }
+
+                if (showArrowTools)
+                {
+                    RectangleF startHandle = new RectangleF(
+                        startScreen.X - ArrowHandleRadius,
+                        startScreen.Y - ArrowHandleRadius,
+                        ArrowHandleRadius * 2f,
+                        ArrowHandleRadius * 2f);
+                    RectangleF endHandle = new RectangleF(
+                        endScreen.X - ArrowHandleRadius,
+                        endScreen.Y - ArrowHandleRadius,
+                        ArrowHandleRadius * 2f,
+                        ArrowHandleRadius * 2f);
+                    using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                    using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                    {
+                        graphics.FillEllipse(handleBrush, startHandle);
+                        graphics.DrawEllipse(handlePen, startHandle);
+                        graphics.FillEllipse(handleBrush, endHandle);
+                        graphics.DrawEllipse(handlePen, endHandle);
+                    }
+
+                    if (TryGetArrowIconRects(arrowObject, out Dictionary<ArrowIconType, Rectangle> arrowIconRects))
+                    {
+                        DrawIconButton(graphics, arrowIconRects[ArrowIconType.Edit], "\uE70F");
+                        DrawIconButton(
+                            graphics,
+                            arrowIconRects[ArrowIconType.Lock],
+                            arrowObject.IsLocked ? "\uE72E" : "\uE785");
+                        DrawIconButton(graphics, arrowIconRects[ArrowIconType.Duplicate], "\uE8C8");
+                        DrawIconButton(graphics, arrowIconRects[ArrowIconType.Order], "\u2630");
+                        DrawIconButton(graphics, arrowIconRects[ArrowIconType.Delete], "\uE74D");
+                    }
+                }
+            }
+            finally
+            {
+                graphics.Restore(state);
+            }
+        }
+
+        private void DrawTextAnnotationOnPreview(Graphics graphics, TextAnnotation annotation, bool multiSelectionActive)
+        {
+            if (graphics == null || annotation == null || annotation.PageNumber != currentPage)
+            {
+                return;
+            }
+
+            System.Drawing.Rectangle rect = new System.Drawing.Rectangle(
+                (int)(annotation.AnnotationBounds.X * scaleFactor),
+                (int)(annotation.AnnotationBounds.Y * scaleFactor),
+                (int)(annotation.AnnotationBounds.Width * scaleFactor * 72f / graphics.DpiX),
+                (int)(annotation.AnnotationBounds.Height * scaleFactor * 72f / graphics.DpiY)
+            );
+
+            bool isSelectedAnnotation = IsTextAnnotationSelected(annotation);
+            bool showTextTools = selectedTextAnnotation != null &&
+                                 ReferenceEquals(selectedTextAnnotation, annotation) &&
+                                 GetGroupSelectionCount() == 0;
+
+            using (Pen pen = new Pen(System.Drawing.Color.Green, 1f))
+            {
+                graphics.DrawRectangle(pen, rect);
+            }
+
+            StringAlignment align;
+            switch (annotation.AnnotationAlignment)
+            {
+                case System.Windows.Forms.HorizontalAlignment.Left:
+                    align = StringAlignment.Near;
+                    break;
+                case System.Windows.Forms.HorizontalAlignment.Center:
+                    align = StringAlignment.Center;
+                    break;
+                case System.Windows.Forms.HorizontalAlignment.Right:
+                    align = StringAlignment.Far;
+                    break;
+                default:
+                    align = StringAlignment.Near;
+                    break;
+            }
+
+            StringFormat stringFormat = StringFormat.GenericTypographic;
+            stringFormat.Alignment = align;
+            stringFormat.LineAlignment = StringAlignment.Near;
+            stringFormat.FormatFlags = StringFormatFlags.NoWrap;
+            stringFormat.Trimming = StringTrimming.None;
+
+            float dpiCorrection = 72f / graphics.DpiY;
+            int annotationRotation = NormalizeRotation(annotation.AnnotationRotation);
+            SizeF baseSize = GetAnnotationSize(annotation.AnnotationText, annotation.AnnotationFont, 0);
+            float layoutWidth = baseSize.Width * scaleFactor * 72f / graphics.DpiX;
+            float layoutHeight = baseSize.Height * scaleFactor * 72f / graphics.DpiY;
+
+            using (SolidBrush brush = new SolidBrush((isSelectedAnnotation && !multiSelectionActive) ? System.Drawing.Color.Red : annotation.AnnotationColor))
+            {
+                float scaledFontSize = annotation.AnnotationFont.Size * scaleFactor * dpiCorrection;
+                using (Font scaledFont = new Font(annotation.AnnotationFont.FontFamily, scaledFontSize, annotation.AnnotationFont.Style))
+                {
+                    float rotationRadians = (float)(annotationRotation * Math.PI / 180.0);
+                    float rotCos = (float)Math.Cos(rotationRadians);
+                    float rotSin = (float)Math.Sin(rotationRadians);
+                    PointF rotationOffset = GetRotationOffsetForBounds(annotationRotation, layoutWidth, layoutHeight);
+                    float offsetX = rotationOffset.X;
+                    float offsetY = rotationOffset.Y;
+
+                    RectangleF layoutRect = new RectangleF(0, 0, layoutWidth, layoutHeight);
+                    var state = graphics.Save();
+                    graphics.Transform = new System.Drawing.Drawing2D.Matrix(
+                        rotCos, rotSin, -rotSin, rotCos,
+                        rect.X + offsetX, rect.Y + offsetY);
+                    graphics.DrawString(
+                        annotation.AnnotationText,
+                        scaledFont,
+                        brush,
+                        layoutRect,
+                        stringFormat
+                    );
+                    graphics.Restore(state);
+                }
+            }
+
+            if (multiSelectionActive && isSelectedAnnotation)
+            {
+                DrawGroupSelectionOutline(graphics, rect);
+            }
+
+            if (showTextTools && TryGetAnnotationIconRects(annotation, graphics.DpiX, graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
+            {
+                DrawIconButton(graphics, annotationIconRects[IconType.Edit], "\uE70F");
+                DrawIconButton(
+                    graphics,
+                    annotationIconRects[IconType.Lock],
+                    annotation.AnnotationIsLocked ? "\uE72E" : "\uE785");
+                DrawIconButton(graphics, annotationIconRects[IconType.Duplicate], "\uE8C8");
+                DrawIconButton(graphics, annotationIconRects[IconType.Delete], "\uE74D");
+            }
+        }
+
         private void OnPaint(object sender, PaintEventArgs e)
         {
             // Draw current selection
@@ -12915,353 +14590,26 @@ namespace AnonPDF
                 }
             }
 
-            // Drawing raster objects for current page
-            foreach (var rasterObject in rasterObjects.Where(obj => obj.PageNumber == currentPage))
+            foreach (object drawableObject in GetOrderedObjectsForCurrentPage())
             {
-                if (!TryCreateRasterPreviewImage(rasterObject, out DrawingImage previewImage))
+                if (drawableObject is RasterObject rasterObject)
                 {
-                    continue;
+                    DrawRasterObjectOnPreview(e.Graphics, rasterObject, multiSelectionActive);
                 }
-
-                using (previewImage)
+                else if (drawableObject is ArrowObject arrowObject)
                 {
-                    bool isSelectedRaster = IsRasterObjectSelected(rasterObject);
-                    bool showRasterTools = selectedRasterObject != null &&
-                                           selectedRasterObject.Id == rasterObject.Id &&
-                                           GetGroupSelectionCount() == 0;
-                    RectangleF scaledBounds = new RectangleF(
-                        rasterObject.Bounds.X * scaleFactor,
-                        rasterObject.Bounds.Y * scaleFactor,
-                        rasterObject.Bounds.Width * scaleFactor,
-                        rasterObject.Bounds.Height * scaleFactor);
-
-                    var state = e.Graphics.Save();
-                    try
-                    {
-                        e.Graphics.TranslateTransform(
-                            scaledBounds.X + (scaledBounds.Width / 2f),
-                            scaledBounds.Y + (scaledBounds.Height / 2f));
-                        e.Graphics.RotateTransform(rasterObject.Rotation);
-                        e.Graphics.TranslateTransform(-(scaledBounds.Width / 2f), -(scaledBounds.Height / 2f));
-                        float opacity = NormalizeOpacity(rasterObject.Opacity);
-                        if (opacity >= 0.999f)
-                        {
-                            e.Graphics.DrawImage(previewImage, new RectangleF(0f, 0f, scaledBounds.Width, scaledBounds.Height));
-                        }
-                        else
-                        {
-                            using (var imageAttributes = new ImageAttributes())
-                            {
-                                var colorMatrix = new ColorMatrix
-                                {
-                                    Matrix33 = opacity
-                                };
-                                imageAttributes.SetColorMatrix(colorMatrix, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
-                                var drawRect = new Rectangle(
-                                    0,
-                                    0,
-                                    Math.Max(1, (int)Math.Round(scaledBounds.Width)),
-                                    Math.Max(1, (int)Math.Round(scaledBounds.Height)));
-                                e.Graphics.DrawImage(
-                                    previewImage,
-                                    drawRect,
-                                    0,
-                                    0,
-                                    previewImage.Width,
-                                    previewImage.Height,
-                                    GraphicsUnit.Pixel,
-                                    imageAttributes);
-                            }
-                        }
-                        System.Drawing.Color borderColor = (isSelectedRaster && !multiSelectionActive)
-                            ? System.Drawing.Color.Red
-                            : System.Drawing.Color.SteelBlue;
-                        float borderWidth = (isSelectedRaster && !multiSelectionActive) ? 2f : 1f;
-                        using (var borderPen = new Pen(borderColor, borderWidth))
-                        {
-                            e.Graphics.DrawRectangle(borderPen, 0f, 0f, scaledBounds.Width, scaledBounds.Height);
-                        }
-                    }
-                    finally
-                    {
-                        e.Graphics.Restore(state);
-                    }
-
-                    RectangleF frameBounds = GetRasterObjectScreenFrameBounds(rasterObject);
-                    if (frameBounds.Width > 0f && frameBounds.Height > 0f)
-                    {
-                        using (var framePen = new Pen(System.Drawing.Color.Green, 1f))
-                        {
-                            e.Graphics.DrawRectangle(framePen, frameBounds.X, frameBounds.Y, frameBounds.Width, frameBounds.Height);
-                        }
-
-                        if (multiSelectionActive && isSelectedRaster)
-                        {
-                            DrawGroupSelectionOutline(e.Graphics, frameBounds);
-                        }
-                    }
-
-                    if (showRasterTools && TryGetRasterRotationHandleRect(rasterObject, out RectangleF handleRect, out PointF connectorPoint))
-                    {
-                        PointF handleCenter = new PointF(
-                            handleRect.X + (handleRect.Width / 2f),
-                            handleRect.Y + (handleRect.Height / 2f));
-                        using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
-                        {
-                            e.Graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
-                        }
-                        using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
-                        using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
-                        {
-                            e.Graphics.FillEllipse(handleBrush, handleRect);
-                            e.Graphics.DrawEllipse(handlePen, handleRect);
-                        }
-                    }
-
-                    if (showRasterTools && TryGetRasterResizeHandleRects(rasterObject, out Dictionary<RasterResizeHandleType, RectangleF> resizeHandles))
-                    {
-                        using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
-                        using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
-                        {
-                            foreach (var kvp in resizeHandles)
-                            {
-                                if (kvp.Key == RasterResizeHandleType.None)
-                                {
-                                    continue;
-                                }
-
-                                e.Graphics.FillRectangle(handleBrush, kvp.Value);
-                                e.Graphics.DrawRectangle(handlePen, kvp.Value.X, kvp.Value.Y, kvp.Value.Width, kvp.Value.Height);
-                            }
-                        }
-                    }
-
-                    if (showRasterTools && TryGetRasterIconRects(rasterObject, out Dictionary<RasterIconType, Rectangle> iconRects))
-                    {
-                        DrawIconButton(e.Graphics, iconRects[RasterIconType.Edit], "\uE70F");
-                        DrawIconButton(
-                            e.Graphics,
-                            iconRects[RasterIconType.Lock],
-                            rasterObject.IsLocked ? "\uE72E" : "\uE785");
-                        DrawIconButton(e.Graphics, iconRects[RasterIconType.Duplicate], "\uE8C8");
-                        DrawIconButton(e.Graphics, iconRects[RasterIconType.Order], "\u2630");
-                        DrawIconButton(e.Graphics, iconRects[RasterIconType.ResetSize], "\uE777");
-                        DrawIconButton(e.Graphics, iconRects[RasterIconType.Delete], "\uE74D");
-                    }
+                    DrawArrowObjectOnPreview(e.Graphics, arrowObject, multiSelectionActive);
+                }
+                else if (drawableObject is VectorShapeObject vectorShapeObject)
+                {
+                    DrawVectorShapeOnPreview(e.Graphics, vectorShapeObject);
+                }
+                else if (drawableObject is TextAnnotation annotation)
+                {
+                    DrawTextAnnotationOnPreview(e.Graphics, annotation, multiSelectionActive);
                 }
             }
-
-            // Drawing arrow objects for current page
-            foreach (var arrowObject in arrowObjects.Where(obj => obj.PageNumber == currentPage))
-            {
-                if (arrowObject == null)
-                {
-                    continue;
-                }
-
-                arrowObject.Thickness = NormalizeArrowThickness(arrowObject.Thickness);
-                arrowObject.HeadLength = NormalizeArrowHeadLength(arrowObject.HeadLength);
-                arrowObject.HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
-                if (!IsArrowColorValid(arrowObject))
-                {
-                    arrowObject.LineColorArgb = DefaultArrowColor.ToArgb();
-                }
-
-                bool isSelectedArrow = IsArrowObjectSelected(arrowObject);
-                bool showArrowTools = selectedArrowObject != null &&
-                                      selectedArrowObject.Id == arrowObject.Id &&
-                                      GetGroupSelectionCount() == 0;
-                System.Drawing.Color baseColor = (isSelectedArrow && !multiSelectionActive)
-                    ? System.Drawing.Color.Red
-                    : GetArrowColor(arrowObject);
-                PointF startScreen = GetArrowScreenPoint(arrowObject.Start);
-                PointF endScreen = GetArrowScreenPoint(arrowObject.End);
-                float thicknessPx = Math.Max(1f, arrowObject.Thickness * scaleFactor);
-                float headLengthPx = Math.Max(4f, arrowObject.HeadLength * scaleFactor);
-                float headWidthPx = Math.Max(4f, arrowObject.HeadWidth * scaleFactor);
-
-                var state = e.Graphics.Save();
-                try
-                {
-                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    if (TryBuildArrowHead(startScreen, endScreen, headLengthPx, headWidthPx, out PointF leftPoint, out PointF rightPoint, out PointF lineEndPoint))
-                    {
-                        using (var pen = new Pen(baseColor, thicknessPx))
-                        {
-                            pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
-                            pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
-                            pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
-                            e.Graphics.DrawLine(pen, startScreen, lineEndPoint);
-                        }
-
-                        using (var brush = new SolidBrush(baseColor))
-                        {
-                            e.Graphics.FillPolygon(brush, new[] { endScreen, leftPoint, rightPoint });
-                        }
-                    }
-                    else
-                    {
-                        using (var pen = new Pen(baseColor, thicknessPx))
-                        {
-                            pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
-                            pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
-                            pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
-                            e.Graphics.DrawLine(pen, startScreen, endScreen);
-                        }
-                    }
-
-                    if (multiSelectionActive && isSelectedArrow)
-                    {
-                        float minX = Math.Min(startScreen.X, endScreen.X);
-                        float maxX = Math.Max(startScreen.X, endScreen.X);
-                        float minY = Math.Min(startScreen.Y, endScreen.Y);
-                        float maxY = Math.Max(startScreen.Y, endScreen.Y);
-                        RectangleF arrowBounds = new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY));
-                        DrawGroupSelectionOutline(e.Graphics, arrowBounds);
-                    }
-
-                    if (showArrowTools)
-                    {
-                        RectangleF startHandle = new RectangleF(
-                            startScreen.X - ArrowHandleRadius,
-                            startScreen.Y - ArrowHandleRadius,
-                            ArrowHandleRadius * 2f,
-                            ArrowHandleRadius * 2f);
-                        RectangleF endHandle = new RectangleF(
-                            endScreen.X - ArrowHandleRadius,
-                            endScreen.Y - ArrowHandleRadius,
-                            ArrowHandleRadius * 2f,
-                            ArrowHandleRadius * 2f);
-                        using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
-                        using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
-                        {
-                            e.Graphics.FillEllipse(handleBrush, startHandle);
-                            e.Graphics.DrawEllipse(handlePen, startHandle);
-                            e.Graphics.FillEllipse(handleBrush, endHandle);
-                            e.Graphics.DrawEllipse(handlePen, endHandle);
-                        }
-
-                        if (TryGetArrowIconRects(arrowObject, out Dictionary<ArrowIconType, Rectangle> arrowIconRects))
-                        {
-                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Edit], "\uE70F");
-                            DrawIconButton(
-                                e.Graphics,
-                                arrowIconRects[ArrowIconType.Lock],
-                                arrowObject.IsLocked ? "\uE72E" : "\uE785");
-                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Duplicate], "\uE8C8");
-                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Order], "\u2630");
-                            DrawIconButton(e.Graphics, arrowIconRects[ArrowIconType.Delete], "\uE74D");
-                        }
-                    }
-                }
-                finally
-                {
-                    e.Graphics.Restore(state);
-                }
-            }
-
-            // Drawing text annotation blocks with text
-            foreach (var annotation in textAnnotations.Where(b => b.PageNumber == currentPage))
-            {
-                // Calculate rectangle – taking scale into account
-                System.Drawing.Rectangle rect = new System.Drawing.Rectangle(
-                    (int)(annotation.AnnotationBounds.X * scaleFactor),
-                    (int)(annotation.AnnotationBounds.Y * scaleFactor),
-                    (int)(annotation.AnnotationBounds.Width * scaleFactor * 72f / e.Graphics.DpiX),
-                    (int)(annotation.AnnotationBounds.Height * scaleFactor * 72f / e.Graphics.DpiY)
-                );
-
-                bool isSelectedAnnotation = IsTextAnnotationSelected(annotation);
-                bool showTextTools = selectedTextAnnotation != null &&
-                                     ReferenceEquals(selectedTextAnnotation, annotation) &&
-                                     GetGroupSelectionCount() == 0;
-
-                // Draw annotation border
-                using (Pen pen = new Pen(System.Drawing.Color.Green, 1f))
-                {
-                    e.Graphics.DrawRectangle(pen, rect);
-                }
-
-                // Transform HorizontalAlignment to StringAlignment
-                StringAlignment align;
-                switch (annotation.AnnotationAlignment)
-                {
-                    case System.Windows.Forms.HorizontalAlignment.Left:
-                        align = StringAlignment.Near;
-                        break;
-                    case System.Windows.Forms.HorizontalAlignment.Center:
-                        align = StringAlignment.Center;
-                        break;
-                    case System.Windows.Forms.HorizontalAlignment.Right:
-                        align = StringAlignment.Far;
-                        break;
-                    default:
-                        align = StringAlignment.Near;
-                        break;
-                }
-
-                // Set text formatting – horizontal and vertical alignment (center)
-
-                StringFormat stringFormat = StringFormat.GenericTypographic;
-                stringFormat.Alignment = align;
-                stringFormat.LineAlignment = StringAlignment.Near;
-                stringFormat.FormatFlags = StringFormatFlags.NoWrap;
-                stringFormat.Trimming = StringTrimming.None;
-
-
-                // DPI correction coefficient (assuming PDF uses 72 DPI)
-                float dpiCorrection = 72f / e.Graphics.DpiY; // DpiY to DPI w pionie dla bitmapy
-
-                int annotationRotation = NormalizeRotation(annotation.AnnotationRotation);
-                SizeF baseSize = GetAnnotationSize(annotation.AnnotationText, annotation.AnnotationFont, 0);
-                float layoutWidth = baseSize.Width * scaleFactor * 72f / e.Graphics.DpiX;
-                float layoutHeight = baseSize.Height * scaleFactor * 72f / e.Graphics.DpiY;
-
-                // Render text with scaled font
-                using (SolidBrush brush = new SolidBrush((isSelectedAnnotation && !multiSelectionActive) ? System.Drawing.Color.Red : annotation.AnnotationColor))
-                {
-                    float scaledFontSize = annotation.AnnotationFont.Size * scaleFactor * dpiCorrection;
-                    using (Font scaledFont = new Font(annotation.AnnotationFont.FontFamily, scaledFontSize, annotation.AnnotationFont.Style))
-                    {
-                        float rotationRadians = (float)(annotationRotation * Math.PI / 180.0);
-                        float rotCos = (float)Math.Cos(rotationRadians);
-                        float rotSin = (float)Math.Sin(rotationRadians);
-                        PointF rotationOffset = GetRotationOffsetForBounds(annotationRotation, layoutWidth, layoutHeight);
-                        float offsetX = rotationOffset.X;
-                        float offsetY = rotationOffset.Y;
-
-                        RectangleF layoutRect = new RectangleF(0, 0, layoutWidth, layoutHeight);
-                        var state = e.Graphics.Save();
-                        e.Graphics.Transform = new System.Drawing.Drawing2D.Matrix(
-                            rotCos, rotSin, -rotSin, rotCos,
-                            rect.X + offsetX, rect.Y + offsetY);
-                        e.Graphics.DrawString(
-                            annotation.AnnotationText,  // Tekst adnotacji
-                            scaledFont,                  // Przeskalowana czcionka
-                            brush,                       // Kolor tekstu
-                            layoutRect,                  // Obszar renderowania
-                            stringFormat               // Alignment settings
-                        );
-                        e.Graphics.Restore(state);
-                    }
-                }
-
-                if (multiSelectionActive && isSelectedAnnotation)
-                {
-                    DrawGroupSelectionOutline(e.Graphics, rect);
-                }
-
-                if (showTextTools && TryGetAnnotationIconRects(annotation, e.Graphics.DpiX, e.Graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
-                {
-                    DrawIconButton(e.Graphics, annotationIconRects[IconType.Edit], "\uE70F");
-                    DrawIconButton(
-                        e.Graphics,
-                        annotationIconRects[IconType.Lock],
-                        annotation.AnnotationIsLocked ? "\uE72E" : "\uE785");
-                    DrawIconButton(e.Graphics, annotationIconRects[IconType.Duplicate], "\uE8C8");
-                    DrawIconButton(e.Graphics, annotationIconRects[IconType.Delete], "\uE74D");
-                }
-            }
+            DrawVectorShapeDraftOnPreview(e.Graphics);
 
             if (!multiSelectionActive)
             {
@@ -13676,6 +15024,9 @@ namespace AnonPDF
                     List<ArrowObject> arrowObjectsJson = (projectData.ArrowObjects ?? new List<ArrowObject>())
                         .Where(obj => obj != null && obj.PageNumber >= 1 && obj.PageNumber <= numPages)
                         .ToList();
+                    List<VectorShapeObject> vectorShapesJson = (projectData.VectorShapes ?? new List<VectorShapeObject>())
+                        .Where(obj => obj != null && obj.PageNumber >= 1 && obj.PageNumber <= numPages)
+                        .ToList();
                     Dictionary<int, int> rotationOffsetsJson = projectData.PageRotationOffsets ?? new Dictionary<int, int>();
                     List<string> signaturesToRemoveJson = projectData.SignaturesToRemove;
                     string signaturesMode = projectData.SignaturesMode;
@@ -13739,6 +15090,14 @@ namespace AnonPDF
                         arrowObject.HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth);
                         ConstrainArrowToPage(arrowObject);
                     }
+
+                    ClearVectorShapes();
+                    vectorShapes = vectorShapesJson;
+                    foreach (var vectorShape in vectorShapes)
+                    {
+                        NormalizeVectorShape(vectorShape);
+                    }
+                    LoadProjectObjectLayerOrder(projectData.ObjectLayers);
 
                     pageRotationOffsets = rotationOffsetsJson
                         .Where(kvp => kvp.Key >= 1 && kvp.Key <= numPages)
@@ -13830,6 +15189,15 @@ namespace AnonPDF
                         var item = pagesListView.Items[arrowObject.PageNumber - 1];
                         status.HasObjects = true;
                         UpdateItemTag(item, arrowObject.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                        pagesListView.Invalidate(item.Bounds);
+                    }
+
+                    foreach (var vectorShape in vectorShapes)
+                    {
+                        status = allPageStatuses[vectorShape.PageNumber - 1];
+                        var item = pagesListView.Items[vectorShape.PageNumber - 1];
+                        status.HasObjects = true;
+                        UpdateItemTag(item, vectorShape.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -13958,6 +15326,8 @@ namespace AnonPDF
                             TextAnnotations = textAnnotations,
                             RasterObjects = rasterObjects,
                             ArrowObjects = arrowObjects,
+                            VectorShapes = vectorShapes,
+                            ObjectLayers = BuildProjectObjectLayersSnapshot(),
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
                             CurrentPage = currentPage,
@@ -14401,6 +15771,8 @@ namespace AnonPDF
                             TextAnnotations = textAnnotations,
                             RasterObjects = rasterObjects,
                             ArrowObjects = arrowObjects,
+                            VectorShapes = vectorShapes,
+                            ObjectLayers = BuildProjectObjectLayersSnapshot(),
                             PageRotationOffsets = new Dictionary<int, int>(pageRotationOffsets),
                             FilePath = inputPdfPath,
                             CurrentPage = currentPage,
@@ -15184,17 +16556,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
-            if (index < 0)
-            {
-                return false;
-            }
-
-            int lastIndexBeforeMove = rasterObjects.Count - 1;
-            rasterObjects.RemoveAt(index);
-            rasterObjects.Add(rasterObject);
-            return index != lastIndexBeforeMove;
+            EnsureRasterObjectId(rasterObject);
+            return BringLayerToFront(LayerObjectType.Raster, rasterObject.Id);
         }
 
         private bool SendRasterObjectToBack(RasterObject rasterObject)
@@ -15203,16 +16566,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
-            if (index < 0)
-            {
-                return false;
-            }
-
-            rasterObjects.RemoveAt(index);
-            rasterObjects.Insert(0, rasterObject);
-            return index != 0;
+            EnsureRasterObjectId(rasterObject);
+            return SendLayerToBack(LayerObjectType.Raster, rasterObject.Id);
         }
 
         private bool MoveRasterObjectForward(RasterObject rasterObject)
@@ -15221,16 +16576,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
-            if (index < 0 || index >= rasterObjects.Count - 1)
-            {
-                return false;
-            }
-
-            rasterObjects.RemoveAt(index);
-            rasterObjects.Insert(index + 1, rasterObject);
-            return true;
+            EnsureRasterObjectId(rasterObject);
+            return MoveLayerForward(LayerObjectType.Raster, rasterObject.Id);
         }
 
         private bool MoveRasterObjectBackward(RasterObject rasterObject)
@@ -15239,16 +16586,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = rasterObjects.FindIndex(obj => obj != null && obj.Id == rasterObject.Id);
-            if (index <= 0)
-            {
-                return false;
-            }
-
-            rasterObjects.RemoveAt(index);
-            rasterObjects.Insert(index - 1, rasterObject);
-            return true;
+            EnsureRasterObjectId(rasterObject);
+            return MoveLayerBackward(LayerObjectType.Raster, rasterObject.Id);
         }
 
         private static string GetRasterMimeTypeFromPath(string filePath)
@@ -15354,6 +16693,93 @@ namespace AnonPDF
             {
                 return System.Drawing.Color.Red;
             }
+        }
+
+        private static float NormalizeVectorStrokeWidth(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return 2f;
+            }
+
+            return Math.Max(0.5f, Math.Min(24f, value));
+        }
+
+        private static float NormalizeVectorFillOpacity(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return 0.18f;
+            }
+
+            return Math.Max(0f, Math.Min(1f, value));
+        }
+
+        private static VectorShapeType ParseVectorShapeType(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return VectorShapeType.Polyline;
+            }
+
+            if (Enum.TryParse(value.Trim(), true, out VectorShapeType parsed))
+            {
+                return parsed;
+            }
+
+            return VectorShapeType.Polyline;
+        }
+
+        private static VectorShapeStrokeKind ParseVectorStrokeKind(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return VectorShapeStrokeKind.Solid;
+            }
+
+            if (Enum.TryParse(value.Trim(), true, out VectorShapeStrokeKind parsed))
+            {
+                return parsed;
+            }
+
+            return VectorShapeStrokeKind.Solid;
+        }
+
+        private static bool ShapeTypeSupportsCurrentMvp(VectorShapeType type)
+        {
+            return type == VectorShapeType.Polyline || type == VectorShapeType.Region;
+        }
+
+        private static int GetRequiredPointsForShape(VectorShapeType type)
+        {
+            return type == VectorShapeType.Region ? 3 : 2;
+        }
+
+        private static bool IsShapeClosed(VectorShapeType type)
+        {
+            return type == VectorShapeType.Region;
+        }
+
+        private void NormalizeVectorShape(VectorShapeObject vectorShape)
+        {
+            if (vectorShape == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(vectorShape.Id))
+            {
+                vectorShape.Id = Guid.NewGuid().ToString("N");
+            }
+
+            VectorShapeType parsedType = ParseVectorShapeType(vectorShape.ShapeType);
+            vectorShape.ShapeType = parsedType.ToString();
+            vectorShape.StrokeWidth = NormalizeVectorStrokeWidth(vectorShape.StrokeWidth);
+            vectorShape.FillOpacity = NormalizeVectorFillOpacity(vectorShape.FillOpacity);
+            vectorShape.StrokeStyle = ParseVectorStrokeKind(vectorShape.StrokeStyle).ToString();
+            vectorShape.Points = (vectorShape.Points ?? new List<PointF>())
+                .Where(p => !float.IsNaN(p.X) && !float.IsInfinity(p.X) && !float.IsNaN(p.Y) && !float.IsInfinity(p.Y))
+                .ToList();
         }
 
         private PointF GetArrowScreenPoint(PointF viewPoint)
@@ -15516,17 +16942,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
-            if (index < 0)
-            {
-                return false;
-            }
-
-            int lastIndexBeforeMove = arrowObjects.Count - 1;
-            arrowObjects.RemoveAt(index);
-            arrowObjects.Add(arrowObject);
-            return index != lastIndexBeforeMove;
+            EnsureArrowObjectId(arrowObject);
+            return BringLayerToFront(LayerObjectType.Arrow, arrowObject.Id);
         }
 
         private bool SendArrowObjectToBack(ArrowObject arrowObject)
@@ -15535,16 +16952,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
-            if (index < 0)
-            {
-                return false;
-            }
-
-            arrowObjects.RemoveAt(index);
-            arrowObjects.Insert(0, arrowObject);
-            return index != 0;
+            EnsureArrowObjectId(arrowObject);
+            return SendLayerToBack(LayerObjectType.Arrow, arrowObject.Id);
         }
 
         private bool MoveArrowObjectForward(ArrowObject arrowObject)
@@ -15553,16 +16962,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
-            if (index < 0 || index >= arrowObjects.Count - 1)
-            {
-                return false;
-            }
-
-            arrowObjects.RemoveAt(index);
-            arrowObjects.Insert(index + 1, arrowObject);
-            return true;
+            EnsureArrowObjectId(arrowObject);
+            return MoveLayerForward(LayerObjectType.Arrow, arrowObject.Id);
         }
 
         private bool MoveArrowObjectBackward(ArrowObject arrowObject)
@@ -15571,16 +16972,8 @@ namespace AnonPDF
             {
                 return false;
             }
-
-            int index = arrowObjects.FindIndex(obj => obj != null && obj.Id == arrowObject.Id);
-            if (index <= 0)
-            {
-                return false;
-            }
-
-            arrowObjects.RemoveAt(index);
-            arrowObjects.Insert(index - 1, arrowObject);
-            return true;
+            EnsureArrowObjectId(arrowObject);
+            return MoveLayerBackward(LayerObjectType.Arrow, arrowObject.Id);
         }
 
         private bool ConstrainArrowToPage(ArrowObject arrowObject)
@@ -19182,6 +20575,33 @@ namespace AnonPDF
             AddArrowObject();
         }
 
+        private void AddShapeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!TryPromptShapeDefaults(out VectorShapeDefaults selectedDefaults))
+            {
+                return;
+            }
+
+            if (!ShapeTypeSupportsCurrentMvp(selectedDefaults.ShapeType))
+            {
+                string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+                string message = string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase)
+                    ? "Ten typ kształtu będzie dostępny w kolejnym etapie."
+                    : string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase)
+                        ? "Dieser Formtyp ist in der nächsten Phase verfügbar."
+                        : "This shape type will be available in the next stage.";
+                ShowInfoMessage(message);
+                return;
+            }
+
+            BeginVectorShapeCreation(selectedDefaults);
+        }
+
         private void PasteObjectFromClipboardToolStripMenuItem_Click(object sender, EventArgs e)
         {
             TryHandleGlobalPasteShortcut();
@@ -19210,6 +20630,8 @@ namespace AnonPDF
 
     public class TextAnnotation
     {
+        public string Id { get; set; }
+
         public int PageNumber { get; set; }
 
         public string AnnotationText { get; set; }
@@ -19228,6 +20650,7 @@ namespace AnonPDF
 
         public TextAnnotation()
         {
+            Id = Guid.NewGuid().ToString("N");
             PageNumber = 1;
             AnnotationText = "";
             AnnotationFont = new Font("Arial", 12);
@@ -19241,6 +20664,7 @@ namespace AnonPDF
 
         public TextAnnotation(int pageNumber, string text, Font font, System.Drawing.Color color, System.Windows.Forms.HorizontalAlignment alignment, RectangleF bounds, bool isLocked = false)
         {
+            Id = Guid.NewGuid().ToString("N");
             PageNumber = pageNumber;
             AnnotationText = text;
             AnnotationFont = font;
@@ -21389,6 +22813,8 @@ namespace AnonPDF
         public List<TextAnnotation> TextAnnotations { get; set; }
         public List<RasterObject> RasterObjects { get; set; }
         public List<ArrowObject> ArrowObjects { get; set; }
+        public List<VectorShapeObject> VectorShapes { get; set; }
+        public List<ProjectObjectLayer> ObjectLayers { get; set; }
         public Dictionary<int, int> PageRotationOffsets { get; set; }
         public int CurrentPage { get; set; }
         public float? ZoomFactor { get; set; }
@@ -21433,6 +22859,28 @@ namespace AnonPDF
         public bool IsLocked { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+    }
+
+    public class VectorShapeObject
+    {
+        public string Id { get; set; }
+        public int PageNumber { get; set; }
+        public string ShapeType { get; set; }
+        public List<PointF> Points { get; set; } = new List<PointF>();
+        public int StrokeColorArgb { get; set; } = System.Drawing.Color.Blue.ToArgb();
+        public float StrokeWidth { get; set; } = 2f;
+        public int FillColorArgb { get; set; } = System.Drawing.Color.Gold.ToArgb();
+        public float FillOpacity { get; set; } = 0.18f;
+        public string StrokeStyle { get; set; } = "solid";
+        public bool IsLocked { get; set; }
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+    }
+
+    public class ProjectObjectLayer
+    {
+        public string Type { get; set; }
+        public string Id { get; set; }
     }
 
     public class ResumeState
