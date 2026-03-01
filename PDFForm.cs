@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Text;
 using System.Linq;
 using System.Windows.Forms;
 using System.IO;
@@ -12617,105 +12618,182 @@ namespace AnonPDF
 
                     if (TryBuildFootnoteMarkerText(block, previewBasisNumberMap, out string badgeText))
                     {
-                        float badgeFontSize = Math.Max(8f, this.Font.SizeInPoints - 1f);
-                        using (Font badgeFont = new Font(this.Font.FontFamily, badgeFontSize, FontStyle.Bold))
+                        string previewBadgeText = badgeText
+                            .Replace("[", string.Empty)
+                            .Replace("]", string.Empty)
+                            .Replace(".", ",")
+                            .Replace(",", ", ");
+                        float badgeScale = Math.Max(1f, scaleFactor);
+                        float badgeFontSize = Math.Max(9f, (this.Font.SizeInPoints * badgeScale) - 0.5f);
+                        using (Font badgeFont = CreatePreviewBadgeFont(badgeFontSize))
                         {
-                            SizeF textSize = e.Graphics.MeasureString(badgeText, badgeFont);
-                            float badgePaddingX = 4f;
-                            float badgePaddingY = 2f;
-                            float badgeWidth = textSize.Width + (badgePaddingX * 2f);
-                            float badgeHeight = textSize.Height + (badgePaddingY * 2f);
-                            float margin = 2f;
-                            int rotationOffset = NormalizeRotation(GetRotationOffset(block.PageNumber));
-                            float halfDiff = (badgeWidth - badgeHeight) / 2f;
+                            TextRenderingHint previousTextRenderingHint = e.Graphics.TextRenderingHint;
+                            try
+                            {
+                                e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+                                SizeF textSize = e.Graphics.MeasureString(previewBadgeText, badgeFont);
+                                float badgePaddingX = Math.Max(4f, 4f * badgeScale);
+                                float badgePaddingY = Math.Max(1f, 1f * badgeScale);
+                                float badgeWidth = textSize.Width + (badgePaddingX * 2f);
+                                float badgeHeight = textSize.Height + (badgePaddingY * 2f);
+                                float margin = Math.Max(2f, 2f * badgeScale);
+                                int rotationOffset = NormalizeRotation(GetRotationOffset(block.PageNumber));
+                                float halfDiff = (badgeWidth - badgeHeight) / 2f;
 
-                            float badgeX;
-                            float badgeY;
+                                float badgeX;
+                                float badgeY;
+                                switch (rotationOffset)
+                                {
+                                    case 90:
+                                        badgeX = rect.Right - badgeWidth;
+                                        badgeY = rect.Bottom + margin;
+                                        break;
+                                    case 180:
+                                        badgeX = rect.Left - badgeWidth - margin;
+                                        badgeY = rect.Bottom - badgeHeight;
+                                        break;
+                                    case 270:
+                                        badgeX = rect.Left;
+                                        badgeY = rect.Top - badgeHeight - margin;
+                                        break;
+                                    default:
+                                        badgeX = rect.Right + margin;
+                                        badgeY = rect.Top;
+                                        break;
+                                }
+
+                                if (rotationOffset == 90)
+                                {
+                                    badgeX += halfDiff;
+                                    badgeY += halfDiff;
+                                }
+                                else if (rotationOffset == 270)
+                                {
+                                    badgeX -= halfDiff;
+                                    badgeY -= halfDiff;
+                                }
+
+                            float badgeVerticalShift = badgeHeight / 2f;
                             switch (rotationOffset)
                             {
                                 case 90:
-                                    badgeX = rect.Right - badgeWidth;
-                                    badgeY = rect.Bottom + margin;
-                                    break;
-                                case 180:
-                                    badgeX = rect.Left - badgeWidth - margin;
-                                    badgeY = rect.Bottom - badgeHeight;
-                                    break;
-                                case 270:
-                                    badgeX = rect.Left;
-                                    badgeY = rect.Top - badgeHeight - margin;
-                                    break;
-                                default:
-                                    badgeX = rect.Right + margin;
-                                    badgeY = rect.Top;
+                                    badgeX += badgeVerticalShift;
+                                        break;
+                                    case 180:
+                                        badgeY += badgeVerticalShift;
+                                        break;
+                                    case 270:
+                                        badgeX -= badgeVerticalShift;
+                                        break;
+                                    default:
+                                    badgeY -= badgeVerticalShift;
                                     break;
                             }
 
-                            if (rotationOffset == 90)
+                            float markerThicknessPx = markerWidth * scaleFactor;
+                            bool isThinMarkerSelection = block.IsMarkerSelection &&
+                                                         markerThicknessPx > 0f &&
+                                                         (rect.Width <= markerThicknessPx * 1.4f || rect.Height <= markerThicknessPx * 1.4f);
+                            if (isThinMarkerSelection)
                             {
-                                badgeX += halfDiff;
-                                badgeY += halfDiff;
-                            }
-                            else if (rotationOffset == 270)
-                            {
-                                badgeX -= halfDiff;
-                                badgeY -= halfDiff;
+                                bool markerAxisIsVertical = rect.Height > rect.Width;
+                                float markerAxisCenterY = rect.Top + (rect.Height / 2f);
+                                float markerAxisCenterX = rect.Left + (rect.Width / 2f);
+
+                                if (!markerAxisIsVertical)
+                                {
+                                    if (rotationOffset == 0)
+                                    {
+                                        // Bottom edge of badge sits on marker symmetry axis.
+                                        badgeY = markerAxisCenterY - badgeHeight;
+                                    }
+                                    else if (rotationOffset == 180)
+                                    {
+                                        // For 180 deg badge rotation, bottom edge maps to top edge in view space.
+                                        badgeY = markerAxisCenterY;
+                                    }
+                                }
+                                else
+                                {
+                                    if (rotationOffset == 90)
+                                    {
+                                        // For 90 deg badge rotation, bottom edge maps to left edge in view space.
+                                        badgeX = markerAxisCenterX;
+                                    }
+                                    else if (rotationOffset == 270)
+                                    {
+                                        // For 270 deg badge rotation, bottom edge maps to right edge in view space.
+                                        badgeX = markerAxisCenterX - badgeWidth;
+                                    }
+                                }
                             }
 
                             if (badgeX + badgeWidth > pdfViewer.ClientSize.Width)
                             {
                                 badgeX = Math.Max(0f, rect.Right - badgeWidth - 2f);
                             }
-                            if (badgeX < 0f)
-                            {
-                                badgeX = 0f;
-                            }
-                            if (badgeY < 0f)
-                            {
-                                badgeY = 0f;
-                            }
-                            if (badgeY + badgeHeight > pdfViewer.ClientSize.Height)
-                            {
-                                badgeY = Math.Max(0f, pdfViewer.ClientSize.Height - badgeHeight);
-                            }
-
-                            RectangleF badgeRect = new RectangleF(badgeX, badgeY, badgeWidth, badgeHeight);
-                            LogFootnoteBadgeLayoutIfNeeded(badgeText, block, rect, badgeRect, rotationOffset, halfDiff);
-                            using (SolidBrush badgeBackground = new SolidBrush(System.Drawing.Color.FromArgb(235, 255, 255, 255)))
-                            using (Pen badgeBorder = new Pen(System.Drawing.Color.FromArgb(200, 170, 0, 0), 1f))
-                            using (SolidBrush badgeTextBrush = new SolidBrush(System.Drawing.Color.FromArgb(220, 120, 0, 0)))
-                            {
-                                if (rotationOffset == 0)
+                                if (badgeX < 0f)
                                 {
-                                    e.Graphics.FillRectangle(badgeBackground, badgeRect);
-                                    e.Graphics.DrawRectangle(badgeBorder, badgeRect.X, badgeRect.Y, badgeRect.Width, badgeRect.Height);
-                                    e.Graphics.DrawString(
-                                        badgeText,
-                                        badgeFont,
-                                        badgeTextBrush,
-                                        badgeRect.X + badgePaddingX,
-                                        badgeRect.Y + badgePaddingY - 1f);
+                                    badgeX = 0f;
                                 }
-                                else
+                                if (badgeY < 0f)
                                 {
-                                    var state = e.Graphics.Save();
-                                    float centerX = badgeRect.X + (badgeRect.Width / 2f);
-                                    float centerY = badgeRect.Y + (badgeRect.Height / 2f);
-                                    e.Graphics.TranslateTransform(centerX, centerY);
-                                    e.Graphics.RotateTransform(rotationOffset);
-                                    e.Graphics.TranslateTransform(-centerX, -centerY);
-
-                                    e.Graphics.FillRectangle(badgeBackground, badgeRect);
-                                    e.Graphics.DrawRectangle(badgeBorder, badgeRect.X, badgeRect.Y, badgeRect.Width, badgeRect.Height);
-                                    e.Graphics.DrawString(
-                                        badgeText,
-                                        badgeFont,
-                                        badgeTextBrush,
-                                        badgeRect.X + badgePaddingX,
-                                        badgeRect.Y + badgePaddingY - 1f);
-
-                                    e.Graphics.Restore(state);
+                                    badgeY = 0f;
                                 }
+                                if (badgeY + badgeHeight > pdfViewer.ClientSize.Height)
+                                {
+                                    badgeY = Math.Max(0f, pdfViewer.ClientSize.Height - badgeHeight);
+                                }
+
+                                RectangleF badgeRect = new RectangleF(badgeX, badgeY, badgeWidth, badgeHeight);
+                                LogFootnoteBadgeLayoutIfNeeded(badgeText, block, rect, badgeRect, rotationOffset, halfDiff);
+                                using (SolidBrush badgeBackground = new SolidBrush(System.Drawing.Color.FromArgb(64, 255, 0, 0)))
+                                using (Pen badgeBorder = new Pen(System.Drawing.Color.FromArgb(220, 255, 0, 0), Math.Max(1f, badgeScale * 0.9f)))
+                                using (SolidBrush badgeTextBrush = new SolidBrush(System.Drawing.Color.FromArgb(255, 255, 0, 0)))
+                                {
+                                    float borderInset = 3f;
+                                    RectangleF borderRect = new RectangleF(
+                                        badgeRect.X + borderInset,
+                                        badgeRect.Y + borderInset,
+                                        Math.Max(1f, badgeRect.Width - (borderInset * 2f)),
+                                        Math.Max(1f, badgeRect.Height - (borderInset * 2f)));
+
+                                    if (rotationOffset == 0)
+                                    {
+                                        e.Graphics.FillRectangle(badgeBackground, borderRect);
+                                        e.Graphics.DrawRectangle(badgeBorder, borderRect.X, borderRect.Y, borderRect.Width, borderRect.Height);
+                                        e.Graphics.DrawString(
+                                            previewBadgeText,
+                                            badgeFont,
+                                            badgeTextBrush,
+                                            badgeRect.X + badgePaddingX,
+                                            badgeRect.Y + badgePaddingY);
+                                    }
+                                    else
+                                    {
+                                        var state = e.Graphics.Save();
+                                        float centerX = badgeRect.X + (badgeRect.Width / 2f);
+                                        float centerY = badgeRect.Y + (badgeRect.Height / 2f);
+                                        e.Graphics.TranslateTransform(centerX, centerY);
+                                        e.Graphics.RotateTransform(rotationOffset);
+                                        e.Graphics.TranslateTransform(-centerX, -centerY);
+
+                                        e.Graphics.FillRectangle(badgeBackground, borderRect);
+                                        e.Graphics.DrawRectangle(badgeBorder, borderRect.X, borderRect.Y, borderRect.Width, borderRect.Height);
+                                        e.Graphics.DrawString(
+                                            previewBadgeText,
+                                            badgeFont,
+                                            badgeTextBrush,
+                                            badgeRect.X + badgePaddingX,
+                                            badgeRect.Y + badgePaddingY);
+
+                                        e.Graphics.Restore(state);
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                e.Graphics.TextRenderingHint = previousTextRenderingHint;
                             }
                         }
                     }
@@ -13301,6 +13379,18 @@ namespace AnonPDF
             if (DebugLogEnabled)
             {
                 LogDebug("PagesList selected count=0");
+            }
+        }
+
+        private Font CreatePreviewBadgeFont(float sizeInPoints)
+        {
+            try
+            {
+                return new Font("Segoe UI", sizeInPoints, FontStyle.Bold, GraphicsUnit.Point);
+            }
+            catch
+            {
+                return new Font(this.Font.FontFamily, sizeInPoints, FontStyle.Bold, GraphicsUnit.Point);
             }
         }
 
