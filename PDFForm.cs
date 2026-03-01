@@ -1035,7 +1035,23 @@ namespace AnonPDF
                 return;
             }
 
-            menuAddItem.Text = LocalizedText("Menu_Add");
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                menuAddItem.Text = "Narz\u0119dzia";
+            }
+            else if (string.Equals(lang, "en", StringComparison.OrdinalIgnoreCase))
+            {
+                menuAddItem.Text = "Tools";
+            }
+            else if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                menuAddItem.Text = "Werk";
+            }
+            else
+            {
+                menuAddItem.Text = LocalizedText("Menu_Add");
+            }
             addTextMenuItem.Text = Resources.Menu_AddText;
 
             if (addRasterImageToolStripMenuItem != null)
@@ -2718,7 +2734,11 @@ namespace AnonPDF
             // Top-level menus (from resources)
             menuFileItem.Text = Resources.Menu_File;
             menuOptionsItem.Text = Resources.Menu_Options;
-            menuHelpItem.Text = Resources.Menu_Help;
+            string topLang = currentCulture.TwoLetterISOLanguageName;
+            menuHelpItem.Text = (string.Equals(topLang, "pl", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(topLang, "en", StringComparison.OrdinalIgnoreCase))
+                ? "?"
+                : Resources.Menu_Help;
             ApplyAddMenuLocalization();
 
             // Language submenu
