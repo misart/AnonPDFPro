@@ -12194,21 +12194,29 @@ namespace AnonPDF
                 return map;
             }
 
+            var usedBasisIdSet = new HashSet<string>(usedBasisIds, StringComparer.OrdinalIgnoreCase);
             var orderedAllBases = GetOrderedLegalBasesForIndexing();
-            var allBasisNumberById = orderedAllBases
-                .Where(b => !string.IsNullOrWhiteSpace(b.Id))
-                .Select((basis, index) => new { BasisId = basis.Id.Trim(), Number = index + 1 })
-                .ToDictionary(item => item.BasisId, item => item.Number, StringComparer.OrdinalIgnoreCase);
+            int nextNumber = 1;
 
-            foreach (string basisId in usedBasisIds)
+            // Footnote numbering is independent from legal-basis ordering in UI/context menu.
+            // We keep basis order stable (global+local ordering), but compress numbering to used items only: 1..N.
+            foreach (var basis in orderedAllBases)
             {
-                if (allBasisNumberById.TryGetValue(basisId, out int number))
+                if (basis == null || string.IsNullOrWhiteSpace(basis.Id))
                 {
-                    map[basisId] = number;
+                    continue;
                 }
+
+                string basisId = basis.Id.Trim();
+                if (!usedBasisIdSet.Contains(basisId) || map.ContainsKey(basisId))
+                {
+                    continue;
+                }
+
+                map[basisId] = nextNumber++;
             }
 
-            int nextNumber = allBasisNumberById.Count == 0 ? 1 : allBasisNumberById.Values.Max() + 1;
+            // Any unknown/custom IDs that are used in blocks but not present in current catalogs.
             foreach (string basisId in usedBasisIds.Where(id => !map.ContainsKey(id)))
             {
                 map[basisId] = nextNumber++;
@@ -12507,13 +12515,22 @@ namespace AnonPDF
 
             currentY -= lineHeight * 1.5f;
 
-            pdfCanvas.BeginText();
-            pdfCanvas.SetFontAndSize(italicFont, bodyFontSize);
-            pdfCanvas.MoveText(left, currentY);
-            pdfCanvas.ShowText(GetExclusionAuthoritySummaryLine(ResolveExclusionAuthorityForSummary(blocksWithFootnotes)));
-            pdfCanvas.EndText();
+            bool requiresAuthorityLine = (blocksWithFootnotes ?? new List<RedactionBlock>())
+                .Any(block => BlockRequiresInterestSubject(block));
+            if (requiresAuthorityLine)
+            {
+                pdfCanvas.BeginText();
+                pdfCanvas.SetFontAndSize(italicFont, bodyFontSize);
+                pdfCanvas.MoveText(left, currentY);
+                pdfCanvas.ShowText(GetExclusionAuthoritySummaryLine(ResolveExclusionAuthorityForSummary(blocksWithFootnotes)));
+                pdfCanvas.EndText();
 
-            currentY -= lineHeight * 2f;
+                currentY -= lineHeight * 2f;
+            }
+            else
+            {
+                currentY -= lineHeight;
+            }
 
             foreach (var entry in summaryEntries)
             {
