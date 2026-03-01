@@ -149,6 +149,7 @@ namespace AnonPDF
         private bool hasCustomSignatureSelection = false;
         private bool suppressSignatureModeChange;
         private List<TextAnnotation> textAnnotations = new List<TextAnnotation>();
+        private List<CommentAnnotation> commentAnnotations = new List<CommentAnnotation>();
         private List<RasterObject> rasterObjects = new List<RasterObject>();
         private List<ArrowObject> arrowObjects = new List<ArrowObject>();
         private int oldScrollValue = 0;
@@ -249,6 +250,18 @@ namespace AnonPDF
         private bool preferObjectClipboardPaste;
         private List<VectorShapeObject> vectorShapes = new List<VectorShapeObject>();
         private bool isVectorShapeCreationMode;
+        private bool isCommentCreationMode;
+        private bool commentPreviewOverlayReady;
+        private bool isMovingCommentNote;
+        private bool commentNoteMoveChanged;
+        private CommentAnnotation commentNoteToMove;
+        private PointF commentNoteMoveOffsetDoc = PointF.Empty;
+        private bool isResizingCommentNote;
+        private bool commentNoteResizeChanged;
+        private CommentAnnotation commentNoteToResize;
+        private PointF commentNoteResizeAnchorDoc = PointF.Empty;
+        private readonly Dictionary<string, RectangleF> commentNoteRectsDoc = new Dictionary<string, RectangleF>(StringComparer.Ordinal);
+        private const float CommentNoteResizeHandleSizePx = 10f;
         private VectorShapeType activeVectorShapeType = VectorShapeType.Polyline;
         private VectorShapeDefaults activeVectorShapeDefaults = VectorShapeDefaults.CreateDefault();
         private readonly List<PointF> vectorShapeDraftPoints = new List<PointF>();
@@ -1081,7 +1094,7 @@ namespace AnonPDF
             addRasterImageToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addRasterImageToolStripMenuItem",
-                ShortcutKeys = Keys.Control | Keys.R
+                ShortcutKeys = Keys.Control | Keys.G
             };
             addRasterImageToolStripMenuItem.Enabled = false;
             addRasterImageToolStripMenuItem.Click += AddRasterImageToolStripMenuItem_Click;
@@ -1112,8 +1125,10 @@ namespace AnonPDF
             addCommentToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addCommentToolStripMenuItem",
+                ShortcutKeys = Keys.Control | Keys.K,
                 Enabled = false
             };
+            addCommentToolStripMenuItem.Click += AddCommentToolStripMenuItem_Click;
             addBlankPageToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addBlankPageToolStripMenuItem",
@@ -1152,7 +1167,7 @@ namespace AnonPDF
 
             if (rotatePageMenuItem != null)
             {
-                rotatePageMenuItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.R;
+                rotatePageMenuItem.ShortcutKeys = Keys.Control | Keys.R;
             }
 
             if (menuStrip1 == null)
@@ -6383,6 +6398,7 @@ namespace AnonPDF
                 var projectData = new ProjectData
                 {
                     RedactionBlocks = redactionBlocks ?? new List<RedactionBlock>(),
+                    CommentAnnotations = commentAnnotations ?? new List<CommentAnnotation>(),
                     PagesToRemove = pagesToRemove ?? new HashSet<int>(),
                     TextAnnotations = textAnnotations ?? new List<TextAnnotation>(),
                     RasterObjects = rasterObjects ?? new List<RasterObject>(),
@@ -8125,10 +8141,9 @@ namespace AnonPDF
             return rotation;
         }
 
-        private bool IsMarkerVerticalForCurrentPage()
+        private static bool IsMarkerVerticalByDrag(float deltaX, float deltaY)
         {
-            int rotationOffset = NormalizeRotation(GetRotationOffset(currentPage));
-            return rotationOffset == 90 || rotationOffset == 270;
+            return Math.Abs(deltaY) > Math.Abs(deltaX);
         }
 
         private static int OrientationToDegrees(PageOrientations orientation)
@@ -8372,7 +8387,7 @@ namespace AnonPDF
                 return null;
             }
 
-            var page = pdf.Pages[pageNumber - 1]; // 'pdf' is PDFiumSharp.PdfDocument loaded original
+            var page = pdf.Pages[pageNumber - 1]; // 'pdf' is PDFumSharp.PdfDocument loaded original
             int offset = GetRotationOffset(pageNumber);
 
             using (var bmp = new PDFiumBitmap(
@@ -8656,6 +8671,7 @@ namespace AnonPDF
             }
 
             pdfViewer.Image = RenderOriginalPage(pageNumber);
+            commentPreviewOverlayReady = false;
             renderTimer.Stop();
             renderTimer.Start();
 
@@ -9545,6 +9561,8 @@ namespace AnonPDF
                     }
                 }
 
+                RenderCommentAnnotationsToPdf(pdfDoc, pagesWithBakedRotation);
+
                 // --- Section for rendering captions from textAnnotations list ---
                 // Iterate over each annotation to be rendered on the given page.
                 foreach (var annotation in textAnnotations)
@@ -10034,6 +10052,15 @@ namespace AnonPDF
             pdfViewer.Invalidate();
         }
 
+        private void ClearCommentAnnotations()
+        {
+            commentAnnotations.Clear();
+            commentNoteRectsDoc.Clear();
+            ResetCommentNoteMoveState();
+            commentPreviewOverlayReady = false;
+            pdfViewer.Invalidate();
+        }
+
         private void ClearRasterObjects()
         {
             rasterObjects.Clear();
@@ -10212,6 +10239,7 @@ namespace AnonPDF
             ClearRedactionBlocks();
             ClearPagesToRemove();
             ClearTextAnnotations();
+            ClearCommentAnnotations();
             ClearRasterObjects();
             ClearArrowObjects();
             ClearVectorShapes();
@@ -10307,6 +10335,10 @@ namespace AnonPDF
             if (addShapeToolStripMenuItem != null)
             {
                 addShapeToolStripMenuItem.Enabled = true;
+            }
+            if (addCommentToolStripMenuItem != null)
+            {
+                addCommentToolStripMenuItem.Enabled = true;
             }
             ApplyAutomaticFootnotesMenuState();
             deletePageMenuItem.Enabled = true;
@@ -10430,6 +10462,7 @@ namespace AnonPDF
             }
 
             return redactionBlocks.Count > 0
+                || commentAnnotations.Count > 0
                 || textAnnotations.Count > 0
                 || rasterObjects.Count > 0
                 || arrowObjects.Count > 0
@@ -10745,6 +10778,7 @@ namespace AnonPDF
         private bool HasAnyObjectsOnPage(int pageNumber)
         {
             return textAnnotations.Any(a => a.PageNumber == pageNumber)
+                || commentAnnotations.Any(c => c != null && c.PageNumber == pageNumber)
                 || rasterObjects.Any(r => r.PageNumber == pageNumber)
                 || arrowObjects.Any(a => a.PageNumber == pageNumber)
                 || vectorShapes.Any(v => v != null && v.PageNumber == pageNumber);
@@ -10804,6 +10838,7 @@ namespace AnonPDF
             ClearRedactionBlocks();
             ClearPagesToRemove();
             ClearTextAnnotations();
+            ClearCommentAnnotations();
             ClearRasterObjects();
             ClearArrowObjects();
             ClearVectorShapes();
@@ -10818,6 +10853,7 @@ namespace AnonPDF
             ClearSearchResult();
 
             isDrawing = false;
+            isCommentCreationMode = false;
             currentSelection = System.Drawing.Rectangle.Empty;
             zoomPending = false;
 
@@ -10866,6 +10902,10 @@ namespace AnonPDF
             if (addShapeToolStripMenuItem != null)
             {
                 addShapeToolStripMenuItem.Enabled = false;
+            }
+            if (addCommentToolStripMenuItem != null)
+            {
+                addCommentToolStripMenuItem.Enabled = false;
             }
             ApplyAutomaticFootnotesMenuState();
             deletePageMenuItem.Enabled = false;
@@ -10950,6 +10990,10 @@ namespace AnonPDF
             {
                 addShapeToolStripMenuItem.Enabled = canEditCurrentPage;
             }
+            if (addCommentToolStripMenuItem != null)
+            {
+                addCommentToolStripMenuItem.Enabled = canEditCurrentPage;
+            }
             rotatePageMenuItem.Enabled = canEditCurrentPage;
             searchToSelectionButton.Enabled = canEditCurrentPage && groupBoxSearch.Enabled;
 
@@ -10967,6 +11011,7 @@ namespace AnonPDF
                 ResetRasterInteractionState();
                 ResetVectorInteractionState();
                 selectedVectorShape = null;
+                EndCommentCreationMode();
                 this.Cursor = Cursors.Default;
             }
 
@@ -11017,6 +11062,9 @@ namespace AnonPDF
             {
                 block.Bounds = RotateRectClockwise(block.Bounds, pageSize.Width, pageSize.Height);
             }
+
+            // Comment annotations are intentionally not rotated with page rotation.
+            // This keeps their coordinates unchanged until the dedicated rotation model is reintroduced.
 
             foreach (var annotation in textAnnotations.Where(a => a.PageNumber == currentPage))
             {
@@ -11091,6 +11139,8 @@ namespace AnonPDF
             }
 
             currentSelection = RectangleF.Empty;
+            commentNoteRectsDoc.Clear();
+            commentPreviewOverlayReady = false;
 
             projectWasChangedAfterLastSave = true;
             saveProjectButton.Enabled = true;
@@ -11909,6 +11959,7 @@ namespace AnonPDF
         private bool HasAnyProjectContent()
         {
             return redactionBlocks.Count > 0
+                || commentAnnotations.Count > 0
                 || textAnnotations.Count > 0
                 || rasterObjects.Count > 0
                 || arrowObjects.Count > 0
@@ -11935,6 +11986,7 @@ namespace AnonPDF
             return new ProjectData
             {
                 RedactionBlocks = redactionBlocks ?? new List<RedactionBlock>(),
+                CommentAnnotations = commentAnnotations ?? new List<CommentAnnotation>(),
                 PagesToRemove = pagesToRemove ?? new HashSet<int>(),
                 TextAnnotations = textAnnotations ?? new List<TextAnnotation>(),
                 RasterObjects = rasterObjects ?? new List<RasterObject>(),
@@ -13044,6 +13096,7 @@ namespace AnonPDF
                 ClearRasterIconClickState();
                 ClearArrowIconClickState();
                 ClearVectorIconClickState();
+                ResetCommentNoteMoveState();
                 TryBeginMiddleMousePan();
                 return;
             }
@@ -13133,6 +13186,12 @@ namespace AnonPDF
             {
                 isDrawing = false;
                 startPoint = e.Location;
+                if (isCommentCreationMode)
+                {
+                    EndCommentCreationMode();
+                    pdfViewer.Invalidate();
+                    return;
+                }
             }
             else if (e.Button == MouseButtons.Left)
             {
@@ -13145,6 +13204,83 @@ namespace AnonPDF
                 {
                     dpiX = g.DpiX;
                     dpiY = g.DpiY;
+                }
+                float docX = e.X / scaleFactor;
+                float docY = e.Y / scaleFactor;
+
+                if (!isCommentCreationMode &&
+                    TryGetCommentAtPoint(e.Location, out CommentAnnotation hitComment, out RectangleF hitNoteRect) &&
+                    hitComment != null &&
+                    !hitNoteRect.IsEmpty &&
+                    hitNoteRect.Contains(docX, docY))
+                {
+                    if (e.Clicks >= 2)
+                    {
+                        EditCommentAnnotation(hitComment);
+                        pdfViewer.Invalidate();
+                        return;
+                    }
+
+                    isDrawing = false;
+                    isMoving = false;
+                    annotationToMove = null;
+                    textMoveMouseOffset = PointF.Empty;
+                    selectedTextAnnotation = null;
+                    selectedRasterObject = null;
+                    selectedArrowObject = null;
+                    selectedVectorShape = null;
+                    ResetRasterInteractionState();
+                    ResetArrowInteractionState();
+                    ResetVectorInteractionState();
+                    ClearRasterIconClickState();
+                    ClearArrowIconClickState();
+                    ClearVectorIconClickState();
+                    ClearGroupSelection();
+                    ResetGroupMoveState();
+
+                    if (IsPointInCommentResizeHandle(e.Location, hitNoteRect))
+                    {
+                        isResizingCommentNote = true;
+                        commentNoteResizeChanged = false;
+                        commentNoteToResize = hitComment;
+                        hitComment.NoteX = hitNoteRect.X;
+                        hitComment.NoteY = hitNoteRect.Y;
+                        commentNoteResizeAnchorDoc = new PointF(hitNoteRect.X, hitNoteRect.Y);
+                        this.Cursor = Cursors.SizeNWSE;
+                    }
+                    else
+                    {
+                        isMovingCommentNote = true;
+                        commentNoteMoveChanged = false;
+                        commentNoteToMove = hitComment;
+                        commentNoteMoveOffsetDoc = new PointF(docX - hitNoteRect.X, docY - hitNoteRect.Y);
+                        this.Cursor = Cursors.SizeAll;
+                    }
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (isCommentCreationMode)
+                {
+                    selectedTextAnnotation = null;
+                    annotationToMove = null;
+                    isMoving = false;
+                    textMoveMouseOffset = PointF.Empty;
+                    selectedRasterObject = null;
+                    selectedArrowObject = null;
+                    selectedVectorShape = null;
+                    ResetRasterInteractionState();
+                    ResetArrowInteractionState();
+                    ResetVectorInteractionState();
+                    ClearRasterIconClickState();
+                    ClearArrowIconClickState();
+                    ClearVectorIconClickState();
+                    ClearGroupSelection();
+                    ResetGroupMoveState();
+                    isDrawing = true;
+                    currentSelection = new RectangleF(startPoint, Size.Empty);
+                    pdfViewer.Invalidate();
+                    return;
                 }
 
                 bool additiveSelection = (Control.ModifierKeys & Keys.Control) == Keys.Control;
@@ -13390,6 +13526,7 @@ namespace AnonPDF
                 ResetVectorInteractionState();
                 selectedVectorShape = null;
                 ResetGroupMoveState();
+                ResetCommentNoteMoveState();
                 return;
             }
 
@@ -13398,6 +13535,74 @@ namespace AnonPDF
                 PointF rawHover = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
                 vectorShapeDraftHoverPoint = NormalizeVectorShapeDraftInputPoint(rawHover);
                 vectorShapeDraftHoverActive = true;
+                pdfViewer.Invalidate();
+                return;
+            }
+
+            if (isResizingCommentNote && commentNoteToResize != null)
+            {
+                if (commentNoteRectsDoc.Count == 0)
+                {
+                    RefreshCommentNoteLayoutCache();
+                }
+
+                PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                float marginDoc = 6f;
+                var pageSize = GetPageSizeWithOffset(commentNoteToResize.PageNumber);
+                float maxWidth = Math.Max(40f, pageSize.Width - marginDoc - commentNoteResizeAnchorDoc.X);
+                float maxHeight = Math.Max(12f, pageSize.Height - marginDoc - commentNoteResizeAnchorDoc.Y);
+                float newWidth = Math.Max(40f, Math.Min(maxWidth, mouseDoc.X - commentNoteResizeAnchorDoc.X));
+                float newHeight = Math.Max(12f, Math.Min(maxHeight, mouseDoc.Y - commentNoteResizeAnchorDoc.Y));
+
+                if (!commentNoteToResize.NoteWidth.HasValue || !commentNoteToResize.NoteHeight.HasValue ||
+                    Math.Abs(commentNoteToResize.NoteWidth.Value - newWidth) > 0.01f ||
+                    Math.Abs(commentNoteToResize.NoteHeight.Value - newHeight) > 0.01f)
+                {
+                    commentNoteToResize.NoteWidth = newWidth;
+                    commentNoteToResize.NoteHeight = newHeight;
+                    commentNoteToResize.UpdatedAtUtc = DateTime.UtcNow;
+                    commentNoteResizeChanged = true;
+                }
+
+                this.Cursor = Cursors.SizeNWSE;
+                pdfViewer.Invalidate();
+                return;
+            }
+
+            if (isMovingCommentNote && commentNoteToMove != null)
+            {
+                if (commentNoteRectsDoc.Count == 0)
+                {
+                    RefreshCommentNoteLayoutCache();
+                }
+
+                if (!commentNoteRectsDoc.TryGetValue(commentNoteToMove.Id, out RectangleF noteRectDoc))
+                {
+                    noteRectDoc = new RectangleF(0f, 0f, 80f, 14f);
+                }
+
+                PointF mouseDoc = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                float newX = mouseDoc.X - commentNoteMoveOffsetDoc.X;
+                float newY = mouseDoc.Y - commentNoteMoveOffsetDoc.Y;
+
+                var pageSize = GetPageSizeWithOffset(commentNoteToMove.PageNumber);
+                float marginDoc = 6f;
+                float maxX = Math.Max(marginDoc, pageSize.Width - marginDoc - noteRectDoc.Width);
+                float maxY = Math.Max(marginDoc, pageSize.Height - marginDoc - noteRectDoc.Height);
+                newX = Math.Max(marginDoc, Math.Min(maxX, newX));
+                newY = Math.Max(marginDoc, Math.Min(maxY, newY));
+
+                if (!commentNoteToMove.NoteX.HasValue || !commentNoteToMove.NoteY.HasValue ||
+                    Math.Abs(commentNoteToMove.NoteX.Value - newX) > 0.01f ||
+                    Math.Abs(commentNoteToMove.NoteY.Value - newY) > 0.01f)
+                {
+                    commentNoteToMove.NoteX = newX;
+                    commentNoteToMove.NoteY = newY;
+                    commentNoteToMove.UpdatedAtUtc = DateTime.UtcNow;
+                    commentNoteMoveChanged = true;
+                }
+
+                this.Cursor = Cursors.SizeAll;
                 pdfViewer.Invalidate();
                 return;
             }
@@ -13915,12 +14120,25 @@ namespace AnonPDF
                     dpiY = g.DpiY;
                 }
 
-                if (!TryUpdateTextHoverCursor(e.Location, dpiX, dpiY) &&
+                float docX = e.X / scaleFactor;
+                float docY = e.Y / scaleFactor;
+                bool overCommentNote = TryGetCommentAtPoint(e.Location, out CommentAnnotation hoverComment, out RectangleF hoverNoteRect) &&
+                    hoverComment != null &&
+                    !hoverNoteRect.IsEmpty &&
+                    hoverNoteRect.Contains(docX, docY);
+
+                if (overCommentNote)
+                {
+                    this.Cursor = IsPointInCommentResizeHandle(e.Location, hoverNoteRect)
+                        ? Cursors.SizeNWSE
+                        : Cursors.SizeAll;
+                }
+                else if (!TryUpdateTextHoverCursor(e.Location, dpiX, dpiY) &&
                     !TryUpdateVectorHoverCursor(e.Location) &&
                     !TryUpdateArrowHoverCursor(e.Location) &&
                     !TryUpdateRasterHoverCursor(e.Location))
                 {
-                    this.Cursor = Cursors.Default;
+                    this.Cursor = isCommentCreationMode ? Cursors.Cross : Cursors.Default;
                 }
             }
 
@@ -13930,7 +14148,8 @@ namespace AnonPDF
                 float y;
                 float width = Math.Abs(e.X - startPoint.X);
                 float height;
-                if (markerRadioButton.Checked)
+                bool useMarkerStyle = markerRadioButton.Checked || isCommentCreationMode;
+                if (useMarkerStyle)
                 {
                     bool markerCtrlBoxMode = (Control.ModifierKeys & Keys.Control) == Keys.Control;
                     isMarkerCtrlBoxMode = markerCtrlBoxMode;
@@ -13941,7 +14160,10 @@ namespace AnonPDF
                     }
                     else
                     {
-                        if (IsMarkerVerticalForCurrentPage())
+                        float deltaX = e.X - startPoint.X;
+                        float deltaY = e.Y - startPoint.Y;
+                        bool markerVerticalMode = IsMarkerVerticalByDrag(deltaX, deltaY);
+                        if (markerVerticalMode)
                         {
                             x = startPoint.X - (markerWidth * scaleFactor / 2f);
                             width = markerWidth * scaleFactor;
@@ -14054,6 +14276,7 @@ namespace AnonPDF
                 ResetVectorInteractionState();
                 selectedVectorShape = null;
                 ResetGroupMoveState();
+                ResetCommentNoteMoveState();
                 currentSelection = RectangleF.Empty;
                 isClickOnIcon = false;
                 clickedIconType = IconType.None;
@@ -14068,6 +14291,42 @@ namespace AnonPDF
 
             if (e.Button == MouseButtons.Left)
             {
+                if (isResizingCommentNote)
+                {
+                    bool changed = commentNoteResizeChanged;
+                    ResetCommentNoteMoveState();
+                    this.Cursor = Cursors.Default;
+                    if (changed)
+                    {
+                        projectWasChangedAfterLastSave = true;
+                        saveProjectButton.Enabled = true;
+                        saveProjectMenuItem.Enabled = true;
+                        commentNoteRectsDoc.Clear();
+                    }
+                    renderTimer.Stop();
+                    renderTimer.Start();
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (isMovingCommentNote)
+                {
+                    bool changed = commentNoteMoveChanged;
+                    ResetCommentNoteMoveState();
+                    this.Cursor = Cursors.Default;
+                    if (changed)
+                    {
+                        projectWasChangedAfterLastSave = true;
+                        saveProjectButton.Enabled = true;
+                        saveProjectMenuItem.Enabled = true;
+                        commentNoteRectsDoc.Clear();
+                    }
+                    renderTimer.Stop();
+                    renderTimer.Start();
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
                 if (isMovingObjectGroup)
                 {
                     bool changed = groupMoveChanged;
@@ -14328,10 +14587,36 @@ namespace AnonPDF
                     else
                     {
                         System.Drawing.RectangleF rect = new System.Drawing.RectangleF((currentSelection.X / scaleFactor), (currentSelection.Y / scaleFactor), (currentSelection.Width / scaleFactor), (currentSelection.Height / scaleFactor));
-                        if (markerRadioButton.Checked)
+                        if (isCommentCreationMode)
+                        {
+                            bool markerVerticalMode = !isMarkerCtrlBoxMode && currentSelection.Height > currentSelection.Width;
+                            bool enoughWidth = markerVerticalMode
+                                ? currentSelection.Height > markerHeight * scaleFactor
+                                : currentSelection.Width > markerWidth * scaleFactor;
+                            bool enoughHeightForCtrlBox = !isMarkerCtrlBoxMode || currentSelection.Height > markerHeight * scaleFactor;
+                            if (isDrawing && enoughWidth && enoughHeightForCtrlBox)
+                            {
+                                if (PromptForCommentText(string.Empty, out string commentText))
+                                {
+                                    var comment = new CommentAnnotation
+                                    {
+                                        Id = Guid.NewGuid().ToString("N"),
+                                        PageNumber = currentPage,
+                                        Bounds = rect,
+                                        CommentText = commentText,
+                                        IsMarkerSelection = !isMarkerCtrlBoxMode,
+                                        CreatedAtUtc = DateTime.UtcNow,
+                                        UpdatedAtUtc = DateTime.UtcNow
+                                    };
+                                    AddCommentAnnotation(comment);
+                                }
+                            }
+                            EndCommentCreationMode();
+                        }
+                        else if (markerRadioButton.Checked)
                         {
                             renderTimer.Stop();
-                            bool markerVerticalMode = !isMarkerCtrlBoxMode && IsMarkerVerticalForCurrentPage();
+                            bool markerVerticalMode = !isMarkerCtrlBoxMode && currentSelection.Height > currentSelection.Width;
                             bool enoughWidth = markerVerticalMode
                                 ? currentSelection.Height > markerHeight * scaleFactor
                                 : currentSelection.Width > markerWidth * scaleFactor;
@@ -14406,6 +14691,13 @@ namespace AnonPDF
             }
             else if (e.Button == MouseButtons.Right)
             {
+                if (isCommentCreationMode)
+                {
+                    EndCommentCreationMode();
+                    pdfViewer.Invalidate();
+                    return;
+                }
+
                 if (selectedArrowObject != null &&
                     selectedArrowObject.PageNumber == currentPage &&
                     (IsPointNearArrowLine(selectedArrowObject, startPoint) || TryGetArrowHandleAtPoint(selectedArrowObject, startPoint, out _)))
@@ -14415,11 +14707,19 @@ namespace AnonPDF
                     return;
                 }
 
+                if (TryShowCommentContextMenu(startPoint))
+                {
+                    return;
+                }
                 TryShowRedactionContextMenu(startPoint);
             }
             isDrawing = false;
             isMarkerCtrlBoxMode = false;
             currentSelection = System.Drawing.Rectangle.Empty;
+            if (!isMovingCommentNote && !isResizingCommentNote)
+            {
+                commentNoteToMove = null;
+            }
             pdfViewer.Invalidate();
 
 
@@ -14435,6 +14735,535 @@ namespace AnonPDF
                 arrowMouseActionInProgress = false;
             }
 
+        }
+
+        private void AddCommentToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            BeginCommentCreationMode();
+        }
+
+        private void BeginCommentCreationMode()
+        {
+            if (pdf == null || numPages <= 0)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            isCommentCreationMode = true;
+            isDrawing = false;
+            isMarkerCtrlBoxMode = false;
+            currentSelection = RectangleF.Empty;
+            markerRadioButton.Checked = true;
+            this.Cursor = Cursors.Cross;
+            pdfViewer.Invalidate();
+        }
+
+        private void EndCommentCreationMode()
+        {
+            isCommentCreationMode = false;
+            isDrawing = false;
+            isMarkerCtrlBoxMode = false;
+            currentSelection = RectangleF.Empty;
+            if (!isMiddleMousePanning)
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        private void ResetCommentNoteMoveState()
+        {
+            isMovingCommentNote = false;
+            commentNoteMoveChanged = false;
+            commentNoteToMove = null;
+            commentNoteMoveOffsetDoc = PointF.Empty;
+            isResizingCommentNote = false;
+            commentNoteResizeChanged = false;
+            commentNoteToResize = null;
+            commentNoteResizeAnchorDoc = PointF.Empty;
+        }
+
+        private bool IsPointInCommentResizeHandle(Point location, RectangleF noteRectDoc)
+        {
+            if (noteRectDoc.IsEmpty)
+            {
+                return false;
+            }
+
+            RectangleF noteRectPx = new RectangleF(
+                noteRectDoc.X * scaleFactor,
+                noteRectDoc.Y * scaleFactor,
+                noteRectDoc.Width * scaleFactor,
+                noteRectDoc.Height * scaleFactor);
+
+            float size = Math.Max(8f, CommentNoteResizeHandleSizePx);
+            RectangleF handleRect = new RectangleF(
+                noteRectPx.Right - size,
+                noteRectPx.Bottom - size,
+                size,
+                size);
+
+            return handleRect.Contains(location.X, location.Y);
+        }
+
+        private List<CommentAnnotation> GetOrderedCommentsForPage(int pageNumber)
+        {
+            if (commentAnnotations == null)
+            {
+                return new List<CommentAnnotation>();
+            }
+
+            return commentAnnotations
+                .Where(c => c != null && c.PageNumber == pageNumber)
+                .OrderBy(c => c.Bounds.Top)
+                .ThenBy(c => c.Bounds.Left)
+                .ToList();
+        }
+
+        private Dictionary<string, RectangleF> BuildCommentNoteRectanglesDoc(int pageNumber, Graphics graphics)
+        {
+            var result = new Dictionary<string, RectangleF>(StringComparer.Ordinal);
+            if (graphics == null || pageNumber <= 0 || pdf == null || pageNumber > numPages)
+            {
+                return result;
+            }
+
+            List<CommentAnnotation> comments = GetOrderedCommentsForPage(pageNumber);
+            if (comments.Count == 0)
+            {
+                return result;
+            }
+
+            var pageSize = GetPageSizeWithOffset(pageNumber);
+            float pageWidthDoc = Math.Max(1f, pageSize.Width);
+            float pageHeightDoc = Math.Max(1f, pageSize.Height);
+            float marginDoc = 6f;
+            float noteGapDoc = 4f;
+            float defaultNoteWidthDoc = 50f;
+            float nextAutoYDoc = marginDoc;
+
+            float fontSize = Math.Max(6.5f, Math.Min(8.5f, this.Font.SizeInPoints * 0.72f));
+            using (Font noteFont = new Font(this.Font.FontFamily, fontSize, FontStyle.Regular))
+            {
+                for (int i = 0; i < comments.Count; i++)
+                {
+                    CommentAnnotation comment = comments[i];
+                    string text = string.IsNullOrWhiteSpace(comment.CommentText)
+                        ? GetDefaultCommentText()
+                        : comment.CommentText.Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+                    string noteText = $"{i + 1}. {text}";
+                    float noteWidthDoc = Math.Max(40f, Math.Min(240f, comment.NoteWidth ?? defaultNoteWidthDoc));
+
+                    float textPaddingDoc = 2.5f;
+                    float textWidthPx = Math.Max(20f, (noteWidthDoc - (textPaddingDoc * 2f)) * scaleFactor);
+                    SizeF measured = graphics.MeasureString(noteText, noteFont, (int)Math.Ceiling(textWidthPx));
+                    float autoHeightDoc = Math.Max(13f, (measured.Height / Math.Max(0.01f, scaleFactor)) + (textPaddingDoc * 2f));
+                    float noteHeightDoc = Math.Max(12f, Math.Min(200f, comment.NoteHeight ?? autoHeightDoc));
+
+                    float noteXDoc;
+                    float noteYDoc;
+                    if (comment.NoteX.HasValue && comment.NoteY.HasValue)
+                    {
+                        noteXDoc = comment.NoteX.Value;
+                        noteYDoc = comment.NoteY.Value;
+                    }
+                    else
+                    {
+                        noteXDoc = pageWidthDoc - marginDoc - noteWidthDoc;
+
+                        float preferredYDoc = comment.Bounds.Top - (noteHeightDoc * 0.2f);
+                        noteYDoc = Math.Max(preferredYDoc, nextAutoYDoc);
+                        nextAutoYDoc = noteYDoc + noteHeightDoc + noteGapDoc;
+                    }
+
+                    noteXDoc = Math.Max(marginDoc, Math.Min(pageWidthDoc - marginDoc - noteWidthDoc, noteXDoc));
+                    noteYDoc = Math.Max(marginDoc, Math.Min(pageHeightDoc - marginDoc - noteHeightDoc, noteYDoc));
+                    result[comment.Id] = new RectangleF(noteXDoc, noteYDoc, noteWidthDoc, noteHeightDoc);
+                }
+            }
+
+            return result;
+        }
+
+        private void RefreshCommentNoteLayoutCache()
+        {
+            if (pdf == null || currentPage <= 0 || currentPage > numPages)
+            {
+                commentNoteRectsDoc.Clear();
+                return;
+            }
+
+            using (Graphics g = pdfViewer.CreateGraphics())
+            {
+                var layout = BuildCommentNoteRectanglesDoc(currentPage, g);
+                commentNoteRectsDoc.Clear();
+                foreach (var pair in layout)
+                {
+                    commentNoteRectsDoc[pair.Key] = pair.Value;
+                }
+            }
+        }
+
+        private bool TryGetCommentAtPoint(Point location, out CommentAnnotation comment, out RectangleF noteRectDoc)
+        {
+            comment = null;
+            noteRectDoc = RectangleF.Empty;
+            if (pdf == null || currentPage <= 0 || currentPage > numPages)
+            {
+                return false;
+            }
+
+            float docX = location.X / scaleFactor;
+            float docY = location.Y / scaleFactor;
+
+            List<CommentAnnotation> comments = GetOrderedCommentsForPage(currentPage);
+            if (commentNoteRectsDoc.Count == 0 || comments.Any(c => string.IsNullOrWhiteSpace(c.Id) || !commentNoteRectsDoc.ContainsKey(c.Id)))
+            {
+                RefreshCommentNoteLayoutCache();
+            }
+            for (int i = comments.Count - 1; i >= 0; i--)
+            {
+                CommentAnnotation candidate = comments[i];
+                bool inSelection = candidate.Bounds.Contains(docX, docY);
+                bool inNote = commentNoteRectsDoc.TryGetValue(candidate.Id, out RectangleF candidateNoteRect) &&
+                              candidateNoteRect.Contains(docX, docY);
+                if (inSelection || inNote)
+                {
+                    comment = candidate;
+                    noteRectDoc = candidateNoteRect;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void NormalizeCommentAnnotation(CommentAnnotation comment)
+        {
+            if (comment == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(comment.Id))
+            {
+                comment.Id = Guid.NewGuid().ToString("N");
+            }
+
+            comment.CommentText = string.IsNullOrWhiteSpace(comment.CommentText)
+                ? string.Empty
+                : comment.CommentText.Trim();
+
+            if (comment.NoteX.HasValue && (float.IsNaN(comment.NoteX.Value) || float.IsInfinity(comment.NoteX.Value)))
+            {
+                comment.NoteX = null;
+            }
+
+            if (comment.NoteY.HasValue && (float.IsNaN(comment.NoteY.Value) || float.IsInfinity(comment.NoteY.Value)))
+            {
+                comment.NoteY = null;
+            }
+
+            if (comment.NoteWidth.HasValue)
+            {
+                float width = comment.NoteWidth.Value;
+                if (float.IsNaN(width) || float.IsInfinity(width))
+                {
+                    comment.NoteWidth = null;
+                }
+                else
+                {
+                    comment.NoteWidth = Math.Max(40f, Math.Min(240f, width));
+                }
+            }
+
+            if (comment.NoteHeight.HasValue)
+            {
+                float height = comment.NoteHeight.Value;
+                if (float.IsNaN(height) || float.IsInfinity(height))
+                {
+                    comment.NoteHeight = null;
+                }
+                else
+                {
+                    comment.NoteHeight = Math.Max(12f, Math.Min(200f, height));
+                }
+            }
+        }
+
+        private string GetCommentDialogTitleText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Dodaj komentarz";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Kommentar hinzuf\u00fcgen";
+            }
+
+            return "Add comment";
+        }
+
+        private string GetCommentDialogLabelText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Tre\u015b\u0107 komentarza:";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Kommentartext:";
+            }
+
+            return "Comment text:";
+        }
+
+        private string GetDefaultCommentText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Komentarz";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Kommentar";
+            }
+
+            return "Comment";
+        }
+
+        private string GetEditCommentContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Edytuj komentarz";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Kommentar bearbeiten";
+            }
+
+            return "Edit comment";
+        }
+
+        private string GetDeleteCommentContextMenuText()
+        {
+            string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
+            if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Usu\u0144 komentarz";
+            }
+
+            if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Kommentar entfernen";
+            }
+
+            return "Delete comment";
+        }
+
+        private bool PromptForCommentText(string initialValue, out string commentText)
+        {
+            commentText = string.Empty;
+
+            using (Form prompt = new Form())
+            {
+                prompt.Text = GetCommentDialogTitleText();
+                prompt.StartPosition = FormStartPosition.CenterParent;
+                prompt.FormBorderStyle = FormBorderStyle.FixedDialog;
+                prompt.MinimizeBox = false;
+                prompt.MaximizeBox = false;
+                prompt.ShowInTaskbar = false;
+                prompt.ClientSize = new Size(460, 250);
+
+                var label = new Label
+                {
+                    Text = GetCommentDialogLabelText(),
+                    AutoSize = true,
+                    Location = new Point(12, 12)
+                };
+
+                var textBox = new TextBox
+                {
+                    Multiline = true,
+                    AcceptsReturn = true,
+                    ScrollBars = ScrollBars.Vertical,
+                    Location = new Point(12, 34),
+                    Size = new Size(prompt.ClientSize.Width - 24, 150),
+                    Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+                    Text = initialValue ?? string.Empty
+                };
+
+                var okButton = new Button
+                {
+                    Text = Resources.Merge_OK,
+                    DialogResult = DialogResult.OK,
+                    Size = new Size(100, 32),
+                    Location = new Point(prompt.ClientSize.Width - 212, prompt.ClientSize.Height - 44),
+                    Anchor = AnchorStyles.Right | AnchorStyles.Bottom
+                };
+
+                var cancelButton = new Button
+                {
+                    Text = Resources.Merge_Cancel,
+                    DialogResult = DialogResult.Cancel,
+                    Size = new Size(100, 32),
+                    Location = new Point(prompt.ClientSize.Width - 106, prompt.ClientSize.Height - 44),
+                    Anchor = AnchorStyles.Right | AnchorStyles.Bottom
+                };
+
+                prompt.Controls.Add(label);
+                prompt.Controls.Add(textBox);
+                prompt.Controls.Add(okButton);
+                prompt.Controls.Add(cancelButton);
+                // Enter in multiline textbox inserts a new line instead of closing dialog.
+                prompt.AcceptButton = null;
+                prompt.CancelButton = cancelButton;
+
+                if (prompt.ShowDialog(this) != DialogResult.OK)
+                {
+                    return false;
+                }
+
+                commentText = (textBox.Text ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(commentText))
+                {
+                    commentText = GetDefaultCommentText();
+                }
+
+                return true;
+            }
+        }
+
+        private void AddCommentAnnotation(CommentAnnotation comment)
+        {
+            if (comment == null)
+            {
+                return;
+            }
+
+            NormalizeCommentAnnotation(comment);
+            commentAnnotations.Add(comment);
+
+            if (currentPage >= 1 && currentPage <= allPageStatuses.Count)
+            {
+                PageItemStatus status = allPageStatuses[currentPage - 1];
+                status.HasObjects = HasAnyObjectsOnPage(currentPage);
+                if ((string)filterComboBox.SelectedItem == allComboItem)
+                {
+                    ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                    pagesListView.Invalidate(currentItem.Bounds);
+                }
+                else
+                {
+                    ApplyFilter((string)filterComboBox.SelectedItem);
+                }
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            commentNoteRectsDoc.Clear();
+            commentPreviewOverlayReady = false;
+            renderTimer.Stop();
+            renderTimer.Start();
+            pdfViewer.Invalidate();
+        }
+
+        private void RemoveCommentAnnotation(CommentAnnotation comment)
+        {
+            if (comment == null)
+            {
+                return;
+            }
+
+            if (!commentAnnotations.Remove(comment))
+            {
+                return;
+            }
+
+            if (currentPage >= 1 && currentPage <= allPageStatuses.Count)
+            {
+                PageItemStatus status = allPageStatuses[currentPage - 1];
+                status.HasObjects = HasAnyObjectsOnPage(currentPage);
+                if ((string)filterComboBox.SelectedItem == allComboItem)
+                {
+                    ListViewItem currentItem = pagesListView.Items[currentPage - 1];
+                    UpdateItemTag(currentItem, currentPage, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                    pagesListView.Invalidate(currentItem.Bounds);
+                }
+                else
+                {
+                    ApplyFilter((string)filterComboBox.SelectedItem);
+                }
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            commentNoteRectsDoc.Clear();
+            commentPreviewOverlayReady = false;
+            renderTimer.Stop();
+            renderTimer.Start();
+            pdfViewer.Invalidate();
+        }
+
+        private void EditCommentAnnotation(CommentAnnotation comment)
+        {
+            if (comment == null)
+            {
+                return;
+            }
+
+            if (!PromptForCommentText(comment.CommentText, out string updatedText))
+            {
+                return;
+            }
+
+            bool textChanged = !string.Equals(comment.CommentText ?? string.Empty, updatedText ?? string.Empty, StringComparison.Ordinal);
+            if (!textChanged)
+            {
+                return;
+            }
+
+            comment.CommentText = updatedText;
+            comment.UpdatedAtUtc = DateTime.UtcNow;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            commentNoteRectsDoc.Clear();
+            commentPreviewOverlayReady = false;
+            renderTimer.Stop();
+            renderTimer.Start();
+            pdfViewer.Invalidate();
+        }
+
+        private bool TryShowCommentContextMenu(Point location)
+        {
+            if (!TryGetCommentAtPoint(location, out CommentAnnotation comment, out _))
+            {
+                return false;
+            }
+
+            var menu = new ContextMenuStrip();
+            menu.Items.Add(GetEditCommentContextMenuText(), null, (_, __) => EditCommentAnnotation(comment));
+            menu.Items.Add(GetDeleteCommentContextMenuText(), null, (_, __) => RemoveCommentAnnotation(comment));
+            menu.Show(pdfViewer, location);
+            return true;
         }
 
         private bool TryShowRedactionContextMenu(Point location)
@@ -15957,6 +16786,272 @@ namespace AnonPDF
             }
         }
 
+        private void RenderCommentAnnotationsToPdf(
+            iText.Kernel.Pdf.PdfDocument pdfDoc,
+            ISet<int> pagesWithBakedRotation)
+        {
+            if (pdfDoc == null || commentAnnotations == null || commentAnnotations.Count == 0)
+            {
+                return;
+            }
+
+            List<CommentAnnotation> exportComments = commentAnnotations
+                .Where(c => c != null && c.PageNumber >= 1 && c.PageNumber <= pdfDoc.GetNumberOfPages())
+                .Where(c => !pagesToRemove.Contains(c.PageNumber))
+                .OrderBy(c => c.PageNumber)
+                .ThenBy(c => c.Bounds.Top)
+                .ThenBy(c => c.Bounds.Left)
+                .ToList();
+            if (exportComments.Count == 0)
+            {
+                return;
+            }
+
+            PdfFont noteFont = PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA, "Cp1250");
+            const float noteFontSize = 7f;
+            const float notePadding = 2.5f;
+            var highlightState = new PdfExtGState().SetFillOpacity(1f);
+            highlightState.GetPdfObject().Put(PdfName.BM, PdfName.Multiply);
+            var noteFillState = new PdfExtGState().SetFillOpacity(0.82f);
+            var noteColor = new DeviceRgb(255, 235, 59);
+
+            foreach (var pageGroup in exportComments.GroupBy(c => c.PageNumber))
+            {
+                int pageNumber = pageGroup.Key;
+                iText.Kernel.Pdf.PdfPage page = pdfDoc.GetPage(pageNumber);
+                if (page == null)
+                {
+                    continue;
+                }
+
+                bool baseRotationBaked = pagesWithBakedRotation != null && pagesWithBakedRotation.Contains(pageNumber);
+                int rotation = baseRotationBaked ? GetRotationOffset(pageNumber) : GetEffectiveRotationDegrees(pageNumber);
+                bool includeBaseRotation = !baseRotationBaked;
+                var viewSize = GetPageSizeWithOffset(pageNumber);
+                float viewWidth = Math.Max(1f, viewSize.Width);
+                float viewHeight = Math.Max(1f, viewSize.Height);
+                float margin = 6f;
+                float noteGap = 4f;
+                float defaultNoteWidth = 50f;
+                float nextAutoY = margin;
+
+                var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+                using (var layoutCanvas = new Canvas(pdfCanvas, page.GetPageSize()))
+                {
+                    int noteIndex = 0;
+                    foreach (var comment in pageGroup.OrderBy(c => c.Bounds.Top).ThenBy(c => c.Bounds.Left))
+                    {
+                        RectangleF sourcePdfRect = ConvertToPdfCoordinates(
+                            comment.Bounds,
+                            pageNumber,
+                            rotation,
+                            includeBaseRotation);
+                        iText.Kernel.Geom.Rectangle highlightRectangle = new iText.Kernel.Geom.Rectangle(
+                            sourcePdfRect.X,
+                            sourcePdfRect.Y,
+                            sourcePdfRect.Width,
+                            sourcePdfRect.Height);
+                        highlightRectangle = ExpandMarkerCleanupRectangleToTextBounds(
+                            page,
+                            highlightRectangle,
+                            pageNumber,
+                            rotation,
+                            comment.IsMarkerSelection ? "comment-marker" : "comment-box");
+                        RectangleF highlightViewRect = ConvertPdfToViewCoordinates(
+                            ConvertToItTextRectangleF(highlightRectangle),
+                            pageNumber,
+                            rotation,
+                            includeBaseRotation);
+
+                        pdfCanvas.SaveState();
+                        pdfCanvas.SetExtGState(highlightState);
+                        pdfCanvas.SetFillColor(noteColor);
+                        pdfCanvas.Rectangle(
+                            highlightRectangle.GetX(),
+                            highlightRectangle.GetY(),
+                            highlightRectangle.GetWidth(),
+                            highlightRectangle.GetHeight());
+                        pdfCanvas.Fill();
+                        pdfCanvas.RestoreState();
+
+                        noteIndex++;
+                        string noteTextValue = string.IsNullOrWhiteSpace(comment.CommentText)
+                            ? GetDefaultCommentText()
+                            : comment.CommentText.Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+                        string noteText = $"{noteIndex}. {noteTextValue}";
+                        float noteWidth = Math.Max(40f, Math.Min(240f, comment.NoteWidth ?? defaultNoteWidth));
+
+                        List<string> wrappedLines = WrapTextToWidth(
+                            noteFont,
+                            noteText,
+                            noteFontSize,
+                            Math.Max(30f, noteWidth - (notePadding * 2f)));
+                        if (wrappedLines.Count == 0)
+                        {
+                            wrappedLines.Add(noteText);
+                        }
+
+                        float lineHeight = noteFontSize + 1.2f;
+                        float autoNoteHeight = Math.Max(16f, (wrappedLines.Count * lineHeight) + (notePadding * 2f));
+                        float noteHeight = Math.Max(12f, Math.Min(200f, comment.NoteHeight ?? autoNoteHeight));
+                        float noteX;
+                        float noteY;
+                        if (comment.NoteX.HasValue && comment.NoteY.HasValue)
+                        {
+                            noteX = comment.NoteX.Value;
+                            noteY = comment.NoteY.Value;
+                        }
+                        else
+                        {
+                            noteX = viewWidth - margin - noteWidth;
+                            float preferredY = highlightViewRect.Top - (noteHeight * 0.2f);
+                            noteY = Math.Max(preferredY, nextAutoY);
+                            nextAutoY = noteY + noteHeight + noteGap;
+                        }
+                        noteX = Math.Max(margin, Math.Min(viewWidth - margin - noteWidth, noteX));
+                        noteY = Math.Max(margin, Math.Min(viewHeight - margin - noteHeight, noteY));
+                        RectangleF noteViewRect = new RectangleF(noteX, noteY, noteWidth, noteHeight);
+
+                        RectangleF notePdfRect = ConvertToPdfCoordinates(
+                            noteViewRect,
+                            pageNumber,
+                            rotation,
+                            includeBaseRotation);
+
+                        pdfCanvas.SaveState();
+                        pdfCanvas.SetExtGState(noteFillState);
+                        pdfCanvas.SetFillColor(noteColor);
+                        pdfCanvas.Rectangle(notePdfRect.X, notePdfRect.Y, notePdfRect.Width, notePdfRect.Height);
+                        pdfCanvas.Fill();
+                        pdfCanvas.RestoreState();
+
+                        pdfCanvas.SaveState();
+                        pdfCanvas.SetStrokeColor(noteColor);
+                        pdfCanvas.SetLineWidth(0.6f);
+                        pdfCanvas.Rectangle(notePdfRect.X, notePdfRect.Y, notePdfRect.Width, notePdfRect.Height);
+                        pdfCanvas.Stroke();
+                        pdfCanvas.RestoreState();
+
+                        PointF connectorFromView = new PointF(
+                            highlightViewRect.Right,
+                            highlightViewRect.Top + (highlightViewRect.Height / 2f));
+                        PointF connectorToView = new PointF(
+                            noteViewRect.Left,
+                            noteViewRect.Top + (noteViewRect.Height / 2f));
+                        PointF connectorFromPdf = ConvertPointToPdfCoordinates(
+                            connectorFromView,
+                            pageNumber,
+                            rotation,
+                            includeBaseRotation);
+                        PointF connectorToPdf = ConvertPointToPdfCoordinates(
+                            connectorToView,
+                            pageNumber,
+                            rotation,
+                            includeBaseRotation);
+
+                        pdfCanvas.SaveState();
+                        pdfCanvas.SetStrokeColor(noteColor);
+                        pdfCanvas.SetLineWidth(1.4f);
+                        pdfCanvas.MoveTo(connectorFromPdf.X, connectorFromPdf.Y);
+                        pdfCanvas.LineTo(connectorToPdf.X, connectorToPdf.Y);
+                        pdfCanvas.Stroke();
+                        pdfCanvas.RestoreState();
+
+                        int normalizedPageRotation = NormalizeRotation(rotation);
+                        int commentTextRotation;
+                        switch (normalizedPageRotation)
+                        {
+                            case 0:
+                                commentTextRotation = 0;
+                                break;
+                            case 90:
+                                commentTextRotation = 90;
+                                break;
+                            case 180:
+                                commentTextRotation = 180;
+                                break;
+                            case 270:
+                                commentTextRotation = 270;
+                                break;
+                            default:
+                                commentTextRotation = 0;
+                                break;
+                        }
+
+                        bool verticalText = commentTextRotation == 90 || commentTextRotation == 270;
+                        float wrapWidth = verticalText
+                            ? Math.Max(20f, notePdfRect.Height - (notePadding * 2f))
+                            : Math.Max(20f, notePdfRect.Width - (notePadding * 2f));
+                        List<string> wrappedLinesPdf = WrapTextToWidth(
+                            noteFont,
+                            noteText,
+                            noteFontSize,
+                            wrapWidth);
+                        if (wrappedLinesPdf.Count == 0)
+                        {
+                            wrappedLinesPdf.Add(noteText);
+                        }
+
+                        pdfCanvas.SaveState();
+                        pdfCanvas.BeginText();
+                        pdfCanvas.SetFillColor(new DeviceRgb(0, 0, 0));
+                        pdfCanvas.SetFontAndSize(noteFont, noteFontSize);
+
+                        for (int lineIndex = 0; lineIndex < wrappedLinesPdf.Count; lineIndex++)
+                        {
+                            string line = wrappedLinesPdf[lineIndex];
+                            float lineX;
+                            float lineY;
+                            switch (commentTextRotation)
+                            {
+                                case 0:
+                                    lineX = notePdfRect.X + notePadding;
+                                    lineY = notePdfRect.Y + notePdfRect.Height - notePadding - noteFontSize - (lineIndex * lineHeight);
+                                    if (lineY < notePdfRect.Y + notePadding)
+                                    {
+                                        continue;
+                                    }
+                                    pdfCanvas.SetTextMatrix(1f, 0f, 0f, 1f, lineX, lineY);
+                                    break;
+                                case 90:
+                                    lineX = notePdfRect.X + notePadding + noteFontSize + (lineIndex * lineHeight);
+                                    if (lineX > notePdfRect.Right - notePadding)
+                                    {
+                                        continue;
+                                    }
+                                    lineY = notePdfRect.Y + notePadding;
+                                    pdfCanvas.SetTextMatrix(0f, 1f, -1f, 0f, lineX, lineY);
+                                    break;
+                                case 180:
+                                    lineX = notePdfRect.Right - notePadding;
+                                    lineY = notePdfRect.Y + notePadding + noteFontSize + (lineIndex * lineHeight);
+                                    if (lineY > notePdfRect.Bottom - notePadding)
+                                    {
+                                        continue;
+                                    }
+                                    pdfCanvas.SetTextMatrix(-1f, 0f, 0f, -1f, lineX, lineY);
+                                    break;
+                                case 270:
+                                default:
+                                    lineX = notePdfRect.X + notePadding + noteFontSize + (lineIndex * lineHeight);
+                                    if (lineX > notePdfRect.Right - notePadding)
+                                    {
+                                        continue;
+                                    }
+                                    lineY = notePdfRect.Bottom - notePadding;
+                                    pdfCanvas.SetTextMatrix(0f, -1f, 1f, 0f, lineX, lineY);
+                                    break;
+                            }
+                            pdfCanvas.ShowText(line);
+                        }
+
+                        pdfCanvas.EndText();
+                        pdfCanvas.RestoreState();
+                    }
+                }
+            }
+        }
+
         private void RemoveRedactionBlock(RedactionBlock blockToRemove)
         {
             if (blockToRemove == null)
@@ -16523,15 +17618,107 @@ namespace AnonPDF
             }
         }
 
+        private void DrawCommentAnnotationsOnPreview(Graphics graphics)
+        {
+            if (graphics == null || commentAnnotations == null || commentAnnotations.Count == 0 || currentPage <= 0)
+            {
+                return;
+            }
+
+            List<CommentAnnotation> comments = commentAnnotations
+                .Where(c => c != null && c.PageNumber == currentPage)
+                .OrderBy(c => c.Bounds.Top)
+                .ThenBy(c => c.Bounds.Left)
+                .ToList();
+            if (comments.Count == 0)
+            {
+                return;
+            }
+
+            float connectorThickness = Math.Max(2.6f, scaleFactor * 1.6f);
+            float borderThickness = Math.Max(1.2f, scaleFactor * 0.7f);
+            float fontSize = Math.Max(6.5f, Math.Min(8.5f, this.Font.SizeInPoints * 0.72f));
+            var highlightColor = System.Drawing.Color.FromArgb(255, 255, 235, 59);
+            using (Font noteFont = new Font(this.Font.FontFamily, fontSize, FontStyle.Regular))
+            using (SolidBrush noteBack = new SolidBrush(System.Drawing.Color.FromArgb(215, highlightColor)))
+            using (Pen noteBorder = new Pen(highlightColor, borderThickness))
+            using (Pen connectorPen = new Pen(highlightColor, connectorThickness))
+            using (SolidBrush noteTextBrush = new SolidBrush(System.Drawing.Color.Black))
+            {
+                connectorPen.DashStyle = DashStyle.Solid;
+                var noteRectsDoc = BuildCommentNoteRectanglesDoc(currentPage, graphics);
+                commentNoteRectsDoc.Clear();
+                foreach (var pair in noteRectsDoc)
+                {
+                    commentNoteRectsDoc[pair.Key] = pair.Value;
+                }
+
+                for (int index = 0; index < comments.Count; index++)
+                {
+                    CommentAnnotation comment = comments[index];
+                    RectangleF highlightRect = new RectangleF(
+                        comment.Bounds.X * scaleFactor,
+                        comment.Bounds.Y * scaleFactor,
+                        comment.Bounds.Width * scaleFactor,
+                        comment.Bounds.Height * scaleFactor);
+
+                    string text = string.IsNullOrWhiteSpace(comment.CommentText)
+                        ? GetDefaultCommentText()
+                        : comment.CommentText.Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+                    string noteText = $"{index + 1}. {text}";
+                    if (!noteRectsDoc.TryGetValue(comment.Id, out RectangleF noteRectDoc))
+                    {
+                        continue;
+                    }
+                    RectangleF noteRect = new RectangleF(
+                        noteRectDoc.X * scaleFactor,
+                        noteRectDoc.Y * scaleFactor,
+                        noteRectDoc.Width * scaleFactor,
+                        noteRectDoc.Height * scaleFactor);
+
+                    PointF from = new PointF(
+                        highlightRect.Right,
+                        highlightRect.Top + (highlightRect.Height / 2f));
+                    PointF to = new PointF(noteRect.Left, noteRect.Top + (noteRect.Height / 2f));
+                    graphics.DrawLine(connectorPen, from, to);
+
+                    graphics.FillRectangle(noteBack, noteRect);
+                    graphics.DrawRectangle(noteBorder, noteRect.X, noteRect.Y, noteRect.Width, noteRect.Height);
+                    float handleSize = Math.Max(8f, CommentNoteResizeHandleSizePx);
+                    RectangleF handleRect = new RectangleF(
+                        noteRect.Right - handleSize,
+                        noteRect.Bottom - handleSize,
+                        handleSize,
+                        handleSize);
+                    graphics.FillRectangle(noteBorder.Brush, handleRect);
+                    float textPadding = Math.Max(2f, 2f * Math.Min(1.4f, scaleFactor));
+                    RectangleF textRect = new RectangleF(
+                        noteRect.X + textPadding,
+                        noteRect.Y + textPadding,
+                        Math.Max(1f, noteRect.Width - (textPadding * 2f)),
+                        Math.Max(1f, noteRect.Height - (textPadding * 2f)));
+                    graphics.DrawString(noteText, noteFont, noteTextBrush, textRect);
+                }
+            }
+        }
+
         private void OnPaint(object sender, PaintEventArgs e)
         {
             // Draw current selection
             if (isDrawing && currentSelection.Width > 0 && currentSelection.Height > 0)
             {
-                using (SolidBrush brush = new SolidBrush(System.Drawing.Color.FromArgb(128, 255, 0, 0)))
+                System.Drawing.Color selectionPreviewColor = isCommentCreationMode
+                    ? System.Drawing.Color.FromArgb(140, 255, 235, 59)
+                    : System.Drawing.Color.FromArgb(128, 255, 0, 0);
+                using (SolidBrush brush = new SolidBrush(selectionPreviewColor))
                 {
                     e.Graphics.FillRectangle(brush, currentSelection);
                 }
+            }
+
+            if (commentPreviewOverlayReady)
+            {
+                DrawCommentAnnotationsOnPreview(e.Graphics);
             }
 
             Dictionary<string, int> previewBasisNumberMap = BuildLegalBasisFootnoteNumberMap();
@@ -17229,6 +18416,9 @@ namespace AnonPDF
                         return;
                     }
                     List<RedactionBlock> redactionBlocksJson = projectData.RedactionBlocks ?? new List<RedactionBlock>();
+                    List<CommentAnnotation> commentAnnotationsJson = (projectData.CommentAnnotations ?? new List<CommentAnnotation>())
+                        .Where(obj => obj != null && obj.PageNumber >= 1 && obj.PageNumber <= numPages)
+                        .ToList();
                     HashSet<int> pagesToRemoveJson = projectData.PagesToRemove ?? new HashSet<int>();
                     List<TextAnnotation> textAnnotationsJson = projectData.TextAnnotations ?? new List<TextAnnotation>();
                     List<RasterObject> rasterObjectsJson = (projectData.RasterObjects ?? new List<RasterObject>())
@@ -17266,6 +18456,13 @@ namespace AnonPDF
                     foreach (var block in redactionBlocks)
                     {
                         NormalizeRedactionBlockMetadata(block);
+                    }
+
+                    ClearCommentAnnotations();
+                    commentAnnotations = commentAnnotationsJson;
+                    foreach (var comment in commentAnnotations)
+                    {
+                        NormalizeCommentAnnotation(comment);
                     }
 
                     ClearPagesToRemove();
@@ -17384,6 +18581,15 @@ namespace AnonPDF
                         //UpdateItemTag(item, block.PageNumber, hasSelections, hasSearchResults, markedForDeletion, true);
                         status.HasObjects = true;
                         UpdateItemTag(item, block.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                        pagesListView.Invalidate(item.Bounds);
+                    }
+
+                    foreach (var comment in commentAnnotations)
+                    {
+                        status = allPageStatuses[comment.PageNumber - 1];
+                        var item = pagesListView.Items[comment.PageNumber - 1];
+                        status.HasObjects = true;
+                        UpdateItemTag(item, comment.PageNumber, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
                         pagesListView.Invalidate(item.Bounds);
                     }
 
@@ -17535,6 +18741,7 @@ namespace AnonPDF
                         ProjectData projectData = new ProjectData
                         {
                             RedactionBlocks = redactionBlocks,
+                            CommentAnnotations = commentAnnotations,
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
                             RasterObjects = rasterObjects,
@@ -17980,6 +19187,7 @@ namespace AnonPDF
                         ProjectData projectData = new ProjectData
                         {
                             RedactionBlocks = redactionBlocks,
+                            CommentAnnotations = commentAnnotations,
                             PagesToRemove = pagesToRemove,
                             TextAnnotations = textAnnotations,
                             RasterObjects = rasterObjects,
@@ -18273,6 +19481,17 @@ namespace AnonPDF
             }
 
             if (keyData == (Keys.Control | Keys.R))
+            {
+                if (IsTextInputFocused())
+                {
+                    return base.ProcessCmdKey(ref msg, keyData);
+                }
+
+                RotateCurrentPageClockwise();
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.G))
             {
                 if (IsTextInputFocused())
                 {
@@ -23300,32 +24519,190 @@ namespace AnonPDF
         private void ShowRedactPreview()
         {
             var blocksForThisPage = redactionBlocks.Where(b => b.PageNumber == currentPage);
-            if (blocksForThisPage.ToList().Any())
+            bool hasBlocks = blocksForThisPage.Any();
+            bool hasComments = commentAnnotations.Any(c => c != null && c.PageNumber == currentPage);
+            commentPreviewOverlayReady = false;
+            if (hasBlocks || hasComments)
             {
                 this.Cursor = Cursors.WaitCursor;
+                DrawingImage previewImage;
                 if (CurrentPageContainsText())
                 {
                     try
                     {
-                        pdfViewer.Image = RenderCurrentPageWithPdfCleanUp();
+                        previewImage = hasBlocks
+                            ? RenderCurrentPageWithPdfCleanUp()
+                            : RenderOriginalPage(currentPage);
                     }
                     catch (Exception)
                     {
-                        pdfViewer.Image = RenderOriginalPage(currentPage);
+                        previewImage = RenderOriginalPage(currentPage);
                         pdfCleanUpToolError = true;
                     }
 
                 }
                 else
                 {
-                    pdfViewer.Image = RenderCurrentPageWithSelections();
+                    previewImage = hasBlocks
+                        ? RenderCurrentPageWithSelections()
+                        : RenderOriginalPage(currentPage);
                 }
+
+                if (hasComments)
+                {
+                    previewImage = RenderBitmapWithCommentHighlights(previewImage);
+                    commentPreviewOverlayReady = true;
+                }
+                pdfViewer.Image = previewImage;
                 this.Cursor = Cursors.Default;
             }
             else
             {
                 pdfViewer.Image = RenderOriginalPage(currentPage);
             }
+        }
+
+        private DrawingImage RenderBitmapWithCommentHighlights(DrawingImage sourceImage)
+        {
+            if (sourceImage == null)
+            {
+                return null;
+            }
+
+            List<CommentAnnotation> comments = commentAnnotations
+                .Where(c => c != null && c.PageNumber == currentPage)
+                .ToList();
+            if (comments.Count == 0)
+            {
+                return sourceImage;
+            }
+
+            var visualBoundsByComment = comments.ToDictionary(
+                comment => comment,
+                comment => comment.Bounds);
+
+            bool requiresTextExpansion = comments.Any(c =>
+                c.Bounds.Width > 0f &&
+                c.Bounds.Height > 0f);
+            if (requiresTextExpansion && !string.IsNullOrWhiteSpace(inputPdfPath) && File.Exists(inputPdfPath))
+            {
+                try
+                {
+                    var props = new ReaderProperties();
+                    if (!string.IsNullOrEmpty(userPassword))
+                    {
+                        props.SetPassword(System.Text.Encoding.UTF8.GetBytes(userPassword));
+                    }
+
+                    using (var reader = new PdfReader(inputPdfPath, props).SetUnethicalReading(Properties.Settings.Default.IgnorePdfRestrictions))
+                    using (var pdfDoc = new iText.Kernel.Pdf.PdfDocument(reader))
+                    {
+                        if (currentPage >= 1 && currentPage <= pdfDoc.GetNumberOfPages())
+                        {
+                            var page = pdfDoc.GetPage(currentPage);
+                            int rotation = GetEffectiveRotationDegrees(currentPage);
+                            foreach (var comment in comments.Where(c =>
+                                c.Bounds.Width > 0f &&
+                                c.Bounds.Height > 0f))
+                            {
+                                RectangleF sourcePdfRect = ConvertToPdfCoordinates(comment.Bounds, currentPage, rotation);
+                                var sourceRectangle = ConvertToItTextRectangle(sourcePdfRect);
+                                var visualRectangle = ExpandMarkerCleanupRectangleToTextBounds(
+                                    page,
+                                    sourceRectangle,
+                                    currentPage,
+                                    rotation,
+                                    comment.IsMarkerSelection ? "comment-marker-preview" : "comment-box-preview");
+                                RectangleF visualViewRect = ConvertPdfToViewCoordinates(
+                                    ConvertToItTextRectangleF(visualRectangle),
+                                    currentPage,
+                                    rotation);
+                                if (visualViewRect.Width > 0f && visualViewRect.Height > 0f)
+                                {
+                                    visualBoundsByComment[comment] = visualViewRect;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogDebug("Comment preview marker expansion failed: " + ex.Message);
+                }
+            }
+
+            Bitmap baseBitmap = new Bitmap(sourceImage);
+            Bitmap resultBitmap = baseBitmap.PixelFormat == PixelFormat.Format32bppArgb
+                ? baseBitmap
+                : baseBitmap.Clone(
+                    new Rectangle(0, 0, baseBitmap.Width, baseBitmap.Height),
+                    PixelFormat.Format32bppArgb);
+            if (!ReferenceEquals(resultBitmap, baseBitmap))
+            {
+                baseBitmap.Dispose();
+            }
+
+            Rectangle imageBounds = new Rectangle(0, 0, resultBitmap.Width, resultBitmap.Height);
+            System.Drawing.Color highlightColor = System.Drawing.Color.FromArgb(255, 255, 235, 59);
+            const float blendFactor = 0.86f;
+
+            BitmapData data = resultBitmap.LockBits(
+                imageBounds,
+                ImageLockMode.ReadWrite,
+                PixelFormat.Format32bppArgb);
+
+            try
+            {
+                int stride = data.Stride;
+                IntPtr scan0 = data.Scan0;
+
+                foreach (var comment in comments)
+                {
+                    RectangleF visualBounds = visualBoundsByComment.TryGetValue(comment, out RectangleF cachedBounds)
+                        ? cachedBounds
+                        : comment.Bounds;
+                    Rectangle rect = Rectangle.Round(new RectangleF(
+                        visualBounds.X * scaleFactor,
+                        visualBounds.Y * scaleFactor,
+                        visualBounds.Width * scaleFactor,
+                        visualBounds.Height * scaleFactor));
+                    rect.Intersect(imageBounds);
+                    if (rect.Width <= 0 || rect.Height <= 0)
+                    {
+                        continue;
+                    }
+
+                    for (int y = rect.Top; y < rect.Bottom; y++)
+                    {
+                        IntPtr rowPtr = IntPtr.Add(scan0, y * stride);
+                        for (int x = rect.Left; x < rect.Right; x++)
+                        {
+                            int pixelOffset = x * 4;
+                            byte b = Marshal.ReadByte(rowPtr, pixelOffset);
+                            byte g = Marshal.ReadByte(rowPtr, pixelOffset + 1);
+                            byte r = Marshal.ReadByte(rowPtr, pixelOffset + 2);
+
+                            float mulR = (r * highlightColor.R) / 255f;
+                            float mulG = (g * highlightColor.G) / 255f;
+                            float mulB = (b * highlightColor.B) / 255f;
+
+                            byte outR = (byte)Math.Max(0, Math.Min(255, (r * (1f - blendFactor)) + (mulR * blendFactor)));
+                            byte outG = (byte)Math.Max(0, Math.Min(255, (g * (1f - blendFactor)) + (mulG * blendFactor)));
+                            byte outB = (byte)Math.Max(0, Math.Min(255, (b * (1f - blendFactor)) + (mulB * blendFactor)));
+
+                            Marshal.WriteByte(rowPtr, pixelOffset, outB);
+                            Marshal.WriteByte(rowPtr, pixelOffset + 1, outG);
+                            Marshal.WriteByte(rowPtr, pixelOffset + 2, outR);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                resultBitmap.UnlockBits(data);
+            }
+
+            return resultBitmap;
         }
 
         private void RemovePageRangeButton_Click(object sender, EventArgs e)
@@ -23789,10 +25166,23 @@ namespace AnonPDF
                 return sourceRectangle;
             }
 
+            bool commentContext = !string.IsNullOrWhiteSpace(context) &&
+                context.StartsWith("comment", StringComparison.OrdinalIgnoreCase);
+
             float sourceTop = sourceRectangle.GetTop();
             float sourceBottom = sourceRectangle.GetBottom();
-            float expandedTop = Math.Max(sourceTop, textBounds.GetTop() + MarkerCleanupVerticalPadding);
-            float expandedBottom = Math.Min(sourceBottom, textBounds.GetBottom() - MarkerCleanupVerticalPadding);
+            float expandedTop;
+            float expandedBottom;
+            if (commentContext)
+            {
+                expandedTop = textBounds.GetTop() + MarkerCleanupVerticalPadding;
+                expandedBottom = textBounds.GetBottom() - MarkerCleanupVerticalPadding;
+            }
+            else
+            {
+                expandedTop = Math.Max(sourceTop, textBounds.GetTop() + MarkerCleanupVerticalPadding);
+                expandedBottom = Math.Min(sourceBottom, textBounds.GetBottom() - MarkerCleanupVerticalPadding);
+            }
 
             var pageSize = page.GetPageSize();
             float minPageY = pageSize.GetBottom();
@@ -23848,7 +25238,11 @@ namespace AnonPDF
             {
                 CustomTextExtractionStrategy strategy = new CustomTextExtractionStrategy(rectangle);
                 PdfTextExtractor.GetTextFromPage(page, strategy);
-                bool hasBounds = strategy.TryGetCoveredBounds(out textBounds);
+                bool commentMarkerContext = !string.IsNullOrWhiteSpace(context) &&
+                    context.StartsWith("comment-marker", StringComparison.OrdinalIgnoreCase);
+                bool hasBounds = commentMarkerContext
+                    ? strategy.TryGetCoveredBoundsForMarkerLine(out textBounds)
+                    : strategy.TryGetCoveredBounds(out textBounds);
                 if (DebugLogEnabled)
                 {
                     string boundsText = hasBounds
@@ -26249,6 +27643,27 @@ namespace AnonPDF
         }
     }
 
+    public class CommentAnnotation
+    {
+        public string Id { get; set; }
+        public int PageNumber { get; set; }
+        public RectangleF Bounds { get; set; }
+        public string CommentText { get; set; }
+        public bool IsMarkerSelection { get; set; }
+        public float? NoteX { get; set; }
+        public float? NoteY { get; set; }
+        public float? NoteWidth { get; set; }
+        public float? NoteHeight { get; set; }
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        public CommentAnnotation()
+        {
+            Id = Guid.NewGuid().ToString("N");
+            CommentText = string.Empty;
+        }
+    }
+
     public class SignatureInfo
     {
         public string FieldName { get; set; }
@@ -26431,6 +27846,7 @@ namespace AnonPDF
     public class ProjectData
     {
         public List<RedactionBlock> RedactionBlocks { get; set; }
+        public List<CommentAnnotation> CommentAnnotations { get; set; }
         public HashSet<int> PagesToRemove { get; set; }
         public List<TextAnnotation> TextAnnotations { get; set; }
         public List<RasterObject> RasterObjects { get; set; }
@@ -27345,6 +28761,7 @@ namespace AnonPDF
     {
         private readonly iText.Kernel.Geom.Rectangle _targetRect;
         private readonly List<TextChunk> _textChunks;
+        private readonly List<GlyphBounds> _coveredGlyphs;
         private readonly float _yTolerance = 1.0f; // Tolerance for Y coordinate (in points)
         private readonly bool _sortByX = false; // Set to true if you want to sort by X
         private readonly bool _reverseOrder = false; // Ustaw na true dla tekstu od prawej do lewej
@@ -27358,6 +28775,7 @@ namespace AnonPDF
         {
             _targetRect = targetRect;
             _textChunks = new List<TextChunk>();
+            _coveredGlyphs = new List<GlyphBounds>();
             _hasCoveredBounds = false;
             _coveredMinX = float.MaxValue;
             _coveredMinY = float.MaxValue;
@@ -27389,6 +28807,12 @@ namespace AnonPDF
                     if (intersects)
                     {
                         _textChunks.Add(new TextChunk(chunk.GetText(), y1, x1));
+                        _coveredGlyphs.Add(new GlyphBounds(
+                            Math.Min(x1, x2),
+                            Math.Min(y1, y2),
+                            Math.Max(x1, x2),
+                            Math.Max(y1, y2),
+                            y1));
                         if (!_hasCoveredBounds)
                         {
                             _coveredMinX = x1;
@@ -27478,6 +28902,89 @@ namespace AnonPDF
 
             bounds = new iText.Kernel.Geom.Rectangle(_coveredMinX, _coveredMinY, width, height);
             return true;
+        }
+
+        public bool TryGetCoveredBoundsForMarkerLine(out iText.Kernel.Geom.Rectangle bounds)
+        {
+            bounds = null;
+            if (_coveredGlyphs.Count == 0)
+            {
+                return false;
+            }
+
+            const float baselineStep = 1.5f;
+            float targetCenterY = _targetRect.GetBottom() + (_targetRect.GetHeight() / 2f);
+            var lines = new Dictionary<float, List<GlyphBounds>>();
+            foreach (var glyph in _coveredGlyphs)
+            {
+                float key = (float)Math.Round(glyph.Baseline / baselineStep) * baselineStep;
+                if (!lines.TryGetValue(key, out List<GlyphBounds> list))
+                {
+                    list = new List<GlyphBounds>();
+                    lines[key] = list;
+                }
+                list.Add(glyph);
+            }
+
+            float selectedKey = 0f;
+            int selectedCount = -1;
+            float selectedDistance = float.MaxValue;
+            foreach (var entry in lines)
+            {
+                int count = entry.Value.Count;
+                float distance = Math.Abs(entry.Key - targetCenterY);
+                if (count > selectedCount || (count == selectedCount && distance < selectedDistance))
+                {
+                    selectedCount = count;
+                    selectedDistance = distance;
+                    selectedKey = entry.Key;
+                }
+            }
+
+            if (!lines.TryGetValue(selectedKey, out List<GlyphBounds> selectedLine) || selectedLine.Count == 0)
+            {
+                return false;
+            }
+
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+            foreach (var glyph in selectedLine)
+            {
+                minX = Math.Min(minX, glyph.Left);
+                minY = Math.Min(minY, glyph.Bottom);
+                maxX = Math.Max(maxX, glyph.Right);
+                maxY = Math.Max(maxY, glyph.Top);
+            }
+
+            float width = maxX - minX;
+            float height = maxY - minY;
+            if (width <= 0f || height <= 0f)
+            {
+                return false;
+            }
+
+            bounds = new iText.Kernel.Geom.Rectangle(minX, minY, width, height);
+            return true;
+        }
+
+        private struct GlyphBounds
+        {
+            public float Left { get; }
+            public float Bottom { get; }
+            public float Right { get; }
+            public float Top { get; }
+            public float Baseline { get; }
+
+            public GlyphBounds(float left, float bottom, float right, float top, float baseline)
+            {
+                Left = left;
+                Bottom = bottom;
+                Right = right;
+                Top = top;
+                Baseline = baseline;
+            }
         }
 
         private class TextChunk
