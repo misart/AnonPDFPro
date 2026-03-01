@@ -10018,6 +10018,16 @@ namespace AnonPDF
                 arrowObject.UpdatedAtUtc = DateTime.UtcNow;
             }
 
+            foreach (var vectorShape in vectorShapes.Where(v => v != null && v.PageNumber == currentPage))
+            {
+                vectorShape.Points = (vectorShape.Points ?? new List<PointF>())
+                    .Select(p => new PointF(pageSize.Height - p.Y, p.X))
+                    .ToList();
+                NormalizeVectorShape(vectorShape);
+                ConstrainVectorShapeToPage(vectorShape);
+                vectorShape.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
             currentSelection = RectangleF.Empty;
 
             projectWasChangedAfterLastSave = true;
