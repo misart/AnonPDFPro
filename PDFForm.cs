@@ -20762,6 +20762,16 @@ namespace AnonPDF
 
             PointF startScreen = GetArrowScreenPoint(selectedArrowObject.Start);
             PointF endScreen = GetArrowScreenPoint(selectedArrowObject.End);
+            float minX = Math.Min(startScreen.X, endScreen.X);
+            float maxX = Math.Max(startScreen.X, endScreen.X);
+            float minY = Math.Min(startScreen.Y, endScreen.Y);
+            float maxY = Math.Max(startScreen.Y, endScreen.Y);
+            RectangleF arrowFrame = new RectangleF(minX, minY, Math.Max(1f, maxX - minX), Math.Max(1f, maxY - minY));
+            using (var framePen = new Pen(System.Drawing.Color.Green, 1f))
+            {
+                graphics.DrawRectangle(framePen, arrowFrame.X, arrowFrame.Y, arrowFrame.Width, arrowFrame.Height);
+            }
+
             RectangleF startHandle = BuildHandleRect(startScreen, RasterResizeHandleSize);
             RectangleF endHandle = BuildHandleRect(endScreen, RasterResizeHandleSize);
             using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
