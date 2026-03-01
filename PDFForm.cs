@@ -349,14 +349,24 @@ namespace AnonPDF
             DashDotDot
         }
 
+        private enum VectorFillPatternKind
+        {
+            Solid,
+            Diagonal,
+            Cross,
+            Dot
+        }
+
         private sealed class VectorShapeDefaults
         {
             public VectorShapeType ShapeType { get; set; }
             public int StrokeColorArgb { get; set; }
             public float StrokeWidth { get; set; }
             public int FillColorArgb { get; set; }
+            public int FillPatternColorArgb { get; set; }
             public float FillOpacity { get; set; }
             public VectorShapeStrokeKind StrokeKind { get; set; }
+            public VectorFillPatternKind FillPattern { get; set; }
 
             public static VectorShapeDefaults CreateDefault()
             {
@@ -366,8 +376,10 @@ namespace AnonPDF
                     StrokeColorArgb = System.Drawing.Color.Blue.ToArgb(),
                     StrokeWidth = 2f,
                     FillColorArgb = System.Drawing.Color.Gold.ToArgb(),
+                    FillPatternColorArgb = System.Drawing.Color.FromArgb(0, 0, 0, 0).ToArgb(),
                     FillOpacity = 0.18f,
-                    StrokeKind = VectorShapeStrokeKind.Solid
+                    StrokeKind = VectorShapeStrokeKind.Solid,
+                    FillPattern = VectorFillPatternKind.Solid
                 };
             }
 
@@ -379,8 +391,10 @@ namespace AnonPDF
                     StrokeColorArgb = StrokeColorArgb,
                     StrokeWidth = StrokeWidth,
                     FillColorArgb = FillColorArgb,
+                    FillPatternColorArgb = FillPatternColorArgb,
                     FillOpacity = FillOpacity,
-                    StrokeKind = StrokeKind
+                    StrokeKind = StrokeKind,
+                    FillPattern = FillPattern
                 };
             }
         }
@@ -4496,8 +4510,10 @@ namespace AnonPDF
                 StrokeColorArgb = source.StrokeColorArgb,
                 StrokeWidth = source.StrokeWidth,
                 FillColorArgb = source.FillColorArgb,
+                FillPatternColorArgb = source.FillPatternColorArgb,
                 FillOpacity = source.FillOpacity,
                 StrokeStyle = source.StrokeStyle,
+                FillPattern = source.FillPattern,
                 IsLocked = source.IsLocked,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -11640,13 +11656,69 @@ namespace AnonPDF
                     Increment = 5,
                     Value = (decimal)Math.Round(NormalizeVectorFillOpacity(working.FillOpacity) * 100f)
                 };
+                var labelFillPattern = new Label { Left = 482, Top = 184, Width = 60, Text = isPl ? "Wzór:" : isDe ? "Muster:" : "Pattern:" };
+                var comboFillPattern = new ComboBox
+                {
+                    Left = 540,
+                    Top = 180,
+                    Width = 56,
+                    DropDownStyle = ComboBoxStyle.DropDownList
+                };
+                comboFillPattern.DropDownWidth = 170;
+                comboFillPattern.Items.Add(isPl ? "Pełny" : isDe ? "Voll" : "Solid");
+                comboFillPattern.Items.Add(isPl ? "Ukośny" : isDe ? "Diagonal" : "Diagonal");
+                comboFillPattern.Items.Add(isPl ? "Krzyżowy" : isDe ? "Kreuz" : "Cross");
+                comboFillPattern.Items.Add(isPl ? "Kropki" : isDe ? "Punkte" : "Dots");
+                switch (working.FillPattern)
+                {
+                    case VectorFillPatternKind.Diagonal:
+                        comboFillPattern.SelectedIndex = 1;
+                        break;
+                    case VectorFillPatternKind.Cross:
+                        comboFillPattern.SelectedIndex = 2;
+                        break;
+                    case VectorFillPatternKind.Dot:
+                        comboFillPattern.SelectedIndex = 3;
+                        break;
+                    default:
+                        comboFillPattern.SelectedIndex = 0;
+                        break;
+                }
+                System.Drawing.Color patternBaseColor = System.Drawing.Color.FromArgb(working.FillPatternColorArgb);
+                if (patternBaseColor.A == 0)
+                {
+                    patternBaseColor = System.Drawing.Color.Black;
+                }
+                var labelFillPatternColor = new Label { Left = 482, Top = 214, Width = 60, Text = isPl ? "Kolor:" : isDe ? "Farbe:" : "Color:" };
+                var buttonFillPatternColor = new Button
+                {
+                    Left = 540,
+                    Top = 210,
+                    Width = 56,
+                    Height = 26,
+                    BackColor = System.Drawing.Color.FromArgb(patternBaseColor.R, patternBaseColor.G, patternBaseColor.B)
+                };
+                buttonFillPatternColor.Click += (_, __) =>
+                {
+                    using (var dlg = new ColorDialog())
+                    {
+                        dlg.Color = buttonFillPatternColor.BackColor;
+                        dlg.FullOpen = true;
+                        if (dlg.ShowDialog(this) == DialogResult.OK)
+                        {
+                            buttonFillPatternColor.BackColor = dlg.Color;
+                        }
+                    }
+                };
                 checkNoStrokeColor.CheckedChanged += (_, __) => refreshVectorStyleControls?.Invoke();
                 checkNoFillColor.CheckedChanged += (_, __) => refreshVectorStyleControls?.Invoke();
+                comboFillPattern.SelectedIndexChanged += (_, __) => refreshVectorStyleControls?.Invoke();
                 refreshVectorStyleControls = () =>
                 {
                     bool supportsFill = ShapeTypeSupportsFill(selectedShape);
                     bool hasStroke = !checkNoStrokeColor.Checked;
                     bool hasFill = supportsFill && !checkNoFillColor.Checked;
+                    bool hasPattern = hasFill && comboFillPattern.SelectedIndex > 0;
 
                     buttonStrokeColor.Enabled = hasStroke;
                     labelStrokeWidth.Enabled = hasStroke;
@@ -11659,6 +11731,10 @@ namespace AnonPDF
                     buttonFillColor.Enabled = hasFill;
                     labelFillOpacity.Enabled = hasFill;
                     numericFillOpacity.Enabled = hasFill;
+                    labelFillPattern.Enabled = hasFill;
+                    comboFillPattern.Enabled = hasFill;
+                    labelFillPatternColor.Enabled = hasPattern;
+                    buttonFillPatternColor.Enabled = hasPattern;
                 };
 
                 var buttonOk = new Button { Left = 364, Top = 252, Width = 110, Text = "OK", DialogResult = DialogResult.OK };
@@ -11677,6 +11753,10 @@ namespace AnonPDF
                 prompt.Controls.Add(buttonFillColor);
                 prompt.Controls.Add(labelFillOpacity);
                 prompt.Controls.Add(numericFillOpacity);
+                prompt.Controls.Add(labelFillPattern);
+                prompt.Controls.Add(comboFillPattern);
+                prompt.Controls.Add(labelFillPatternColor);
+                prompt.Controls.Add(buttonFillPatternColor);
                 prompt.Controls.Add(checkNoFillColor);
                 prompt.Controls.Add(buttonOk);
                 prompt.Controls.Add(buttonCancel);
@@ -11718,9 +11798,27 @@ namespace AnonPDF
                 working.FillColorArgb = noFill
                     ? System.Drawing.Color.FromArgb(0, selectedFill.R, selectedFill.G, selectedFill.B).ToArgb()
                     : System.Drawing.Color.FromArgb(255, selectedFill.R, selectedFill.G, selectedFill.B).ToArgb();
-                working.FillOpacity = noFill
-                    ? 0f
-                    : NormalizeVectorFillOpacity((float)(numericFillOpacity.Value / 100m));
+                working.FillOpacity = NormalizeVectorFillOpacity((float)(numericFillOpacity.Value / 100m));
+                switch (comboFillPattern.SelectedIndex)
+                {
+                    case 1:
+                        working.FillPattern = VectorFillPatternKind.Diagonal;
+                        break;
+                    case 2:
+                        working.FillPattern = VectorFillPatternKind.Cross;
+                        break;
+                    case 3:
+                        working.FillPattern = VectorFillPatternKind.Dot;
+                        break;
+                    default:
+                        working.FillPattern = VectorFillPatternKind.Solid;
+                        break;
+                }
+                System.Drawing.Color selectedPatternColor = buttonFillPatternColor.BackColor;
+                bool hasPatternColor = !noFill && comboFillPattern.SelectedIndex > 0;
+                working.FillPatternColorArgb = hasPatternColor
+                    ? System.Drawing.Color.FromArgb(255, selectedPatternColor.R, selectedPatternColor.G, selectedPatternColor.B).ToArgb()
+                    : System.Drawing.Color.FromArgb(0, selectedPatternColor.R, selectedPatternColor.G, selectedPatternColor.B).ToArgb();
                 switch (comboStrokeStyle.SelectedIndex)
                 {
                     case 1:
@@ -11792,8 +11890,10 @@ namespace AnonPDF
                 StrokeColorArgb = activeVectorShapeDefaults.StrokeColorArgb,
                 StrokeWidth = NormalizeVectorStrokeWidth(activeVectorShapeDefaults.StrokeWidth),
                 FillColorArgb = activeVectorShapeDefaults.FillColorArgb,
+                FillPatternColorArgb = activeVectorShapeDefaults.FillPatternColorArgb,
                 FillOpacity = NormalizeVectorFillOpacity(activeVectorShapeDefaults.FillOpacity),
                 StrokeStyle = activeVectorShapeDefaults.StrokeKind.ToString(),
+                FillPattern = activeVectorShapeDefaults.FillPattern.ToString(),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             };
@@ -13806,6 +13906,8 @@ namespace AnonPDF
                 bool hasStroke = HasVisibleVectorColor(vectorShape.StrokeColorArgb);
                 float fillOpacity = supportsFill ? NormalizeVectorFillOpacity(vectorShape.FillOpacity) : 0f;
                 bool hasFill = supportsFill && HasVisibleVectorColor(vectorShape.FillColorArgb) && fillOpacity > 0f;
+                VectorFillPatternKind fillPattern = ParseVectorFillPattern(vectorShape.FillPattern);
+                bool hasPatternColor = HasVisibleVectorColor(vectorShape.FillPatternColorArgb);
                 if (!hasStroke && !hasFill)
                 {
                     continue;
@@ -13837,16 +13939,31 @@ namespace AnonPDF
                     }
                 }
 
-                pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
-                for (int i = 1; i < pdfPoints.Count; i++)
-                {
-                    pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
-                }
-
                 if (isClosed && pdfPoints.Count >= 3)
                 {
-                    if (hasFill && hasStroke)
+                    if (hasFill && fillPattern != VectorFillPatternKind.Solid && hasPatternColor)
                     {
+                        if (hasStroke)
+                        {
+                            pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
+                            for (int i = 1; i < pdfPoints.Count; i++)
+                            {
+                                pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
+                            }
+                            pdfCanvas.ClosePathStroke();
+                        }
+
+                        System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
+                        System.Drawing.Color patternColor = System.Drawing.Color.FromArgb(vectorShape.FillPatternColorArgb);
+                        DrawVectorHatchFillToPdf(pdfCanvas, pdfPoints, fillColor, patternColor, fillOpacity, fillPattern);
+                    }
+                    else if (hasFill && hasStroke)
+                    {
+                        pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
+                        for (int i = 1; i < pdfPoints.Count; i++)
+                        {
+                            pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
+                        }
                         System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
                         pdfCanvas.SetFillColor(new DeviceRgb(fillColor.R, fillColor.G, fillColor.B));
                         var fillState = new PdfExtGState().SetFillOpacity(fillOpacity);
@@ -13855,6 +13972,11 @@ namespace AnonPDF
                     }
                     else if (hasFill)
                     {
+                        pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
+                        for (int i = 1; i < pdfPoints.Count; i++)
+                        {
+                            pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
+                        }
                         System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
                         pdfCanvas.SetFillColor(new DeviceRgb(fillColor.R, fillColor.G, fillColor.B));
                         var fillState = new PdfExtGState().SetFillOpacity(fillOpacity);
@@ -13863,16 +13985,118 @@ namespace AnonPDF
                     }
                     else if (hasStroke)
                     {
+                        pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
+                        for (int i = 1; i < pdfPoints.Count; i++)
+                        {
+                            pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
+                        }
                         pdfCanvas.ClosePathStroke();
                     }
                 }
                 else if (hasStroke)
                 {
+                    pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
+                    for (int i = 1; i < pdfPoints.Count; i++)
+                    {
+                        pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
+                    }
                     pdfCanvas.Stroke();
                 }
 
                 pdfCanvas.RestoreState();
             }
+        }
+
+        private void DrawVectorHatchFillToPdf(
+            iText.Kernel.Pdf.Canvas.PdfCanvas pdfCanvas,
+            IList<PointF> polygon,
+            System.Drawing.Color fillColor,
+            System.Drawing.Color patternColor,
+            float fillOpacity,
+            VectorFillPatternKind fillPattern)
+        {
+            if (pdfCanvas == null || polygon == null || polygon.Count < 3)
+            {
+                return;
+            }
+
+            float minX = polygon.Min(p => p.X);
+            float maxX = polygon.Max(p => p.X);
+            float minY = polygon.Min(p => p.Y);
+            float maxY = polygon.Max(p => p.Y);
+            float width = maxX - minX;
+            float height = maxY - minY;
+            if (width <= 0.01f || height <= 0.01f)
+            {
+                return;
+            }
+
+            float spacing = 6f;
+            float margin = Math.Max(width, height) + spacing;
+
+            pdfCanvas.SaveState();
+            pdfCanvas.MoveTo(polygon[0].X, polygon[0].Y);
+            for (int i = 1; i < polygon.Count; i++)
+            {
+                pdfCanvas.LineTo(polygon[i].X, polygon[i].Y);
+            }
+            pdfCanvas.LineTo(polygon[0].X, polygon[0].Y);
+            pdfCanvas.Clip();
+            pdfCanvas.EndPath();
+
+            var backgroundFillState = new PdfExtGState().SetFillOpacity(fillOpacity);
+            pdfCanvas.SetExtGState(backgroundFillState);
+            pdfCanvas.SetFillColor(new DeviceRgb(fillColor.R, fillColor.G, fillColor.B));
+            pdfCanvas.Rectangle(minX - margin, minY - margin, width + (2f * margin), height + (2f * margin));
+            pdfCanvas.Fill();
+
+            if (fillPattern == VectorFillPatternKind.Dot)
+            {
+                var fillState = new PdfExtGState().SetFillOpacity(fillOpacity);
+                pdfCanvas.SetExtGState(fillState);
+                pdfCanvas.SetFillColor(new DeviceRgb(patternColor.R, patternColor.G, patternColor.B));
+                float radius = 0.65f;
+                for (float y = minY - margin; y <= maxY + margin; y += spacing)
+                {
+                    for (float x = minX - margin; x <= maxX + margin; x += spacing)
+                    {
+                        pdfCanvas.Circle(x, y, radius);
+                    }
+                }
+                pdfCanvas.Fill();
+                pdfCanvas.RestoreState();
+                return;
+            }
+
+            var strokeState = new PdfExtGState().SetStrokeOpacity(fillOpacity);
+            pdfCanvas.SetExtGState(strokeState);
+            pdfCanvas.SetStrokeColor(new DeviceRgb(patternColor.R, patternColor.G, patternColor.B));
+            pdfCanvas.SetLineWidth(0.7f);
+
+            if (fillPattern == VectorFillPatternKind.Diagonal)
+            {
+                for (float x = minX - margin; x <= maxX + margin; x += spacing)
+                {
+                    pdfCanvas.MoveTo(x, minY - margin);
+                    pdfCanvas.LineTo(x + height + (margin * 2f), maxY + margin);
+                }
+            }
+            else
+            {
+                for (float y = minY - margin; y <= maxY + margin; y += spacing)
+                {
+                    pdfCanvas.MoveTo(minX - margin, y);
+                    pdfCanvas.LineTo(maxX + margin, y);
+                }
+                for (float x = minX - margin; x <= maxX + margin; x += spacing)
+                {
+                    pdfCanvas.MoveTo(x, minY - margin);
+                    pdfCanvas.LineTo(x, maxY + margin);
+                }
+            }
+
+            pdfCanvas.Stroke();
+            pdfCanvas.RestoreState();
         }
 
         private void RenderRasterObjectToPdf(
@@ -14534,9 +14758,33 @@ namespace AnonPDF
                         if (alpha > 0)
                         {
                             System.Drawing.Color fillBase = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
-                            using (var fillBrush = new SolidBrush(System.Drawing.Color.FromArgb(alpha, fillBase.R, fillBase.G, fillBase.B)))
+                            System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(alpha, fillBase.R, fillBase.G, fillBase.B);
+                            VectorFillPatternKind fillPattern = ParseVectorFillPattern(vectorShape.FillPattern);
+                            if (fillPattern == VectorFillPatternKind.Solid)
                             {
-                                graphics.FillPolygon(fillBrush, points);
+                                using (var fillBrush = new SolidBrush(fillColor))
+                                {
+                                    graphics.FillPolygon(fillBrush, points);
+                                }
+                            }
+                            else
+                            {
+                                using (var fillBrush = new SolidBrush(fillColor))
+                                {
+                                    graphics.FillPolygon(fillBrush, points);
+                                }
+                                if (HasVisibleVectorColor(vectorShape.FillPatternColorArgb))
+                                {
+                                    System.Drawing.Color patternBase = System.Drawing.Color.FromArgb(vectorShape.FillPatternColorArgb);
+                                    System.Drawing.Color patternColor = System.Drawing.Color.FromArgb(alpha, patternBase.R, patternBase.G, patternBase.B);
+                                    using (var hatchBrush = new HatchBrush(
+                                        ToDrawingHatchStyle(fillPattern),
+                                        patternColor,
+                                        System.Drawing.Color.FromArgb(0, fillBase.R, fillBase.G, fillBase.B)))
+                                    {
+                                        graphics.FillPolygon(hatchBrush, points);
+                                    }
+                                }
                             }
                         }
                     }
@@ -17080,8 +17328,10 @@ namespace AnonPDF
                 StrokeColorArgb = vectorShape.StrokeColorArgb,
                 StrokeWidth = NormalizeVectorStrokeWidth(vectorShape.StrokeWidth),
                 FillColorArgb = vectorShape.FillColorArgb,
+                FillPatternColorArgb = vectorShape.FillPatternColorArgb,
                 FillOpacity = NormalizeVectorFillOpacity(vectorShape.FillOpacity),
-                StrokeKind = ParseVectorStrokeKind(vectorShape.StrokeStyle)
+                StrokeKind = ParseVectorStrokeKind(vectorShape.StrokeStyle),
+                FillPattern = ParseVectorFillPattern(vectorShape.FillPattern)
             };
 
             if (!TryPromptShapeDefaults(out VectorShapeDefaults selectedDefaults, initialDefaults, lockShapeType: true))
@@ -17099,8 +17349,10 @@ namespace AnonPDF
                 vectorShape.StrokeColorArgb != selectedDefaults.StrokeColorArgb ||
                 !AreSameFloat(NormalizeVectorStrokeWidth(vectorShape.StrokeWidth), NormalizeVectorStrokeWidth(selectedDefaults.StrokeWidth)) ||
                 vectorShape.FillColorArgb != selectedDefaults.FillColorArgb ||
+                vectorShape.FillPatternColorArgb != selectedDefaults.FillPatternColorArgb ||
                 !AreSameFloat(NormalizeVectorFillOpacity(vectorShape.FillOpacity), NormalizeVectorFillOpacity(selectedDefaults.FillOpacity)) ||
-                !string.Equals(vectorShape.StrokeStyle ?? string.Empty, selectedDefaults.StrokeKind.ToString(), StringComparison.OrdinalIgnoreCase);
+                !string.Equals(vectorShape.StrokeStyle ?? string.Empty, selectedDefaults.StrokeKind.ToString(), StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(vectorShape.FillPattern ?? string.Empty, selectedDefaults.FillPattern.ToString(), StringComparison.OrdinalIgnoreCase);
 
             if (!changed)
             {
@@ -17111,8 +17363,10 @@ namespace AnonPDF
             vectorShape.StrokeColorArgb = selectedDefaults.StrokeColorArgb;
             vectorShape.StrokeWidth = NormalizeVectorStrokeWidth(selectedDefaults.StrokeWidth);
             vectorShape.FillColorArgb = selectedDefaults.FillColorArgb;
+            vectorShape.FillPatternColorArgb = selectedDefaults.FillPatternColorArgb;
             vectorShape.FillOpacity = NormalizeVectorFillOpacity(selectedDefaults.FillOpacity);
             vectorShape.StrokeStyle = selectedDefaults.StrokeKind.ToString();
+            vectorShape.FillPattern = selectedDefaults.FillPattern.ToString();
             NormalizeVectorShape(vectorShape);
             ConstrainVectorShapeToPage(vectorShape);
             vectorShape.UpdatedAtUtc = DateTime.UtcNow;
@@ -17455,6 +17709,21 @@ namespace AnonPDF
             return VectorShapeStrokeKind.Solid;
         }
 
+        private static VectorFillPatternKind ParseVectorFillPattern(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return VectorFillPatternKind.Solid;
+            }
+
+            if (Enum.TryParse(value.Trim(), true, out VectorFillPatternKind parsed))
+            {
+                return parsed;
+            }
+
+            return VectorFillPatternKind.Solid;
+        }
+
         private static DashStyle ToDrawingDashStyle(VectorShapeStrokeKind strokeKind)
         {
             switch (strokeKind)
@@ -17469,6 +17738,21 @@ namespace AnonPDF
                     return DashStyle.DashDotDot;
                 default:
                     return DashStyle.Solid;
+            }
+        }
+
+        private static HatchStyle ToDrawingHatchStyle(VectorFillPatternKind pattern)
+        {
+            switch (pattern)
+            {
+                case VectorFillPatternKind.Diagonal:
+                    return HatchStyle.ForwardDiagonal;
+                case VectorFillPatternKind.Cross:
+                    return HatchStyle.Cross;
+                case VectorFillPatternKind.Dot:
+                    return HatchStyle.DottedGrid;
+                default:
+                    return HatchStyle.SolidDiamond;
             }
         }
 
@@ -17706,6 +17990,9 @@ namespace AnonPDF
             vectorShape.StrokeWidth = NormalizeVectorStrokeWidth(vectorShape.StrokeWidth);
             vectorShape.FillOpacity = NormalizeVectorFillOpacity(vectorShape.FillOpacity);
             vectorShape.StrokeStyle = ParseVectorStrokeKind(vectorShape.StrokeStyle).ToString();
+            vectorShape.FillPattern = ParseVectorFillPattern(vectorShape.FillPattern).ToString();
+            System.Drawing.Color patternColor = System.Drawing.Color.FromArgb(vectorShape.FillPatternColorArgb);
+            vectorShape.FillPatternColorArgb = System.Drawing.Color.FromArgb(patternColor.A, patternColor.R, patternColor.G, patternColor.B).ToArgb();
             vectorShape.Points = (vectorShape.Points ?? new List<PointF>())
                 .Where(p => !float.IsNaN(p.X) && !float.IsInfinity(p.X) && !float.IsNaN(p.Y) && !float.IsInfinity(p.Y))
                 .ToList();
@@ -17715,6 +18002,7 @@ namespace AnonPDF
                 vectorShape.FillOpacity = 0f;
                 System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
                 vectorShape.FillColorArgb = System.Drawing.Color.FromArgb(0, fillColor.R, fillColor.G, fillColor.B).ToArgb();
+                vectorShape.FillPatternColorArgb = System.Drawing.Color.FromArgb(0, patternColor.R, patternColor.G, patternColor.B).ToArgb();
             }
         }
 
@@ -24015,8 +24303,10 @@ namespace AnonPDF
         public int StrokeColorArgb { get; set; } = System.Drawing.Color.Blue.ToArgb();
         public float StrokeWidth { get; set; } = 2f;
         public int FillColorArgb { get; set; } = System.Drawing.Color.Gold.ToArgb();
+        public int FillPatternColorArgb { get; set; } = System.Drawing.Color.FromArgb(0, 0, 0, 0).ToArgb();
         public float FillOpacity { get; set; } = 0.18f;
         public string StrokeStyle { get; set; } = "solid";
+        public string FillPattern { get; set; } = "solid";
         public bool IsLocked { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
