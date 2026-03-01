@@ -450,7 +450,7 @@ Anwendung schließen und Installer jetzt starten?</value>
     <value>Ganz nach vorn</value>
   </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
-    <value>Text in Zwischenablage kopieren</value>
+    <value>In Zwischenablage kopieren</value>
   </data>
   <data name="Menu_ExportGraphics" xml:space="preserve">
     <value>Grafiken exportieren</value>

@@ -256,7 +256,7 @@
     <value>Przesuń na wierzch</value>
   </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
-    <value>Kopiuj tekst do schowka</value>
+    <value>Kopiuj do schowka</value>
   </data>
   <data name="Menu_ExportGraphics" xml:space="preserve">
     <value>Eksport obiektów graficznych</value>

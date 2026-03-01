@@ -256,7 +256,7 @@
     <value>Bring to front</value>
   </data>
   <data name="Menu_CopyToClipboard" xml:space="preserve">
-    <value>Copy text to clipboard</value>
+    <value>Copy to clipboard</value>
   </data>
   <data name="Menu_ExportGraphics" xml:space="preserve">
     <value>Export graphics</value>

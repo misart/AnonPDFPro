@@ -244,6 +244,9 @@ namespace AnonPDF
         private readonly HashSet<string> selectedRasterObjectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> selectedArrowObjectIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> selectedVectorShapeIds = new HashSet<string>(StringComparer.Ordinal);
+        private ObjectClipboardSnapshot objectClipboardSnapshot;
+        private int objectClipboardPasteCount;
+        private bool preferObjectClipboardPaste;
         private List<VectorShapeObject> vectorShapes = new List<VectorShapeObject>();
         private bool isVectorShapeCreationMode;
         private VectorShapeType activeVectorShapeType = VectorShapeType.Polyline;
@@ -319,6 +322,30 @@ namespace AnonPDF
             Raster,
             Arrow,
             VectorShape
+        }
+
+        private enum ObjectClipboardItemType
+        {
+            Text,
+            Raster,
+            Arrow,
+            VectorShape
+        }
+
+        private sealed class ObjectClipboardItem
+        {
+            public ObjectClipboardItemType Type { get; set; }
+            public RectangleF Bounds { get; set; }
+            public TextAnnotation Text { get; set; }
+            public RasterObject Raster { get; set; }
+            public ArrowObject Arrow { get; set; }
+            public VectorShapeObject VectorShape { get; set; }
+        }
+
+        private sealed class ObjectClipboardSnapshot
+        {
+            public RectangleF SourceBounds { get; set; }
+            public List<ObjectClipboardItem> Items { get; } = new List<ObjectClipboardItem>();
         }
 
         private sealed class GroupMoveEntry
@@ -438,7 +465,7 @@ namespace AnonPDF
 
         // Fields to detect clicks on icon buttons
         private bool isClickOnIcon = false;
-        private enum IconType { None, Edit, Lock, Duplicate, Delete }
+        private enum IconType { None, Edit, Lock, Duplicate, Order, Delete }
         private IconType clickedIconType = IconType.None;
         private TextAnnotation annotationForIcon = null;  // annotation where the icon was clicked
         private bool isClickOnRasterIcon = false;
@@ -1054,7 +1081,7 @@ namespace AnonPDF
             addRasterImageToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addRasterImageToolStripMenuItem",
-                ShortcutKeys = Keys.Control | Keys.Shift | Keys.I
+                ShortcutKeys = Keys.Control | Keys.R
             };
             addRasterImageToolStripMenuItem.Enabled = false;
             addRasterImageToolStripMenuItem.Click += AddRasterImageToolStripMenuItem_Click;
@@ -1070,6 +1097,7 @@ namespace AnonPDF
             addArrowToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addArrowToolStripMenuItem",
+                ShortcutKeys = Keys.Control | Keys.A,
                 Enabled = false
             };
             addArrowToolStripMenuItem.Click += AddArrowToolStripMenuItem_Click;
@@ -1077,6 +1105,7 @@ namespace AnonPDF
             addShapeToolStripMenuItem = new ToolStripMenuItem
             {
                 Name = "addShapeToolStripMenuItem",
+                ShortcutKeys = Keys.Control | Keys.F,
                 Enabled = false
             };
             addShapeToolStripMenuItem.Click += AddShapeToolStripMenuItem_Click;
@@ -1121,6 +1150,11 @@ namespace AnonPDF
             };
             automaticFootnotesToolStripMenuItem.CheckedChanged += AutomaticFootnotesToolStripMenuItem_CheckedChanged;
 
+            if (rotatePageMenuItem != null)
+            {
+                rotatePageMenuItem.ShortcutKeys = Keys.Control | Keys.Shift | Keys.R;
+            }
+
             if (menuStrip1 == null)
             {
                 return;
@@ -1146,12 +1180,23 @@ namespace AnonPDF
                 addTextOwner.DropDownItems.Remove(addTextMenuItem);
             }
 
+            if (menuOptionsItem != null && menuOptionsItem.DropDownItems.Contains(copyToClipboardMenuItem))
+            {
+                menuOptionsItem.DropDownItems.Remove(copyToClipboardMenuItem);
+            }
+
+            if (copyToClipboardMenuItem.OwnerItem is ToolStripDropDownItem copyOwner && copyOwner.DropDownItems.Contains(copyToClipboardMenuItem))
+            {
+                copyOwner.DropDownItems.Remove(copyToClipboardMenuItem);
+            }
+
             menuAddItem.DropDownItems.Clear();
             menuAddItem.DropDownItems.Add(addArrowToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addTextMenuItem);
             menuAddItem.DropDownItems.Add(addShapeToolStripMenuItem);
             menuAddItem.DropDownItems.Add(addRasterImageToolStripMenuItem);
             menuAddItem.DropDownItems.Add(new ToolStripSeparator());
+            menuAddItem.DropDownItems.Add(copyToClipboardMenuItem);
             menuAddItem.DropDownItems.Add(pasteObjectFromClipboardToolStripMenuItem);
             menuAddItem.DropDownItems.Add(new ToolStripSeparator());
             menuAddItem.DropDownItems.Add(addCommentToolStripMenuItem);
@@ -2780,6 +2825,734 @@ namespace AnonPDF
             }
 
             return selectedObjects.Count;
+        }
+
+        private static Font CloneFontSafe(Font source)
+        {
+            if (source == null)
+            {
+                return new Font("Arial", 12f);
+            }
+
+            try
+            {
+                return (Font)source.Clone();
+            }
+            catch
+            {
+                return new Font(source.FontFamily, source.Size, source.Style, source.Unit);
+            }
+        }
+
+        private bool TryGetObjectBoundsForClipboard(object selectedObject, out RectangleF bounds)
+        {
+            bounds = RectangleF.Empty;
+            if (selectedObject is TextAnnotation textAnnotation)
+            {
+                bounds = textAnnotation.AnnotationBounds;
+                return bounds.Width > 0f || bounds.Height > 0f;
+            }
+
+            if (selectedObject is RasterObject rasterObject)
+            {
+                bounds = rasterObject.Bounds;
+                return bounds.Width > 0f || bounds.Height > 0f;
+            }
+
+            if (selectedObject is ArrowObject arrowObject)
+            {
+                float minX = Math.Min(arrowObject.Start.X, arrowObject.End.X);
+                float minY = Math.Min(arrowObject.Start.Y, arrowObject.End.Y);
+                float maxX = Math.Max(arrowObject.Start.X, arrowObject.End.X);
+                float maxY = Math.Max(arrowObject.Start.Y, arrowObject.End.Y);
+                bounds = RectangleF.FromLTRB(minX, minY, maxX, maxY);
+                return bounds.Width > 0f || bounds.Height > 0f;
+            }
+
+            if (selectedObject is VectorShapeObject vectorShapeObject)
+            {
+                bounds = GetVectorShapeBounds(vectorShapeObject.Points);
+                return !bounds.IsEmpty;
+            }
+
+            return false;
+        }
+
+        private List<object> GetSelectedObjectsOnCurrentPageInLayerOrder()
+        {
+            var orderedSelection = new List<object>();
+            var addedKeys = new HashSet<string>(StringComparer.Ordinal);
+            EnsureObjectLayerOrder();
+
+            string BuildKey(ObjectClipboardItemType type, string id)
+            {
+                return $"{type}:{id}";
+            }
+
+            foreach (ObjectLayerEntry layer in objectLayerOrder)
+            {
+                if (layer == null || string.IsNullOrWhiteSpace(layer.Id))
+                {
+                    continue;
+                }
+
+                switch (layer.Type)
+                {
+                    case LayerObjectType.Text:
+                    {
+                        TextAnnotation text = textAnnotations.FirstOrDefault(a =>
+                            a != null &&
+                            a.PageNumber == currentPage &&
+                            string.Equals(a.Id, layer.Id, StringComparison.Ordinal));
+                        if (text == null || !IsTextAnnotationSelected(text))
+                        {
+                            continue;
+                        }
+
+                        EnsureTextAnnotationId(text);
+                        string key = BuildKey(ObjectClipboardItemType.Text, text.Id);
+                        if (addedKeys.Add(key))
+                        {
+                            orderedSelection.Add(text);
+                        }
+                        break;
+                    }
+                    case LayerObjectType.Raster:
+                    {
+                        RasterObject raster = rasterObjects.FirstOrDefault(r =>
+                            r != null &&
+                            r.PageNumber == currentPage &&
+                            string.Equals(r.Id, layer.Id, StringComparison.Ordinal));
+                        if (raster == null || !IsRasterObjectSelected(raster))
+                        {
+                            continue;
+                        }
+
+                        EnsureRasterObjectId(raster);
+                        string key = BuildKey(ObjectClipboardItemType.Raster, raster.Id);
+                        if (addedKeys.Add(key))
+                        {
+                            orderedSelection.Add(raster);
+                        }
+                        break;
+                    }
+                    case LayerObjectType.Arrow:
+                    {
+                        ArrowObject arrow = arrowObjects.FirstOrDefault(a =>
+                            a != null &&
+                            a.PageNumber == currentPage &&
+                            string.Equals(a.Id, layer.Id, StringComparison.Ordinal));
+                        if (arrow == null || !IsArrowObjectSelected(arrow))
+                        {
+                            continue;
+                        }
+
+                        EnsureArrowObjectId(arrow);
+                        string key = BuildKey(ObjectClipboardItemType.Arrow, arrow.Id);
+                        if (addedKeys.Add(key))
+                        {
+                            orderedSelection.Add(arrow);
+                        }
+                        break;
+                    }
+                    case LayerObjectType.VectorShape:
+                    {
+                        VectorShapeObject vector = vectorShapes.FirstOrDefault(v =>
+                            v != null &&
+                            v.PageNumber == currentPage &&
+                            string.Equals(v.Id, layer.Id, StringComparison.Ordinal));
+                        if (vector == null || !IsVectorShapeSelected(vector))
+                        {
+                            continue;
+                        }
+
+                        EnsureVectorShapeId(vector);
+                        string key = BuildKey(ObjectClipboardItemType.VectorShape, vector.Id);
+                        if (addedKeys.Add(key))
+                        {
+                            orderedSelection.Add(vector);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            foreach (TextAnnotation text in selectedTextAnnotations.Where(a => a != null && a.PageNumber == currentPage))
+            {
+                EnsureTextAnnotationId(text);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.Text, text.Id)))
+                {
+                    orderedSelection.Add(text);
+                }
+            }
+            if (selectedTextAnnotation != null && selectedTextAnnotation.PageNumber == currentPage)
+            {
+                EnsureTextAnnotationId(selectedTextAnnotation);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.Text, selectedTextAnnotation.Id)))
+                {
+                    orderedSelection.Add(selectedTextAnnotation);
+                }
+            }
+
+            foreach (string rasterId in selectedRasterObjectIds)
+            {
+                RasterObject raster = rasterObjects.FirstOrDefault(r => r != null && r.PageNumber == currentPage && string.Equals(r.Id, rasterId, StringComparison.Ordinal));
+                if (raster == null)
+                {
+                    continue;
+                }
+                EnsureRasterObjectId(raster);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.Raster, raster.Id)))
+                {
+                    orderedSelection.Add(raster);
+                }
+            }
+            if (selectedRasterObject != null && selectedRasterObject.PageNumber == currentPage)
+            {
+                EnsureRasterObjectId(selectedRasterObject);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.Raster, selectedRasterObject.Id)))
+                {
+                    orderedSelection.Add(selectedRasterObject);
+                }
+            }
+
+            foreach (string arrowId in selectedArrowObjectIds)
+            {
+                ArrowObject arrow = arrowObjects.FirstOrDefault(a => a != null && a.PageNumber == currentPage && string.Equals(a.Id, arrowId, StringComparison.Ordinal));
+                if (arrow == null)
+                {
+                    continue;
+                }
+                EnsureArrowObjectId(arrow);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.Arrow, arrow.Id)))
+                {
+                    orderedSelection.Add(arrow);
+                }
+            }
+            if (selectedArrowObject != null && selectedArrowObject.PageNumber == currentPage)
+            {
+                EnsureArrowObjectId(selectedArrowObject);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.Arrow, selectedArrowObject.Id)))
+                {
+                    orderedSelection.Add(selectedArrowObject);
+                }
+            }
+
+            foreach (string vectorId in selectedVectorShapeIds)
+            {
+                VectorShapeObject vector = vectorShapes.FirstOrDefault(v => v != null && v.PageNumber == currentPage && string.Equals(v.Id, vectorId, StringComparison.Ordinal));
+                if (vector == null)
+                {
+                    continue;
+                }
+                EnsureVectorShapeId(vector);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.VectorShape, vector.Id)))
+                {
+                    orderedSelection.Add(vector);
+                }
+            }
+            if (selectedVectorShape != null && selectedVectorShape.PageNumber == currentPage)
+            {
+                EnsureVectorShapeId(selectedVectorShape);
+                if (addedKeys.Add(BuildKey(ObjectClipboardItemType.VectorShape, selectedVectorShape.Id)))
+                {
+                    orderedSelection.Add(selectedVectorShape);
+                }
+            }
+
+            return orderedSelection;
+        }
+
+        private bool TryCopySelectedObjectsToInternalClipboard()
+        {
+            if (pdf == null || numPages <= 0)
+            {
+                return false;
+            }
+
+            List<object> selectedObjects = GetSelectedObjectsOnCurrentPageInLayerOrder();
+            if (selectedObjects.Count == 0)
+            {
+                return false;
+            }
+
+            float minX = float.MaxValue;
+            float minY = float.MaxValue;
+            float maxX = float.MinValue;
+            float maxY = float.MinValue;
+            foreach (object selectedObject in selectedObjects)
+            {
+                if (!TryGetObjectBoundsForClipboard(selectedObject, out RectangleF bounds))
+                {
+                    continue;
+                }
+
+                minX = Math.Min(minX, bounds.Left);
+                minY = Math.Min(minY, bounds.Top);
+                maxX = Math.Max(maxX, bounds.Right);
+                maxY = Math.Max(maxY, bounds.Bottom);
+            }
+
+            if (minX == float.MaxValue || minY == float.MaxValue || maxX == float.MinValue || maxY == float.MinValue)
+            {
+                return false;
+            }
+
+            var snapshot = new ObjectClipboardSnapshot
+            {
+                SourceBounds = RectangleF.FromLTRB(minX, minY, maxX, maxY)
+            };
+
+            foreach (object selectedObject in selectedObjects)
+            {
+                if (selectedObject is TextAnnotation textAnnotation)
+                {
+                    snapshot.Items.Add(new ObjectClipboardItem
+                    {
+                        Type = ObjectClipboardItemType.Text,
+                        Bounds = new RectangleF(
+                            textAnnotation.AnnotationBounds.X - snapshot.SourceBounds.X,
+                            textAnnotation.AnnotationBounds.Y - snapshot.SourceBounds.Y,
+                            textAnnotation.AnnotationBounds.Width,
+                            textAnnotation.AnnotationBounds.Height),
+                        Text = new TextAnnotation
+                        {
+                            AnnotationText = textAnnotation.AnnotationText,
+                            AnnotationFont = CloneFontSafe(textAnnotation.AnnotationFont),
+                            AnnotationColor = textAnnotation.AnnotationColor,
+                            AnnotationAlignment = textAnnotation.AnnotationAlignment,
+                            AnnotationRotation = textAnnotation.AnnotationRotation,
+                            AnnotationIsLocked = textAnnotation.AnnotationIsLocked
+                        }
+                    });
+                    continue;
+                }
+
+                if (selectedObject is RasterObject rasterObject)
+                {
+                    snapshot.Items.Add(new ObjectClipboardItem
+                    {
+                        Type = ObjectClipboardItemType.Raster,
+                        Bounds = new RectangleF(
+                            rasterObject.Bounds.X - snapshot.SourceBounds.X,
+                            rasterObject.Bounds.Y - snapshot.SourceBounds.Y,
+                            rasterObject.Bounds.Width,
+                            rasterObject.Bounds.Height),
+                        Raster = new RasterObject
+                        {
+                            Rotation = rasterObject.Rotation,
+                            Opacity = rasterObject.Opacity,
+                            TransparentBackground = rasterObject.TransparentBackground,
+                            LockAspect = rasterObject.LockAspect,
+                            IsLocked = rasterObject.IsLocked,
+                            SourceType = rasterObject.SourceType,
+                            FilePath = rasterObject.FilePath,
+                            EmbeddedBytes = rasterObject.EmbeddedBytes == null ? null : (byte[])rasterObject.EmbeddedBytes.Clone(),
+                            MimeType = rasterObject.MimeType
+                        }
+                    });
+                    continue;
+                }
+
+                if (selectedObject is ArrowObject arrowObject)
+                {
+                    snapshot.Items.Add(new ObjectClipboardItem
+                    {
+                        Type = ObjectClipboardItemType.Arrow,
+                        Arrow = new ArrowObject
+                        {
+                            Start = new PointF(
+                                arrowObject.Start.X - snapshot.SourceBounds.X,
+                                arrowObject.Start.Y - snapshot.SourceBounds.Y),
+                            End = new PointF(
+                                arrowObject.End.X - snapshot.SourceBounds.X,
+                                arrowObject.End.Y - snapshot.SourceBounds.Y),
+                            LineColorArgb = arrowObject.LineColorArgb,
+                            Thickness = NormalizeArrowThickness(arrowObject.Thickness),
+                            HeadLength = NormalizeArrowHeadLength(arrowObject.HeadLength),
+                            HeadWidth = NormalizeArrowHeadWidth(arrowObject.HeadWidth),
+                            IsLocked = arrowObject.IsLocked
+                        }
+                    });
+                    continue;
+                }
+
+                if (selectedObject is VectorShapeObject vectorShapeObject)
+                {
+                    snapshot.Items.Add(new ObjectClipboardItem
+                    {
+                        Type = ObjectClipboardItemType.VectorShape,
+                        VectorShape = new VectorShapeObject
+                        {
+                            ShapeType = vectorShapeObject.ShapeType,
+                            Points = (vectorShapeObject.Points ?? new List<PointF>())
+                                .Select(point => new PointF(point.X - snapshot.SourceBounds.X, point.Y - snapshot.SourceBounds.Y))
+                                .ToList(),
+                            StrokeColorArgb = vectorShapeObject.StrokeColorArgb,
+                            StrokeWidth = NormalizeVectorStrokeWidth(vectorShapeObject.StrokeWidth),
+                            FillColorArgb = vectorShapeObject.FillColorArgb,
+                            FillPatternColorArgb = vectorShapeObject.FillPatternColorArgb,
+                            FillOpacity = NormalizeVectorFillOpacity(vectorShapeObject.FillOpacity),
+                            StrokeStyle = vectorShapeObject.StrokeStyle,
+                            FillPattern = vectorShapeObject.FillPattern,
+                            IsLocked = vectorShapeObject.IsLocked
+                        }
+                    });
+                }
+            }
+
+            if (snapshot.Items.Count == 0)
+            {
+                return false;
+            }
+
+            objectClipboardSnapshot = snapshot;
+            objectClipboardPasteCount = 0;
+            preferObjectClipboardPaste = true;
+            return true;
+        }
+
+        private bool BringTextAnnotationToFront(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return false;
+            }
+
+            EnsureTextAnnotationId(annotation);
+            return BringLayerToFront(LayerObjectType.Text, annotation.Id);
+        }
+
+        private bool SendTextAnnotationToBack(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return false;
+            }
+
+            EnsureTextAnnotationId(annotation);
+            return SendLayerToBack(LayerObjectType.Text, annotation.Id);
+        }
+
+        private bool MoveTextAnnotationForward(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return false;
+            }
+
+            EnsureTextAnnotationId(annotation);
+            return MoveLayerForward(LayerObjectType.Text, annotation.Id);
+        }
+
+        private bool MoveTextAnnotationBackward(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return false;
+            }
+
+            EnsureTextAnnotationId(annotation);
+            return MoveLayerBackward(LayerObjectType.Text, annotation.Id);
+        }
+
+        private bool TryReorderTextAnnotation(TextAnnotation annotation, Func<TextAnnotation, bool> reorderAction)
+        {
+            if (annotation == null || reorderAction == null)
+            {
+                return false;
+            }
+
+            EnsureTextAnnotationId(annotation);
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            if (annotation.AnnotationIsLocked)
+            {
+                MessageBox.Show(
+                    this,
+                    string.Format(LocalizedText("Msg_TextPositionInfo"), LocalizedText("Msg_TextAnnotation_Locked")),
+                    Resources.Title_Info,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return true;
+            }
+
+            if (!reorderAction(annotation))
+            {
+                return true;
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private void ShowTextOrderMenu(TextAnnotation annotation)
+        {
+            if (annotation == null)
+            {
+                return;
+            }
+
+            var menu = new ContextMenuStrip();
+            menu.Items.Add(LocalizedText("Order_BringToFront"), null, (_, __) => TryReorderTextAnnotation(annotation, BringTextAnnotationToFront));
+            menu.Items.Add(LocalizedText("Order_MoveForward"), null, (_, __) => TryReorderTextAnnotation(annotation, MoveTextAnnotationForward));
+            menu.Items.Add(LocalizedText("Order_MoveBackward"), null, (_, __) => TryReorderTextAnnotation(annotation, MoveTextAnnotationBackward));
+            menu.Items.Add(LocalizedText("Order_SendToBack"), null, (_, __) => TryReorderTextAnnotation(annotation, SendTextAnnotationToBack));
+
+            Point location = pdfViewer.PointToClient(Cursor.Position);
+            menu.Show(pdfViewer, location);
+        }
+
+        private bool TryPasteObjectsFromInternalClipboard()
+        {
+            if (objectClipboardSnapshot == null || objectClipboardSnapshot.Items.Count == 0)
+            {
+                return false;
+            }
+
+            if (pdf == null || numPages <= 0)
+            {
+                return false;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return true;
+            }
+
+            float offset = 12f * (objectClipboardPasteCount + 1);
+            float baseX = objectClipboardSnapshot.SourceBounds.X + offset;
+            float baseY = objectClipboardSnapshot.SourceBounds.Y + offset;
+            DateTime now = DateTime.UtcNow;
+
+            var pastedTextAnnotations = new List<TextAnnotation>();
+            var pastedRasterObjects = new List<RasterObject>();
+            var pastedArrowObjects = new List<ArrowObject>();
+            var pastedVectorShapes = new List<VectorShapeObject>();
+
+            foreach (ObjectClipboardItem item in objectClipboardSnapshot.Items)
+            {
+                if (item == null)
+                {
+                    continue;
+                }
+
+                switch (item.Type)
+                {
+                    case ObjectClipboardItemType.Text:
+                    {
+                        if (item.Text == null)
+                        {
+                            break;
+                        }
+
+                        RectangleF bounds = new RectangleF(
+                            baseX + item.Bounds.X,
+                            baseY + item.Bounds.Y,
+                            item.Bounds.Width,
+                            item.Bounds.Height);
+                        bounds = ConstrainAnnotationBoundsToViewer(bounds);
+                        var textCopy = new TextAnnotation
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            PageNumber = currentPage,
+                            AnnotationText = item.Text.AnnotationText,
+                            AnnotationFont = CloneFontSafe(item.Text.AnnotationFont),
+                            AnnotationColor = item.Text.AnnotationColor,
+                            AnnotationAlignment = item.Text.AnnotationAlignment,
+                            AnnotationRotation = item.Text.AnnotationRotation,
+                            AnnotationBounds = bounds,
+                            AnnotationIsLocked = item.Text.AnnotationIsLocked
+                        };
+                        textAnnotations.Add(textCopy);
+                        pastedTextAnnotations.Add(textCopy);
+                        break;
+                    }
+                    case ObjectClipboardItemType.Raster:
+                    {
+                        if (item.Raster == null)
+                        {
+                            break;
+                        }
+
+                        RectangleF bounds = new RectangleF(
+                            baseX + item.Bounds.X,
+                            baseY + item.Bounds.Y,
+                            item.Bounds.Width,
+                            item.Bounds.Height);
+                        var rasterCopy = new RasterObject
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            PageNumber = currentPage,
+                            Bounds = bounds,
+                            InitialBounds = bounds,
+                            Rotation = item.Raster.Rotation,
+                            Opacity = item.Raster.Opacity,
+                            TransparentBackground = item.Raster.TransparentBackground,
+                            LockAspect = item.Raster.LockAspect,
+                            IsLocked = item.Raster.IsLocked,
+                            SourceType = item.Raster.SourceType,
+                            FilePath = item.Raster.FilePath,
+                            EmbeddedBytes = item.Raster.EmbeddedBytes == null ? null : (byte[])item.Raster.EmbeddedBytes.Clone(),
+                            MimeType = item.Raster.MimeType,
+                            CreatedAtUtc = now,
+                            UpdatedAtUtc = now
+                        };
+                        ConstrainRasterObjectToPage(rasterCopy);
+                        rasterCopy.InitialBounds = rasterCopy.Bounds;
+                        rasterObjects.Add(rasterCopy);
+                        pastedRasterObjects.Add(rasterCopy);
+                        break;
+                    }
+                    case ObjectClipboardItemType.Arrow:
+                    {
+                        if (item.Arrow == null)
+                        {
+                            break;
+                        }
+
+                        var arrowCopy = new ArrowObject
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            PageNumber = currentPage,
+                            Start = new PointF(baseX + item.Arrow.Start.X, baseY + item.Arrow.Start.Y),
+                            End = new PointF(baseX + item.Arrow.End.X, baseY + item.Arrow.End.Y),
+                            LineColorArgb = item.Arrow.LineColorArgb,
+                            Thickness = NormalizeArrowThickness(item.Arrow.Thickness),
+                            HeadLength = NormalizeArrowHeadLength(item.Arrow.HeadLength),
+                            HeadWidth = NormalizeArrowHeadWidth(item.Arrow.HeadWidth),
+                            IsLocked = item.Arrow.IsLocked,
+                            CreatedAtUtc = now,
+                            UpdatedAtUtc = now
+                        };
+                        ConstrainArrowToPage(arrowCopy);
+                        arrowObjects.Add(arrowCopy);
+                        pastedArrowObjects.Add(arrowCopy);
+                        break;
+                    }
+                    case ObjectClipboardItemType.VectorShape:
+                    {
+                        if (item.VectorShape == null)
+                        {
+                            break;
+                        }
+
+                        var vectorCopy = new VectorShapeObject
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            PageNumber = currentPage,
+                            ShapeType = item.VectorShape.ShapeType,
+                            Points = (item.VectorShape.Points ?? new List<PointF>())
+                                .Select(point => new PointF(baseX + point.X, baseY + point.Y))
+                                .ToList(),
+                            StrokeColorArgb = item.VectorShape.StrokeColorArgb,
+                            StrokeWidth = NormalizeVectorStrokeWidth(item.VectorShape.StrokeWidth),
+                            FillColorArgb = item.VectorShape.FillColorArgb,
+                            FillPatternColorArgb = item.VectorShape.FillPatternColorArgb,
+                            FillOpacity = NormalizeVectorFillOpacity(item.VectorShape.FillOpacity),
+                            StrokeStyle = item.VectorShape.StrokeStyle,
+                            FillPattern = item.VectorShape.FillPattern,
+                            IsLocked = item.VectorShape.IsLocked,
+                            CreatedAtUtc = now,
+                            UpdatedAtUtc = now
+                        };
+                        NormalizeVectorShape(vectorCopy);
+                        ConstrainVectorShapeToPage(vectorCopy);
+                        vectorShapes.Add(vectorCopy);
+                        pastedVectorShapes.Add(vectorCopy);
+                        break;
+                    }
+                }
+            }
+
+            int pastedCount = pastedTextAnnotations.Count + pastedRasterObjects.Count + pastedArrowObjects.Count + pastedVectorShapes.Count;
+            if (pastedCount <= 0)
+            {
+                return true;
+            }
+
+            EnsureObjectLayerOrder();
+            foreach (TextAnnotation textAnnotation in pastedTextAnnotations)
+            {
+                BringTextAnnotationToFront(textAnnotation);
+            }
+            foreach (RasterObject rasterObject in pastedRasterObjects)
+            {
+                BringRasterObjectToFront(rasterObject);
+            }
+            foreach (ArrowObject arrowObject in pastedArrowObjects)
+            {
+                BringArrowObjectToFront(arrowObject);
+            }
+            foreach (VectorShapeObject vectorShapeObject in pastedVectorShapes)
+            {
+                BringVectorShapeToFront(vectorShapeObject);
+            }
+
+            ClearGroupSelection();
+            selectedTextAnnotation = null;
+            selectedRasterObject = null;
+            selectedArrowObject = null;
+            selectedVectorShape = null;
+            ResetTextRotationInteractionState();
+            ResetRasterInteractionState();
+            ResetArrowInteractionState();
+            ResetVectorInteractionState();
+            ResetGroupMoveState();
+
+            if (pastedCount == 1)
+            {
+                if (pastedTextAnnotations.Count == 1)
+                {
+                    selectedTextAnnotation = pastedTextAnnotations[0];
+                }
+                else if (pastedRasterObjects.Count == 1)
+                {
+                    selectedRasterObject = pastedRasterObjects[0];
+                }
+                else if (pastedArrowObjects.Count == 1)
+                {
+                    selectedArrowObject = pastedArrowObjects[0];
+                }
+                else if (pastedVectorShapes.Count == 1)
+                {
+                    selectedVectorShape = pastedVectorShapes[0];
+                }
+            }
+            else
+            {
+                foreach (TextAnnotation textAnnotation in pastedTextAnnotations)
+                {
+                    selectedTextAnnotations.Add(textAnnotation);
+                }
+                foreach (RasterObject rasterObject in pastedRasterObjects)
+                {
+                    selectedRasterObjectIds.Add(rasterObject.Id);
+                }
+                foreach (ArrowObject arrowObject in pastedArrowObjects)
+                {
+                    selectedArrowObjectIds.Add(arrowObject.Id);
+                }
+                foreach (VectorShapeObject vectorShape in pastedVectorShapes)
+                {
+                    selectedVectorShapeIds.Add(vectorShape.Id);
+                }
+            }
+
+            objectClipboardPasteCount++;
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateCurrentPageObjectsMarker();
+            pdfViewer.Invalidate();
+            return true;
         }
 
         private void ClearGroupSelection()
@@ -13341,6 +14114,10 @@ namespace AnonPDF
                     {
                         DuplicateAnnotation(annotationForIcon);
                     }
+                    else if (clickedIconType == IconType.Order)
+                    {
+                        ShowTextOrderMenu(annotationForIcon);
+                    }
                     // Refresh view
                     pdfViewer.Invalidate();
                 }
@@ -13486,6 +14263,7 @@ namespace AnonPDF
 
             var menu = new ContextMenuStrip();
             menu.Items.Add(GetDeleteSelectionContextMenuText(), null, (_, __) => RemoveRedactionBlock(block));
+            menu.Items.Add(Resources.Menu_CopyToClipboard, null, (_, __) => CopyRedactionBlockToClipboard(block));
             menu.Items.Add(new ToolStripSeparator());
 
             bool hasDynamicScopes = exclusionScopesCatalog.Count > 0;
@@ -13581,6 +14359,43 @@ namespace AnonPDF
 
             menu.Show(pdfViewer, location);
             return true;
+        }
+
+        private void CopyRedactionBlockToClipboard(RedactionBlock block)
+        {
+            if (block == null || string.IsNullOrWhiteSpace(inputPdfPath) || !File.Exists(inputPdfPath))
+            {
+                return;
+            }
+
+            string extractedText = string.Empty;
+            try
+            {
+                extractedText = ExtractTextFromRectangle(inputPdfPath, block);
+                if (string.IsNullOrWhiteSpace(extractedText))
+                {
+                    using (Bitmap bmp = ExtractBitmapFromRectangle(block.PageNumber, block.Bounds))
+                    {
+                        if (bmp != null)
+                        {
+                            extractedText = OcrFromBitmap(bmp);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDebug("Copy redaction block to clipboard failed: " + ex.Message);
+            }
+
+            if (string.IsNullOrWhiteSpace(extractedText))
+            {
+                ShowInfoMessage(Resources.Msg_NoTextFromSelections);
+                return;
+            }
+
+            Clipboard.SetText(extractedText.Trim());
+            preferObjectClipboardPaste = false;
         }
 
         private void SetRedactionBlockScope(RedactionBlock block, string scopeId)
@@ -15430,27 +16245,16 @@ namespace AnonPDF
             );
 
             bool isSelectedAnnotation = IsTextAnnotationSelected(annotation);
-            bool showTextTools = selectedTextAnnotation != null &&
-                                 ReferenceEquals(selectedTextAnnotation, annotation) &&
-                                 GetGroupSelectionCount() == 0;
 
             if (TryGetAnnotationTextFrameGeometry(
                     annotation,
                     graphics.DpiX,
                     graphics.DpiY,
                     out PointF[] textFrameCorners,
-                    out RectangleF textFrameBounds,
+                    out _,
                     out _,
                     out _))
             {
-                if (showTextTools)
-                {
-                    using (Pen boundPen = new Pen(System.Drawing.Color.Green, 1f))
-                    {
-                        graphics.DrawRectangle(boundPen, textFrameBounds.X, textFrameBounds.Y, textFrameBounds.Width, textFrameBounds.Height);
-                    }
-                }
-
                 System.Drawing.Color frameColor = (isSelectedAnnotation && !multiSelectionActive)
                     ? System.Drawing.Color.Red
                     : System.Drawing.Color.SteelBlue;
@@ -15523,36 +16327,6 @@ namespace AnonPDF
             if (multiSelectionActive && isSelectedAnnotation)
             {
                 DrawGroupSelectionOutline(graphics, rect);
-            }
-
-            if (showTextTools &&
-                !annotation.AnnotationIsLocked &&
-                TryGetAnnotationRotationHandleRect(annotation, graphics.DpiX, graphics.DpiY, out RectangleF handleRect, out PointF connectorPoint))
-            {
-                PointF handleCenter = new PointF(
-                    handleRect.X + (handleRect.Width / 2f),
-                    handleRect.Y + (handleRect.Height / 2f));
-                using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
-                {
-                    graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
-                }
-                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
-                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
-                {
-                    graphics.FillEllipse(handleBrush, handleRect);
-                    graphics.DrawEllipse(handlePen, handleRect);
-                }
-            }
-
-            if (showTextTools && TryGetAnnotationIconRects(annotation, graphics.DpiX, graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
-            {
-                DrawIconButton(graphics, annotationIconRects[IconType.Edit], "\uE70F");
-                DrawIconButton(
-                    graphics,
-                    annotationIconRects[IconType.Lock],
-                    annotation.AnnotationIsLocked ? "\uE72E" : "\uE785");
-                DrawIconButton(graphics, annotationIconRects[IconType.Duplicate], "\uE8C8");
-                DrawIconButton(graphics, annotationIconRects[IconType.Delete], "\uE74D");
             }
         }
 
@@ -15857,6 +16631,7 @@ namespace AnonPDF
 
             if (!multiSelectionActive)
             {
+                DrawSelectedTextOverlayOnTop(e.Graphics);
                 DrawSelectedRasterOverlayOnTop(e.Graphics);
                 DrawSelectedArrowOverlayOnTop(e.Graphics);
                 DrawSelectedVectorOverlayOnTop(e.Graphics);
@@ -17282,6 +18057,55 @@ namespace AnonPDF
                 return true;
             }
 
+            if (keyData == (Keys.Control | Keys.A))
+            {
+                if (IsTextInputFocused())
+                {
+                    return base.ProcessCmdKey(ref msg, keyData);
+                }
+
+                AddArrowObject();
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.F))
+            {
+                if (IsTextInputFocused())
+                {
+                    return base.ProcessCmdKey(ref msg, keyData);
+                }
+
+                AddShapeToolStripMenuItem_Click(this, EventArgs.Empty);
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.R))
+            {
+                if (IsTextInputFocused())
+                {
+                    return base.ProcessCmdKey(ref msg, keyData);
+                }
+
+                AddRasterImageFromFileDialog();
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.C))
+            {
+                if (IsTextInputFocused())
+                {
+                    return base.ProcessCmdKey(ref msg, keyData);
+                }
+
+                if (TryCopySelectedObjectsToInternalClipboard())
+                {
+                    return true;
+                }
+
+                CopyTextsFromAllSelectionsOnCurrentPage();
+                return true;
+            }
+
             if (keyData == (Keys.Control | Keys.V))
             {
                 if (IsTextInputFocused())
@@ -17289,7 +18113,18 @@ namespace AnonPDF
                     return base.ProcessCmdKey(ref msg, keyData);
                 }
 
+                if (preferObjectClipboardPaste && TryPasteObjectsFromInternalClipboard())
+                {
+                    return true;
+                }
+
                 if (TryHandleGlobalPasteShortcut())
+                {
+                    preferObjectClipboardPaste = false;
+                    return true;
+                }
+
+                if (TryPasteObjectsFromInternalClipboard())
                 {
                     return true;
                 }
@@ -19844,6 +20679,59 @@ namespace AnonPDF
             }
         }
 
+        private void DrawSelectedTextOverlayOnTop(Graphics graphics)
+        {
+            if (graphics == null || selectedTextAnnotation == null || selectedTextAnnotation.PageNumber != currentPage || GetGroupSelectionCount() != 0)
+            {
+                return;
+            }
+
+            if (TryGetAnnotationTextFrameGeometry(
+                    selectedTextAnnotation,
+                    graphics.DpiX,
+                    graphics.DpiY,
+                    out _,
+                    out RectangleF textFrameBounds,
+                    out _,
+                    out _))
+            {
+                using (Pen boundPen = new Pen(System.Drawing.Color.Green, 1f))
+                {
+                    graphics.DrawRectangle(boundPen, textFrameBounds.X, textFrameBounds.Y, textFrameBounds.Width, textFrameBounds.Height);
+                }
+            }
+
+            if (!selectedTextAnnotation.AnnotationIsLocked &&
+                TryGetAnnotationRotationHandleRect(selectedTextAnnotation, graphics.DpiX, graphics.DpiY, out RectangleF handleRect, out PointF connectorPoint))
+            {
+                PointF handleCenter = new PointF(
+                    handleRect.X + (handleRect.Width / 2f),
+                    handleRect.Y + (handleRect.Height / 2f));
+                using (var connectorPen = new Pen(System.Drawing.Color.OrangeRed, 1.5f))
+                {
+                    graphics.DrawLine(connectorPen, connectorPoint, handleCenter);
+                }
+                using (var handleBrush = new SolidBrush(System.Drawing.Color.White))
+                using (var handlePen = new Pen(System.Drawing.Color.OrangeRed, 2f))
+                {
+                    graphics.FillEllipse(handleBrush, handleRect);
+                    graphics.DrawEllipse(handlePen, handleRect);
+                }
+            }
+
+            if (TryGetAnnotationIconRects(selectedTextAnnotation, graphics.DpiX, graphics.DpiY, out Dictionary<IconType, Rectangle> annotationIconRects))
+            {
+                DrawIconButton(graphics, annotationIconRects[IconType.Edit], "\uE70F");
+                DrawIconButton(
+                    graphics,
+                    annotationIconRects[IconType.Lock],
+                    selectedTextAnnotation.AnnotationIsLocked ? "\uE72E" : "\uE785");
+                DrawIconButton(graphics, annotationIconRects[IconType.Duplicate], "\uE8C8");
+                DrawIconButton(graphics, annotationIconRects[IconType.Order], "\u2630");
+                DrawIconButton(graphics, annotationIconRects[IconType.Delete], "\uE74D");
+            }
+        }
+
         private Rectangle GetAnnotationScreenRect(TextAnnotation annotation, float dpiX, float dpiY)
         {
             return new Rectangle(
@@ -19987,18 +20875,23 @@ namespace AnonPDF
                 annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                 annotationsIconSize,
                 annotationsIconSize);
-            Rectangle duplicateIconRect = new Rectangle(
+            Rectangle orderIconRect = new Rectangle(
                 annotationRect.Right - (annotationsIconSize * 2) - annotationsIconPadding,
                 annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                 annotationsIconSize,
                 annotationsIconSize);
-            Rectangle lockIconRect = new Rectangle(
+            Rectangle duplicateIconRect = new Rectangle(
                 annotationRect.Right - (annotationsIconSize * 3) - (2 * annotationsIconPadding),
                 annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                 annotationsIconSize,
                 annotationsIconSize);
-            Rectangle editIconRect = new Rectangle(
+            Rectangle lockIconRect = new Rectangle(
                 annotationRect.Right - (annotationsIconSize * 4) - (3 * annotationsIconPadding),
+                annotationRect.Top - annotationsIconSize - annotationsIconPadding,
+                annotationsIconSize,
+                annotationsIconSize);
+            Rectangle editIconRect = new Rectangle(
+                annotationRect.Right - (annotationsIconSize * 5) - (4 * annotationsIconPadding),
                 annotationRect.Top - annotationsIconSize - annotationsIconPadding,
                 annotationsIconSize,
                 annotationsIconSize);
@@ -20008,6 +20901,7 @@ namespace AnonPDF
                 [IconType.Edit] = editIconRect,
                 [IconType.Lock] = lockIconRect,
                 [IconType.Duplicate] = duplicateIconRect,
+                [IconType.Order] = orderIconRect,
                 [IconType.Delete] = deleteIconRect
             };
             return true;
@@ -23046,6 +23940,7 @@ namespace AnonPDF
             if (!string.IsNullOrWhiteSpace(result))
             {
                 Clipboard.SetText(result);
+                preferObjectClipboardPaste = false;
                 MessageBox.Show(this, Resources.Msg_TextsCopiedToClipboard, Resources.Title_Success, MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
@@ -23112,7 +24007,18 @@ namespace AnonPDF
 
         private void PasteObjectFromClipboardToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            TryHandleGlobalPasteShortcut();
+            if (preferObjectClipboardPaste && TryPasteObjectsFromInternalClipboard())
+            {
+                return;
+            }
+
+            if (TryHandleGlobalPasteShortcut())
+            {
+                preferObjectClipboardPaste = false;
+                return;
+            }
+
+            TryPasteObjectsFromInternalClipboard();
         }
 
         private void DeletePageToolStripMenuItem_Click(object sender, EventArgs e)
@@ -23127,6 +24033,11 @@ namespace AnonPDF
 
         private void CopyToClipboardToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            if (TryCopySelectedObjectsToInternalClipboard())
+            {
+                return;
+            }
+
             CopyTextsFromAllSelectionsOnCurrentPage();
         }
 
