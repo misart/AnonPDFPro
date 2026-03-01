@@ -10830,13 +10830,13 @@ namespace AnonPDF
             string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
             if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
             {
-                return "Tryb dodawania kształtu aktywny. LPM dodaje punkt, PPM kończy.";
+                return "Tryb dodawania kształtu aktywny. LPM dodaje punkt, PPM kończy. ALT wymusza symetrię.";
             }
             if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
             {
-                return "Formmodus aktiv. Linksklick fügt Punkte hinzu, Rechtsklick beendet.";
+                return "Formmodus aktiv. Linksklick fügt Punkte hinzu, Rechtsklick beendet. ALT erzwingt Symmetrie.";
             }
-            return "Shape mode active. Left-click adds points, right-click finishes.";
+            return "Shape mode active. Left-click adds points, right-click finishes. ALT enforces symmetry.";
         }
 
         private bool TryGetShapeIconFontFamily(out string familyName)
@@ -10905,84 +10905,6 @@ namespace AnonPDF
 
             familyName = string.Empty;
             return false;
-        }
-
-        private Font CreateShapeIconFont(float size)
-        {
-            if (TryGetShapeIconFontFamily(out string customFamily))
-            {
-                try
-                {
-                    return new Font(customFamily, size, FontStyle.Regular, GraphicsUnit.Point);
-                }
-                catch
-                {
-                    // Ignore and try system fonts.
-                }
-            }
-
-            string[] preferredFamilies = { "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe UI Symbol" };
-            foreach (string family in preferredFamilies)
-            {
-                try
-                {
-                    using (var probe = new Font(family, size, FontStyle.Regular, GraphicsUnit.Point))
-                    {
-                        if (string.Equals(probe.FontFamily.Name, family, StringComparison.OrdinalIgnoreCase))
-                        {
-                            return new Font(family, size, FontStyle.Regular, GraphicsUnit.Point);
-                        }
-                    }
-                }
-                catch
-                {
-                    // Ignore and try the next family.
-                }
-            }
-
-            return new Font(this.Font.FontFamily, size, FontStyle.Regular, GraphicsUnit.Point);
-        }
-
-        private static string GetShapeButtonIcon(VectorShapeType shapeType, bool useMaterialIcons)
-        {
-            if (useMaterialIcons)
-            {
-                switch (shapeType)
-                {
-                    case VectorShapeType.Region:
-                        return char.ConvertFromUtf32(0xF0560);
-                    case VectorShapeType.Polyline:
-                        return char.ConvertFromUtf32(0xF0561);
-                    case VectorShapeType.Rectangle:
-                        return char.ConvertFromUtf32(0xF05C6);
-                    case VectorShapeType.Ellipse:
-                        return char.ConvertFromUtf32(0xF0EA1);
-                    case VectorShapeType.Arc:
-                        return char.ConvertFromUtf32(0xF0559);
-                    case VectorShapeType.Triangle:
-                        return char.ConvertFromUtf32(0xF0563);
-                    default:
-                        return "•";
-                }
-            }
-
-            switch (shapeType)
-            {
-                case VectorShapeType.Region:
-                    return "⬠";
-                case VectorShapeType.Polyline:
-                    return "〰";
-                case VectorShapeType.Rectangle:
-                    return "▭";
-                case VectorShapeType.Ellipse:
-                    return "◯";
-                case VectorShapeType.Triangle:
-                    return "△";
-                case VectorShapeType.Arc:
-                    return "◜";
-                default:
-                    return "•";
-            }
         }
 
         private static int? GetShapeButtonIconCodePoint(VectorShapeType shapeType)
@@ -11455,10 +11377,13 @@ namespace AnonPDF
                     return;
                 }
 
-                PointF docPoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                PointF rawDocPoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                PointF docPoint = NormalizeVectorShapeDraftInputPoint(rawDocPoint);
+                int requiredPoints = GetRequiredPointsForShape(activeVectorShapeType);
+                bool isFreeformShape = activeVectorShapeType == VectorShapeType.Polyline || activeVectorShapeType == VectorShapeType.Region;
                 if (e.Button == MouseButtons.Left)
                 {
-                    if (e.Clicks > 1)
+                    if (isFreeformShape && e.Clicks > 1)
                     {
                         if (vectorShapeDraftPoints.Count == 0 || DistanceBetweenPoints(vectorShapeDraftPoints.Last(), docPoint) > 0.5f)
                         {
@@ -11472,6 +11397,10 @@ namespace AnonPDF
                     vectorShapeDraftPoints.Add(docPoint);
                     vectorShapeDraftHoverPoint = docPoint;
                     vectorShapeDraftHoverActive = true;
+                    if (!isFreeformShape && vectorShapeDraftPoints.Count >= requiredPoints)
+                    {
+                        TryFinalizeVectorShapeDraft();
+                    }
                     pdfViewer.Invalidate();
                     return;
                 }
@@ -11709,7 +11638,8 @@ namespace AnonPDF
 
             if (isVectorShapeCreationMode)
             {
-                vectorShapeDraftHoverPoint = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                PointF rawHover = new PointF(e.X / scaleFactor, e.Y / scaleFactor);
+                vectorShapeDraftHoverPoint = NormalizeVectorShapeDraftInputPoint(rawHover);
                 vectorShapeDraftHoverActive = true;
                 pdfViewer.Invalidate();
                 return;
@@ -13213,7 +13143,8 @@ namespace AnonPDF
 
                 VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
                 VectorShapeStrokeKind strokeKind = ParseVectorStrokeKind(vectorShape.StrokeStyle);
-                List<PointF> pdfPoints = vectorShape.Points
+                List<PointF> viewPoints = BuildVectorShapeRenderPoints(shapeType, vectorShape.Points);
+                List<PointF> pdfPoints = viewPoints
                     .Select(point => ConvertPointToPdfCoordinates(point, pageNumber, rotation, includeBaseRotation))
                     .ToList();
                 if (pdfPoints.Count < 2)
@@ -13234,18 +13165,20 @@ namespace AnonPDF
                     pdfCanvas.SetLineDash(6f, 4f);
                 }
 
+                bool isClosed = IsShapeClosed(shapeType);
+                bool supportsFill = ShapeTypeSupportsFill(shapeType);
                 pdfCanvas.MoveTo(pdfPoints[0].X, pdfPoints[0].Y);
                 for (int i = 1; i < pdfPoints.Count; i++)
                 {
                     pdfCanvas.LineTo(pdfPoints[i].X, pdfPoints[i].Y);
                 }
 
-                if (shapeType == VectorShapeType.Region && pdfPoints.Count >= 3)
+                if (isClosed && pdfPoints.Count >= 3)
                 {
-                    System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
-                    float fillOpacity = NormalizeVectorFillOpacity(vectorShape.FillOpacity);
-                    if (fillOpacity > 0f)
+                    float fillOpacity = supportsFill ? NormalizeVectorFillOpacity(vectorShape.FillOpacity) : 0f;
+                    if (supportsFill && fillOpacity > 0f)
                     {
+                        System.Drawing.Color fillColor = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
                         pdfCanvas.SetFillColor(new DeviceRgb(fillColor.R, fillColor.G, fillColor.B));
                         var fillState = new PdfExtGState().SetFillOpacity(fillOpacity);
                         pdfCanvas.SetExtGState(fillState);
@@ -13889,7 +13822,7 @@ namespace AnonPDF
 
             VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
             VectorShapeStrokeKind strokeKind = ParseVectorStrokeKind(vectorShape.StrokeStyle);
-            PointF[] points = vectorShape.Points
+            PointF[] points = BuildVectorShapeRenderPoints(shapeType, vectorShape.Points)
                 .Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor))
                 .ToArray();
             if (points.Length < 2)
@@ -13904,14 +13837,19 @@ namespace AnonPDF
                 pen.StartCap = LineCap.Round;
                 pen.EndCap = LineCap.Round;
 
-                if (shapeType == VectorShapeType.Region && points.Length >= 3)
+                bool isClosed = IsShapeClosed(shapeType);
+                bool supportsFill = ShapeTypeSupportsFill(shapeType);
+                if (isClosed && points.Length >= 3)
                 {
-                    int alpha = (int)(NormalizeVectorFillOpacity(vectorShape.FillOpacity) * 255f);
-                    alpha = Math.Max(0, Math.Min(255, alpha));
-                    System.Drawing.Color fillBase = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
-                    using (var fillBrush = new SolidBrush(System.Drawing.Color.FromArgb(alpha, fillBase.R, fillBase.G, fillBase.B)))
+                    if (supportsFill)
                     {
-                        graphics.FillPolygon(fillBrush, points);
+                        int alpha = (int)(NormalizeVectorFillOpacity(vectorShape.FillOpacity) * 255f);
+                        alpha = Math.Max(0, Math.Min(255, alpha));
+                        System.Drawing.Color fillBase = System.Drawing.Color.FromArgb(vectorShape.FillColorArgb);
+                        using (var fillBrush = new SolidBrush(System.Drawing.Color.FromArgb(alpha, fillBase.R, fillBase.G, fillBase.B)))
+                        {
+                            graphics.FillPolygon(fillBrush, points);
+                        }
                     }
                     graphics.DrawPolygon(pen, points);
                 }
@@ -13929,14 +13867,15 @@ namespace AnonPDF
                 return;
             }
 
-            var draftPoints = vectorShapeDraftPoints
-                .Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor))
-                .ToList();
+            var draftSourcePoints = vectorShapeDraftPoints.ToList();
             if (vectorShapeDraftHoverActive)
             {
-                draftPoints.Add(new PointF(vectorShapeDraftHoverPoint.X * scaleFactor, vectorShapeDraftHoverPoint.Y * scaleFactor));
+                draftSourcePoints.Add(vectorShapeDraftHoverPoint);
             }
 
+            var draftPoints = BuildVectorShapeRenderPoints(activeVectorShapeType, draftSourcePoints)
+                .Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor))
+                .ToList();
             if (draftPoints.Count < 2)
             {
                 return;
@@ -13949,7 +13888,7 @@ namespace AnonPDF
                 pen.StartCap = LineCap.Round;
                 pen.EndCap = LineCap.Round;
 
-                if (activeVectorShapeType == VectorShapeType.Region && draftPoints.Count >= 3)
+                if (IsShapeClosed(activeVectorShapeType) && draftPoints.Count >= 3)
                 {
                     graphics.DrawPolygon(pen, draftPoints.ToArray());
                 }
@@ -13959,7 +13898,7 @@ namespace AnonPDF
                 }
             }
 
-            foreach (PointF point in draftPoints.Take(vectorShapeDraftPoints.Count))
+            foreach (PointF point in vectorShapeDraftPoints.Select(p => new PointF(p.X * scaleFactor, p.Y * scaleFactor)))
             {
                 float size = 6f;
                 graphics.FillEllipse(Brushes.DarkOrange, point.X - (size / 2f), point.Y - (size / 2f), size, size);
@@ -16745,19 +16684,216 @@ namespace AnonPDF
             return VectorShapeStrokeKind.Solid;
         }
 
-        private static bool ShapeTypeSupportsCurrentMvp(VectorShapeType type)
-        {
-            return type == VectorShapeType.Polyline || type == VectorShapeType.Region;
-        }
-
         private static int GetRequiredPointsForShape(VectorShapeType type)
         {
-            return type == VectorShapeType.Region ? 3 : 2;
+            switch (type)
+            {
+                case VectorShapeType.Region:
+                    return 3;
+                case VectorShapeType.Polyline:
+                    return 2;
+                case VectorShapeType.Rectangle:
+                case VectorShapeType.Ellipse:
+                case VectorShapeType.Triangle:
+                case VectorShapeType.Arc:
+                    return 2;
+                default:
+                    return 2;
+            }
         }
 
         private static bool IsShapeClosed(VectorShapeType type)
         {
-            return type == VectorShapeType.Region;
+            return type == VectorShapeType.Region
+                   || type == VectorShapeType.Rectangle
+                   || type == VectorShapeType.Ellipse
+                   || type == VectorShapeType.Triangle;
+        }
+
+        private static bool ShapeTypeSupportsFill(VectorShapeType type)
+        {
+            return type == VectorShapeType.Region
+                   || type == VectorShapeType.Rectangle
+                   || type == VectorShapeType.Ellipse
+                   || type == VectorShapeType.Triangle;
+        }
+
+        private static bool IsTwoPointConstrainedShape(VectorShapeType type)
+        {
+            return type == VectorShapeType.Rectangle
+                   || type == VectorShapeType.Ellipse
+                   || type == VectorShapeType.Triangle;
+        }
+
+        private static PointF ApplyAltConstraintToSecondPoint(VectorShapeType shapeType, PointF anchor, PointF candidate)
+        {
+            float dx = candidate.X - anchor.X;
+            float dy = candidate.Y - anchor.Y;
+            if (Math.Abs(dx) <= 0.0001f && Math.Abs(dy) <= 0.0001f)
+            {
+                return candidate;
+            }
+
+            float signX = dx >= 0f ? 1f : -1f;
+            float signY = dy >= 0f ? 1f : -1f;
+            float absX = Math.Abs(dx);
+            float absY = Math.Abs(dy);
+
+            switch (shapeType)
+            {
+                case VectorShapeType.Rectangle:
+                case VectorShapeType.Ellipse:
+                {
+                    float side = Math.Max(absX, absY);
+                    return new PointF(anchor.X + (signX * side), anchor.Y + (signY * side));
+                }
+
+                case VectorShapeType.Triangle:
+                {
+                    const float heightRatio = 0.8660254f; // sqrt(3)/2 for an equilateral triangle
+                    float targetWidth;
+                    float targetHeight;
+                    if (absX >= absY)
+                    {
+                        targetWidth = absX;
+                        targetHeight = targetWidth * heightRatio;
+                    }
+                    else
+                    {
+                        targetHeight = absY;
+                        targetWidth = targetHeight / heightRatio;
+                    }
+
+                    return new PointF(anchor.X + (signX * targetWidth), anchor.Y + (signY * targetHeight));
+                }
+
+                default:
+                    return candidate;
+            }
+        }
+
+        private PointF NormalizeVectorShapeDraftInputPoint(PointF rawPoint)
+        {
+            if (!IsTwoPointConstrainedShape(activeVectorShapeType))
+            {
+                return rawPoint;
+            }
+
+            if (vectorShapeDraftPoints.Count == 0)
+            {
+                return rawPoint;
+            }
+
+            if ((Control.ModifierKeys & Keys.Alt) != Keys.Alt)
+            {
+                return rawPoint;
+            }
+
+            return ApplyAltConstraintToSecondPoint(activeVectorShapeType, vectorShapeDraftPoints[0], rawPoint);
+        }
+
+        private static RectangleF CreateNormalizedRectangle(PointF a, PointF b)
+        {
+            float left = Math.Min(a.X, b.X);
+            float top = Math.Min(a.Y, b.Y);
+            float right = Math.Max(a.X, b.X);
+            float bottom = Math.Max(a.Y, b.Y);
+            return RectangleF.FromLTRB(left, top, right, bottom);
+        }
+
+        private static List<PointF> BuildVectorShapeRenderPoints(VectorShapeType shapeType, IList<PointF> points)
+        {
+            var result = new List<PointF>();
+            if (points == null || points.Count == 0)
+            {
+                return result;
+            }
+
+            switch (shapeType)
+            {
+                case VectorShapeType.Polyline:
+                case VectorShapeType.Region:
+                    result.AddRange(points);
+                    return result;
+
+                case VectorShapeType.Rectangle:
+                {
+                    if (points.Count < 2)
+                    {
+                        return result;
+                    }
+
+                    RectangleF rect = CreateNormalizedRectangle(points[0], points[points.Count - 1]);
+                    if (rect.Width <= 0.0001f || rect.Height <= 0.0001f)
+                    {
+                        return result;
+                    }
+
+                    result.Add(new PointF(rect.Left, rect.Top));
+                    result.Add(new PointF(rect.Right, rect.Top));
+                    result.Add(new PointF(rect.Right, rect.Bottom));
+                    result.Add(new PointF(rect.Left, rect.Bottom));
+                    return result;
+                }
+
+                case VectorShapeType.Triangle:
+                {
+                    if (points.Count < 2)
+                    {
+                        return result;
+                    }
+
+                    RectangleF rect = CreateNormalizedRectangle(points[0], points[points.Count - 1]);
+                    if (rect.Width <= 0.0001f || rect.Height <= 0.0001f)
+                    {
+                        return result;
+                    }
+
+                    result.Add(new PointF(rect.Left + (rect.Width / 2f), rect.Top));
+                    result.Add(new PointF(rect.Right, rect.Bottom));
+                    result.Add(new PointF(rect.Left, rect.Bottom));
+                    return result;
+                }
+
+                case VectorShapeType.Ellipse:
+                case VectorShapeType.Arc:
+                {
+                    if (points.Count < 2)
+                    {
+                        return result;
+                    }
+
+                    RectangleF rect = CreateNormalizedRectangle(points[0], points[points.Count - 1]);
+                    if (rect.Width <= 0.0001f || rect.Height <= 0.0001f)
+                    {
+                        return result;
+                    }
+
+                    float centerX = rect.Left + (rect.Width / 2f);
+                    float centerY = rect.Top + (rect.Height / 2f);
+                    float radiusX = rect.Width / 2f;
+                    float radiusY = rect.Height / 2f;
+                    int segments = shapeType == VectorShapeType.Ellipse ? 48 : 24;
+                    float startAngle = shapeType == VectorShapeType.Ellipse ? 0f : 180f;
+                    float sweepAngle = shapeType == VectorShapeType.Ellipse ? 360f : -180f;
+
+                    for (int i = 0; i <= segments; i++)
+                    {
+                        float t = i / (float)segments;
+                        float angleDeg = startAngle + (sweepAngle * t);
+                        float angleRad = (float)(Math.PI * angleDeg / 180.0);
+                        float x = centerX + (radiusX * (float)Math.Cos(angleRad));
+                        float y = centerY + (radiusY * (float)Math.Sin(angleRad));
+                        result.Add(new PointF(x, y));
+                    }
+
+                    return result;
+                }
+
+                default:
+                    result.AddRange(points);
+                    return result;
+            }
         }
 
         private void NormalizeVectorShape(VectorShapeObject vectorShape)
@@ -20584,18 +20720,6 @@ namespace AnonPDF
 
             if (!TryPromptShapeDefaults(out VectorShapeDefaults selectedDefaults))
             {
-                return;
-            }
-
-            if (!ShapeTypeSupportsCurrentMvp(selectedDefaults.ShapeType))
-            {
-                string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
-                string message = string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase)
-                    ? "Ten typ kształtu będzie dostępny w kolejnym etapie."
-                    : string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase)
-                        ? "Dieser Formtyp ist in der nächsten Phase verfügbar."
-                        : "This shape type will be available in the next stage.";
-                ShowInfoMessage(message);
                 return;
             }
 
