@@ -1,4 +1,4 @@
-# AnonPDF Pro
+﻿# AnonPDF Pro
 
 AnonPDF Pro is a Windows (WinForms) application for PDF anonymization. It lets you redact document areas, remove pages, add text annotations, and search for content to mark quickly. For image-only regions with no text, it can fall back to OCR (Tesseract) for searching.
 
@@ -64,6 +64,10 @@ After these changes, the internal iText `FontCache` exception will no longer sto
 ## License & Components
 - License: AGPL-3.0-or-later (see `LICENSE`).
 - Third-party components: iText 9 (AGPL-3.0), PDFium/PDFiumSharp, Newtonsoft.Json (MIT), BouncyCastle (MIT), TesseractOCR (.NET) (Apache-2.0). Details in `THIRD-PARTY-NOTICES.md`.
+
+## Publisher Identity
+- Legal entity: MISART Marta Klimek
+- Tax ID (NIP): 8521472958
 
 ## Copyright
 - Copyright © 2025–2026 Urząd Miasta Szczecin; Modifications © 2026 MISART Marta Klimek
