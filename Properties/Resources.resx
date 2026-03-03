@@ -246,6 +246,12 @@
   <data name="Menu_Context_Delete" xml:space="preserve">
     <value>Usuń</value>
   </data>
+  <data name="Vector_Context_AddNode" xml:space="preserve">
+    <value>Dodaj węzeł</value>
+  </data>
+  <data name="Vector_Context_RemoveNode" xml:space="preserve">
+    <value>Usuń węzeł</value>
+  </data>
   <data name="Order_SendToBack" xml:space="preserve">
     <value>Przesuń na spód</value>
   </data>

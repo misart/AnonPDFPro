@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
@@ -764,7 +764,7 @@ namespace AnonPDF
         private string allComboItem = Resources.UI_Filter_AllPages;
         private string allCategories = Resources.UI_Filter_AllCategories;
 
-        // Mapping: list item text → color
+        // Mapping: list item text â†’ color
         private readonly Dictionary<string, System.Drawing.Color> _comboItemColors = new Dictionary<string, System.Drawing.Color>();
         // Required WinAPI functions
         [DllImport("user32.dll")]
@@ -884,7 +884,7 @@ namespace AnonPDF
 
             if (hasServiceFileAtStartup)
             {
-                // Maintenance window check timer – check every 10 minutes
+                // Maintenance window check timer â€“ check every 10 minutes
                 maintenanceCheckTimer = new System.Timers.Timer(10 * 60 * 1000);
                 maintenanceCheckTimer.Elapsed += OnMaintenanceWindowCheck;
                 maintenanceCheckTimer.AutoReset = true;
@@ -4601,7 +4601,7 @@ namespace AnonPDF
                 e.Graphics.FillRectangle(new SolidBrush(e.BackColor), e.Bounds);
             }
 
-            // 2) text color – default black, or white (HighlightText) when list is expanded and selected
+            // 2) text color â€“ default black, or white (HighlightText) when list is expanded and selected
             System.Drawing.Color fore = (isDropped && isSelected)
                 ? SystemColors.HighlightText
                 : combo.ForeColor;
@@ -4839,7 +4839,7 @@ namespace AnonPDF
 
             using (EditTextDialog dlg = new EditTextDialog())
             {
-                // If we are editing an existing annotation – set default values in the dialog
+                // If we are editing an existing annotation â€“ set default values in the dialog
                 if (annotation != null)
                 {
                     dlg.AnnotationText = annotation.AnnotationText;
@@ -4871,13 +4871,13 @@ namespace AnonPDF
 
                     if (annotation != null)
                     {
-                        // Edit mode – updating existing annotation,
+                        // Edit mode â€“ updating existing annotation,
                         // preserving its original position (X, Y) and updating dimensions
                         ApplyAnnotationFromDialog(annotation, dlg);
                     }
                     else
                     {
-                        // Add mode – creating new annotation
+                        // Add mode â€“ creating new annotation
                         TextAnnotation newAnnotation = new TextAnnotation
                         {
                             PageNumber = currentPage,
@@ -5701,7 +5701,7 @@ namespace AnonPDF
                     bool hasVector = PageHasVectorDrawing(page);
                     if (hasVector)
                     {
-                        // Rasterize the entire page to JPG (PDFiumSharp) – as you have:
+                        // Rasterize the entire page to JPG (PDFiumSharp) â€“ as you have:
                         using (var pdfDocSharp = new PDFiumSharp.PdfDocument(pdfPath, userPassword))
                         using (var pageSharp = pdfDocSharp.Pages[pageNum - 1])
                         {
@@ -5930,7 +5930,7 @@ namespace AnonPDF
                 using (var reader = new PdfReader(inputSplitPdfPath))
                 using (var pdfDoc = new iText.Kernel.Pdf.PdfDocument(reader))
                 {
-                    // try to get page count – this may already throw an exception
+                    // try to get page count â€“ this may already throw an exception
                     int pages = pdfDoc.GetNumberOfPages();
 
                     // try to copy one page to an empty document in memory
@@ -7776,7 +7776,7 @@ namespace AnonPDF
                     int newScrollX = (int)(pendingDocCoordX * scaleFactor) - (panel.ClientSize.Width / 2);
                     int newScrollY = (int)(pendingDocCoordY * scaleFactor) - (panel.ClientSize.Height / 2);
 
-                    // Correction – if new values go beyond scroll range
+                    // Correction â€“ if new values go beyond scroll range
                     if (newScrollX < panel.HorizontalScroll.Minimum)
                         newScrollX = panel.HorizontalScroll.Minimum;
                     if (newScrollX > panel.HorizontalScroll.Maximum)
@@ -7868,7 +7868,7 @@ namespace AnonPDF
 
             bool rollUp = (e.Delta > 0);
 
-            // If CTRL is pressed – perform zoom
+            // If CTRL is pressed â€“ perform zoom
             if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
             {
                 // (D) Calculate new scale depending on wheel direction
@@ -7882,7 +7882,7 @@ namespace AnonPDF
                     int screenX = panel.HorizontalScroll.Value + mousePosInPanel.X;
                     int screenY = panel.VerticalScroll.Value + mousePosInPanel.Y;
 
-                    // (C) Convert to document coordinates – i.e. divide by current scaleFactor
+                    // (C) Convert to document coordinates â€“ i.e. divide by current scaleFactor
                     float docCoordX = screenX / scaleFactor;
                     float docCoordY = screenY / scaleFactor;
                     pendingDocCoordX = docCoordX;
@@ -7919,17 +7919,17 @@ namespace AnonPDF
                 }
 
 
-                // (E) Save calculated values to pending variables – don't render immediately
+                // (E) Save calculated values to pending variables â€“ don't render immediately
                 pendingScaleFactor = newScale;
 
                 zoomPending = true;
             
 
-                // (F) Restart timer – if subsequent events appear quickly, timer will restart
+                // (F) Restart timer â€“ if subsequent events appear quickly, timer will restart
                 zoomTimer.Stop();
                 zoomTimer.Start();
 
-                // Finish – don't execute default rendering
+                // Finish â€“ don't execute default rendering
                 return;
             }
             else
@@ -8320,7 +8320,7 @@ namespace AnonPDF
             int width = originalBmp.Width;
 
 
-            // Set lightening coefficient – for example 0.7 gives more white than (orig + 255)/2
+            // Set lightening coefficient â€“ for example 0.7 gives more white than (orig + 255)/2
             float lightenFactor = 0.7f;
 
             unsafe
@@ -8384,7 +8384,7 @@ namespace AnonPDF
             Bitmap overlayBmp = new Bitmap(originalBmp.Width, originalBmp.Height, PixelFormat.Format32bppArgb);
             using (Graphics g = Graphics.FromImage(overlayBmp))
             {
-                // Fill background with black – means no modification (black pixels don't meet IsNearlyWhite condition)
+                // Fill background with black â€“ means no modification (black pixels don't meet IsNearlyWhite condition)
                 g.Clear(System.Drawing.Color.Black);
 
                 // For each selection draw white rectangle
@@ -8405,7 +8405,7 @@ namespace AnonPDF
                 }
             }
 
-            // 3. Combine original bitmap and overlay – CombineBitmaps function
+            // 3. Combine original bitmap and overlay â€“ CombineBitmaps function
             Bitmap resultBmp = CombineBitmaps(originalBmp, overlayBmp);
             return resultBmp;
         }
@@ -8417,7 +8417,7 @@ namespace AnonPDF
             var blocksForThisPage = redactionBlocks.Where(b => b.PageNumber == currentPage);
             if (blocksForThisPage.Any())
             {
-                // If safeMode is selected – redaction on bitmap
+                // If safeMode is selected â€“ redaction on bitmap
                 if (safeModeCheckBox.Checked || pdfCleanUpToolError)
                 {
                     // 1. Render original page to bitmap
@@ -8430,7 +8430,7 @@ namespace AnonPDF
                     {
                         foreach (var block in blocksForThisPage)
                         {
-                            // Draw white rectangle – redaction (you can change color or transparency if needed)
+                            // Draw white rectangle â€“ redaction (you can change color or transparency if needed)
                             using (SolidBrush brush = new SolidBrush(System.Drawing.Color.FromArgb(128, 255, 255, 255)))
                             {
                                 System.Drawing.RectangleF rect = new System.Drawing.RectangleF((block.Bounds.X * scaleFactor), (block.Bounds.Y * scaleFactor), (block.Bounds.Width * scaleFactor), (block.Bounds.Height * scaleFactor));
@@ -8495,7 +8495,7 @@ namespace AnonPDF
 
                         // Render original page
                         Bitmap originalBmp = new Bitmap(RenderOriginalPage(currentPage));
-                        // Combine bitmaps – CombineBitmaps function performs blending
+                        // Combine bitmaps â€“ CombineBitmaps function performs blending
                         Bitmap resultBmp = CombineBitmaps(originalBmp, overlayBmp);
                         return resultBmp;
                     }
@@ -10374,7 +10374,7 @@ namespace AnonPDF
                 return "Save changes to the project?";
             }
 
-            return "Czy zapisać zmiany w projekcie?";
+            return "Czy zapisaÄ‡ zmiany w projekcie?";
         }
 
         private string GetCloseProjectSaveButtonText()
@@ -12202,15 +12202,15 @@ namespace AnonPDF
                 case VectorShapeType.Region:
                     return isPl ? "Region" : isDe ? "Region" : "Region";
                 case VectorShapeType.Polyline:
-                    return isPl ? "Linia łamana" : isDe ? "Polylinie" : "Polyline";
+                    return isPl ? "Linia Ĺ‚amana" : isDe ? "Polylinie" : "Polyline";
                 case VectorShapeType.Rectangle:
-                    return isPl ? "Prostokąt" : isDe ? "Rechteck" : "Rectangle";
+                    return isPl ? "ProstokÄ…t" : isDe ? "Rechteck" : "Rectangle";
                 case VectorShapeType.Ellipse:
                     return isPl ? "Elipsa" : isDe ? "Ellipse" : "Ellipse";
                 case VectorShapeType.Triangle:
-                    return isPl ? "Trójkąt" : isDe ? "Dreieck" : "Triangle";
+                    return isPl ? "TrĂłjkÄ…t" : isDe ? "Dreieck" : "Triangle";
                 case VectorShapeType.Arc:
-                    return isPl ? "Łuk" : isDe ? "Bogen" : "Arc";
+                    return isPl ? "Ĺuk" : isDe ? "Bogen" : "Arc";
                 default:
                     return shapeType.ToString();
             }
@@ -12221,27 +12221,76 @@ namespace AnonPDF
             string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
             if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
             {
-                return "Dodaj kształt";
+                return "Dodaj ksztaĹ‚t";
             }
             if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
             {
-                return "Form hinzufügen";
+                return "Form hinzufĂĽgen";
             }
             return "Add shape";
         }
 
-        private string GetShapeToolInfoText()
+        private string GetShapeTypeInputTooltip(VectorShapeType shapeType)
         {
             string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
             if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
             {
-                return "Tryb dodawania kształtu aktywny. LPM dodaje punkt, PPM kończy. ALT wymusza symetrię.";
+                switch (shapeType)
+                {
+                    case VectorShapeType.Polyline:
+                        return "Linia łamana:\nLewy przycisk myszy dodaje węzły.\nDwuklik lub prawy przycisk myszy kończy.";
+                    case VectorShapeType.Region:
+                        return "Region:\nLewy przycisk myszy dodaje punkty.\nDwuklik lub prawy przycisk myszy zamyka.";
+                    case VectorShapeType.Rectangle:
+                        return "Prostokąt:\nUstaw dwa narożniki.\nALT wymusza kwadrat.";
+                    case VectorShapeType.Ellipse:
+                        return "Elipsa:\nUstaw początek i koniec obwiedni.\nALT wymusza okrąg.";
+                    case VectorShapeType.Triangle:
+                        return "Trójkąt:\nUstaw początek i koniec obwiedni.\nALT wymusza trójkąt równoboczny.";
+                    case VectorShapeType.Arc:
+                        return "Łuk:\nUstaw punkt początkowy,\nkońcowy i trzeci punkt łuku.";
+                    default:
+                        return "Kliknij na stronie,\naby rozpocząć rysowanie.";
+                }
             }
             if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
             {
-                return "Formmodus aktiv. Linksklick fügt Punkte hinzu, Rechtsklick beendet. ALT erzwingt Symmetrie.";
+                switch (shapeType)
+                {
+                    case VectorShapeType.Polyline:
+                        return "Polylinie:\nLinke Maustaste setzt Knoten.\nDoppelklick oder rechte Maustaste beendet.";
+                    case VectorShapeType.Region:
+                        return "Region:\nLinke Maustaste setzt Punkte.\nDoppelklick oder rechte Maustaste schließt.";
+                    case VectorShapeType.Rectangle:
+                        return "Rechteck:\nZwei Eckpunkte setzen.\nALT erzwingt ein Quadrat.";
+                    case VectorShapeType.Ellipse:
+                        return "Ellipse:\nStart- und Endpunkt setzen.\nALT erzwingt einen Kreis.";
+                    case VectorShapeType.Triangle:
+                        return "Dreieck:\nStart- und Endpunkt setzen.\nALT erzwingt ein gleichseitiges Dreieck.";
+                    case VectorShapeType.Arc:
+                        return "Bogen:\nStartpunkt, Endpunkt\nund dritten Punkt setzen.";
+                    default:
+                        return "Auf der Seite klicken,\num die Form zu zeichnen.";
+                }
             }
-            return "Shape mode active. Left-click adds points, right-click finishes. ALT enforces symmetry.";
+
+            switch (shapeType)
+            {
+                case VectorShapeType.Polyline:
+                    return "Polyline:\nLeft mouse button adds nodes.\nDouble-click or right mouse button finishes.";
+                case VectorShapeType.Region:
+                    return "Region:\nLeft mouse button adds points.\nDouble-click or right mouse button closes.";
+                case VectorShapeType.Rectangle:
+                    return "Rectangle:\nSet two corners.\nALT enforces a square.";
+                case VectorShapeType.Ellipse:
+                    return "Ellipse:\nSet start and end of bounds.\nALT enforces a circle.";
+                case VectorShapeType.Triangle:
+                    return "Triangle:\nSet start and end of bounds.\nALT enforces an equilateral triangle.";
+                case VectorShapeType.Arc:
+                    return "Arc:\nSet start, end,\nand a third arc point.";
+                default:
+                    return "Click on the page\nto start drawing.";
+            }
         }
 
         private bool TryGetShapeIconFontFamily(out string familyName)
@@ -12490,7 +12539,7 @@ namespace AnonPDF
                     Left = 12,
                     Top = 12,
                     Width = 560,
-                    Text = isPl ? "Kształt:" : isDe ? "Form:" : "Shape:"
+                    Text = isPl ? "KsztaĹ‚t:" : isDe ? "Form:" : "Shape:"
                 };
 
                 var shapesPanel = new FlowLayoutPanel
@@ -12530,7 +12579,7 @@ namespace AnonPDF
                         Tag = shapeType,
                         UseCompatibleTextRendering = true
                     };
-                    shapeButtonToolTip.SetToolTip(button, GetShapeTypeDisplayName(shapeType));
+                    shapeButtonToolTip.SetToolTip(button, GetShapeTypeInputTooltip(shapeType));
                     if (useMaterialIcons && TryCreateShapeIconBitmap(shapeType, 30, out Bitmap iconBitmap))
                     {
                         button.Image = iconBitmap;
@@ -12594,7 +12643,7 @@ namespace AnonPDF
                     Checked = !HasVisibleVectorColor(working.StrokeColorArgb)
                 };
 
-                var labelStrokeWidth = new Label { Left = 300, Top = 120, Width = 95, Text = isPl ? "Grubość:" : isDe ? "Stärke:" : "Width:" };
+                var labelStrokeWidth = new Label { Left = 300, Top = 120, Width = 95, Text = isPl ? "GruboĹ›Ä‡:" : isDe ? "StĂ¤rke:" : "Width:" };
                 var numericStrokeWidth = new NumericUpDown
                 {
                     Left = 398,
@@ -12616,7 +12665,7 @@ namespace AnonPDF
                     DropDownStyle = ComboBoxStyle.DropDownList
                 };
                 comboStrokeStyle.DropDownWidth = 170;
-                comboStrokeStyle.Items.Add(isPl ? "Ciągła" : isDe ? "Durchgezogen" : "Solid");
+                comboStrokeStyle.Items.Add(isPl ? "CiÄ…gĹ‚a" : isDe ? "Durchgezogen" : "Solid");
                 comboStrokeStyle.Items.Add(isPl ? "Przerywana" : isDe ? "Gestrichelt" : "Dash");
                 comboStrokeStyle.Items.Add(isPl ? "Kropkowana" : isDe ? "Gepunktet" : "Dot");
                 comboStrokeStyle.Items.Add(isPl ? "Kreska-kropka" : isDe ? "Strich-Punkt" : "Dash-dot");
@@ -12640,7 +12689,7 @@ namespace AnonPDF
                         break;
                 }
 
-                var labelFillColor = new Label { Left = 12, Top = 184, Width = 120, Text = isPl ? "Kolor wypełnienia:" : isDe ? "Füllfarbe:" : "Fill color:" };
+                var labelFillColor = new Label { Left = 12, Top = 184, Width = 120, Text = isPl ? "Kolor wypeĹ‚nienia:" : isDe ? "FĂĽllfarbe:" : "Fill color:" };
                 System.Drawing.Color fillBaseColor = System.Drawing.Color.FromArgb(working.FillColorArgb);
                 var buttonFillColor = new Button
                 {
@@ -12667,11 +12716,11 @@ namespace AnonPDF
                     Left = 140,
                     Top = 210,
                     Width = 200,
-                    Text = isPl ? "Brak koloru wypełnienia" : isDe ? "Keine Füllfarbe" : "No fill color",
+                    Text = isPl ? "Brak koloru wypeĹ‚nienia" : isDe ? "Keine FĂĽllfarbe" : "No fill color",
                     Checked = !HasVisibleVectorColor(working.FillColorArgb) || NormalizeVectorFillOpacity(working.FillOpacity) <= 0f
                 };
 
-                var labelFillOpacity = new Label { Left = 300, Top = 184, Width = 95, Text = isPl ? "Wypełnienie (%):" : isDe ? "Füllung (%):" : "Fill (%):" };
+                var labelFillOpacity = new Label { Left = 300, Top = 184, Width = 95, Text = isPl ? "WypeĹ‚nienie (%):" : isDe ? "FĂĽllung (%):" : "Fill (%):" };
                 var numericFillOpacity = new NumericUpDown
                 {
                     Left = 398,
@@ -12683,7 +12732,7 @@ namespace AnonPDF
                     Increment = 5,
                     Value = (decimal)Math.Round(NormalizeVectorFillOpacity(working.FillOpacity) * 100f)
                 };
-                var labelFillPattern = new Label { Left = 482, Top = 184, Width = 60, Text = isPl ? "Wzór:" : isDe ? "Muster:" : "Pattern:" };
+                var labelFillPattern = new Label { Left = 482, Top = 184, Width = 60, Text = isPl ? "WzĂłr:" : isDe ? "Muster:" : "Pattern:" };
                 var comboFillPattern = new ComboBox
                 {
                     Left = 540,
@@ -12692,9 +12741,9 @@ namespace AnonPDF
                     DropDownStyle = ComboBoxStyle.DropDownList
                 };
                 comboFillPattern.DropDownWidth = 170;
-                comboFillPattern.Items.Add(isPl ? "Pełny" : isDe ? "Voll" : "Solid");
-                comboFillPattern.Items.Add(isPl ? "Ukośny" : isDe ? "Diagonal" : "Diagonal");
-                comboFillPattern.Items.Add(isPl ? "Krzyżowy" : isDe ? "Kreuz" : "Cross");
+                comboFillPattern.Items.Add(isPl ? "PeĹ‚ny" : isDe ? "Voll" : "Solid");
+                comboFillPattern.Items.Add(isPl ? "UkoĹ›ny" : isDe ? "Diagonal" : "Diagonal");
+                comboFillPattern.Items.Add(isPl ? "KrzyĹĽowy" : isDe ? "Kreuz" : "Cross");
                 comboFillPattern.Items.Add(isPl ? "Kropki" : isDe ? "Punkte" : "Dots");
                 switch (working.FillPattern)
                 {
@@ -12883,7 +12932,6 @@ namespace AnonPDF
             vectorShapeDraftPoints.Clear();
             vectorShapeDraftHoverActive = false;
             this.Cursor = Cursors.Cross;
-            ShowInfoMessage(GetShapeToolInfoText());
             pdfViewer.Invalidate();
         }
 
@@ -14589,6 +14637,11 @@ namespace AnonPDF
                 {
                     EditArrowObject(selectedArrowObject);
                     pdfViewer.Invalidate();
+                    return;
+                }
+
+                if (TryShowVectorNodeContextMenu(startPoint))
+                {
                     return;
                 }
 
@@ -17823,7 +17876,7 @@ namespace AnonPDF
                     RectangleF rectF = new RectangleF(x, y, w, h);
                     var pdfCoordinates = ConvertPdfToViewCoordinates(rectF, currentPage, rotation);
 
-                    // Default highlight – e.g. yellow
+                    // Default highlight â€“ e.g. yellow
                     System.Drawing.Color highlightColor = System.Drawing.Color.FromArgb(128, 255, 215, 0);
 
                     // Scale rectangle
@@ -20732,6 +20785,207 @@ namespace AnonPDF
             }
 
             return pointIndex >= 0;
+        }
+
+        private static bool SupportsVectorNodeEditing(VectorShapeType shapeType)
+        {
+            return shapeType == VectorShapeType.Polyline || shapeType == VectorShapeType.Region;
+        }
+
+        private static int GetMinNodeCountForVectorShape(VectorShapeType shapeType)
+        {
+            return shapeType == VectorShapeType.Region ? 3 : 2;
+        }
+
+        private bool TryGetVectorSegmentAtPoint(VectorShapeObject vectorShape, Point location, out int insertIndex)
+        {
+            insertIndex = -1;
+            if (vectorShape == null || vectorShape.PageNumber != currentPage || vectorShape.Points == null)
+            {
+                return false;
+            }
+
+            VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
+            if (!SupportsVectorNodeEditing(shapeType) || vectorShape.Points.Count < 2)
+            {
+                return false;
+            }
+
+            float tolerance = Math.Max(8f, NormalizeVectorStrokeWidth(vectorShape.StrokeWidth) * scaleFactor + 3f);
+            float bestDistance = float.MaxValue;
+            int bestSegmentIndex = -1;
+
+            int segmentCount = shapeType == VectorShapeType.Region
+                ? vectorShape.Points.Count
+                : vectorShape.Points.Count - 1;
+
+            for (int i = 0; i < segmentCount; i++)
+            {
+                int next = (i + 1) % vectorShape.Points.Count;
+                PointF start = new PointF(vectorShape.Points[i].X * scaleFactor, vectorShape.Points[i].Y * scaleFactor);
+                PointF end = new PointF(vectorShape.Points[next].X * scaleFactor, vectorShape.Points[next].Y * scaleFactor);
+                float distance = DistancePointToSegment(location, start, end);
+                if (distance > tolerance || distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                bestSegmentIndex = i;
+            }
+
+            if (bestSegmentIndex < 0)
+            {
+                return false;
+            }
+
+            insertIndex = bestSegmentIndex + 1;
+            if (shapeType == VectorShapeType.Region && bestSegmentIndex == vectorShape.Points.Count - 1)
+            {
+                // Inserting after the closing segment (last -> first) means append at end.
+                insertIndex = vectorShape.Points.Count;
+            }
+
+            return true;
+        }
+
+        private bool InsertVectorNode(VectorShapeObject vectorShape, int insertIndex, Point location)
+        {
+            if (vectorShape == null || vectorShape.Points == null)
+            {
+                return false;
+            }
+
+            VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
+            if (!SupportsVectorNodeEditing(shapeType))
+            {
+                return false;
+            }
+
+            var points = vectorShape.Points.ToList();
+            insertIndex = Math.Max(0, Math.Min(points.Count, insertIndex));
+
+            PointF newPoint = new PointF(location.X / scaleFactor, location.Y / scaleFactor);
+            if (snapToGridEnabled)
+            {
+                newPoint = SnapPointToGrid(newPoint);
+            }
+
+            var pageSize = GetPageSizeWithOffset(vectorShape.PageNumber);
+            if (pageSize.Width > 0f && pageSize.Height > 0f)
+            {
+                newPoint = new PointF(
+                    Math.Max(0f, Math.Min(pageSize.Width, newPoint.X)),
+                    Math.Max(0f, Math.Min(pageSize.Height, newPoint.Y)));
+            }
+
+            points.Insert(insertIndex, newPoint);
+            vectorShape.Points = points;
+            NormalizeVectorShape(vectorShape);
+            ConstrainVectorShapeToPage(vectorShape);
+            vectorShape.UpdatedAtUtc = DateTime.UtcNow;
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private bool RemoveVectorNode(VectorShapeObject vectorShape, int nodeIndex)
+        {
+            if (vectorShape == null || vectorShape.Points == null || nodeIndex < 0 || nodeIndex >= vectorShape.Points.Count)
+            {
+                return false;
+            }
+
+            VectorShapeType shapeType = ParseVectorShapeType(vectorShape.ShapeType);
+            if (!SupportsVectorNodeEditing(shapeType))
+            {
+                return false;
+            }
+
+            int minNodeCount = GetMinNodeCountForVectorShape(shapeType);
+            if (vectorShape.Points.Count <= minNodeCount)
+            {
+                return false;
+            }
+
+            var points = vectorShape.Points.ToList();
+            points.RemoveAt(nodeIndex);
+            vectorShape.Points = points;
+            NormalizeVectorShape(vectorShape);
+            ConstrainVectorShapeToPage(vectorShape);
+            vectorShape.UpdatedAtUtc = DateTime.UtcNow;
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            pdfViewer.Invalidate();
+            return true;
+        }
+
+        private bool TryShowVectorNodeContextMenu(Point location)
+        {
+            if (!EnsureCurrentPageEditable(false))
+            {
+                return false;
+            }
+
+            VectorShapeObject target = null;
+            if (selectedVectorShape != null &&
+                selectedVectorShape.PageNumber == currentPage &&
+                IsPointNearVectorShape(selectedVectorShape, location))
+            {
+                target = selectedVectorShape;
+            }
+            else if (TryGetHitVectorShapeAtPoint(location, out VectorShapeObject hitVectorShape))
+            {
+                target = hitVectorShape;
+            }
+
+            if (target == null || target.IsLocked)
+            {
+                return false;
+            }
+
+            VectorShapeType shapeType = ParseVectorShapeType(target.ShapeType);
+            if (!SupportsVectorNodeEditing(shapeType))
+            {
+                return false;
+            }
+
+            bool hasSegment = TryGetVectorSegmentAtPoint(target, location, out int insertIndex);
+            bool hasHandle = TryGetVectorHandleAtPoint(target, location, out int nodeIndex);
+            int minNodeCount = GetMinNodeCountForVectorShape(shapeType);
+            bool canRemove = hasHandle && target.Points != null && target.Points.Count > minNodeCount;
+
+            if (!hasSegment && !hasHandle)
+            {
+                return false;
+            }
+
+            EnsureVectorShapeId(target);
+            selectedVectorShape = target;
+            ClearGroupSelection();
+
+            var menu = new ContextMenuStrip();
+            var addNodeItem = new ToolStripMenuItem(LocalizedText("Vector_Context_AddNode"))
+            {
+                Enabled = hasSegment
+            };
+            addNodeItem.Click += (_, __) => InsertVectorNode(target, insertIndex, location);
+            menu.Items.Add(addNodeItem);
+
+            var removeNodeItem = new ToolStripMenuItem(LocalizedText("Vector_Context_RemoveNode"))
+            {
+                Enabled = canRemove
+            };
+            removeNodeItem.Click += (_, __) => RemoveVectorNode(target, nodeIndex);
+            menu.Items.Add(removeNodeItem);
+
+            menu.Show(pdfViewer, location);
+            return true;
         }
 
         private bool TryGetArrowHandleAtPoint(ArrowObject arrowObject, Point location, out ArrowHandleType handleType)
@@ -23794,7 +24048,7 @@ namespace AnonPDF
             {
                 int numberOfPages = srcDoc.GetNumberOfPages();
 
-                // Check reencoding mode – if disabled, return false.
+                // Check reencoding mode â€“ if disabled, return false.
                 if (!isReencodingMode)
                     return false;
 
@@ -23806,7 +24060,7 @@ namespace AnonPDF
                     pageFilters.Add(filterForPage);
                 }
 
-                // If any page doesn't have specified filter – reencoding is not performed
+                // If any page doesn't have specified filter â€“ reencoding is not performed
                 //if (!(pageFilters.Any(pf => pf != null) || openSavedPDFCheckBox.Checked))
                 //    return false;
 
@@ -23820,7 +24074,7 @@ namespace AnonPDF
                     {
                         int pageNumber = i + 1;
 
-                        // If there are no redaction blocks for given page – copy page without reencoding
+                        // If there are no redaction blocks for given page â€“ copy page without reencoding
                         if (!redactionBlocks.Any(b => b.PageNumber == pageNumber))
                         {
                             srcDoc.CopyPagesTo(pageNumber, pageNumber, destDoc);
@@ -23958,11 +24212,11 @@ namespace AnonPDF
                     // Reverse condition
                     if (brightness < threshold)
                     {
-                    // Dark pixel — set to white (default is white, so we do nothing)
+                    // Dark pixel â€” set to white (default is white, so we do nothing)
                     }
                     else
                     {
-                        // Bright pixel — set to black
+                        // Bright pixel â€” set to black
                         bmpBuffer[bmpRow + x / 8] |= (byte)(0x80 >> (x % 8));
                     }
                 }
@@ -24674,7 +24928,7 @@ namespace AnonPDF
                             pagesToRemove.Remove(i);
                         }
 
-                        // User chose not to delete pages – handle accordingly if needed
+                        // User chose not to delete pages â€“ handle accordingly if needed
                     }
                     if ((string)filterComboBox.SelectedItem != allComboItem)
                     {
@@ -25814,7 +26068,7 @@ namespace AnonPDF
                 Padding = new Padding(6, 5, 6, 5)
             };
 
-            string[] symbols = { "─", "°", "²", "³", "§", "•", "✓", "✗", "→", "±" };
+            string[] symbols = { "â”€", "Â°", "Â˛", "Âł", "Â§", "â€˘", "âś“", "âś—", "â†’", "Â±" };
             foreach (string symbol in symbols)
             {
                 Button btnSymbol = new Button
@@ -27465,7 +27719,7 @@ namespace AnonPDF
                     pdfForm.Panel2_MouseWheel(args);
                 }
 
-                // If CTRL is pressed, "eat" message – don't pass to base.WndProc
+                // If CTRL is pressed, "eat" message â€“ don't pass to base.WndProc
                 if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
                     return;
             }
@@ -27870,7 +28124,7 @@ namespace AnonPDF
             Label lblStep = new Label() { Text = Resources.Delete_Label_Step, Left = 20, Top = 100, Width = 120 };
             nudStep = new NumericUpDown() { Left = 150, Top = 100, Width = 50, Minimum = 0, Maximum = numPages, Value = 1 };
 
-            // Two RadioButtons — one to apply, one to cancel the selection
+            // Two RadioButtons â€” one to apply, one to cancel the selection
             rbApply = new RadioButton() { Text = Resources.Delete_Radio_Apply, Left = 20, Top = 140, Width = 200 };
             rbCancel = new RadioButton() { Text = Resources.Delete_Radio_Cancel, Left = 20, Top = 170, Width = 200 };
 
@@ -28967,4 +29221,5 @@ namespace AnonPDF
 }
 
 #pragma warning restore SPELL
+
 

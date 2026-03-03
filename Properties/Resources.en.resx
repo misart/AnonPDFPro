@@ -246,6 +246,12 @@
   <data name="Menu_Context_Delete" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="Vector_Context_AddNode" xml:space="preserve">
+    <value>Add node</value>
+  </data>
+  <data name="Vector_Context_RemoveNode" xml:space="preserve">
+    <value>Remove node</value>
+  </data>
   <data name="Order_SendToBack" xml:space="preserve">
     <value>Send to back</value>
   </data>

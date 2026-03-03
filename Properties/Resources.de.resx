@@ -440,6 +440,12 @@ Anwendung schließen und Installer jetzt starten?</value>
   <data name="Menu_Context_Delete" xml:space="preserve">
     <value>Loeschen</value>
   </data>
+  <data name="Vector_Context_AddNode" xml:space="preserve">
+    <value>Knoten hinzufuegen</value>
+  </data>
+  <data name="Vector_Context_RemoveNode" xml:space="preserve">
+    <value>Knoten entfernen</value>
+  </data>
   <data name="Order_SendToBack" xml:space="preserve">
     <value>Ganz nach hinten</value>
   </data>
