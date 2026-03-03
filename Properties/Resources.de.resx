@@ -1112,10 +1112,10 @@ Bitte speichern Sie Ihre Arbeit und schließen Sie die Anwendung.
     <value>Das Einfuegen von Vektorgrafiken aus der Zwischenablage wird im naechsten Schritt verfuegbar sein.</value>
   </data>
   <data name="Msg_PasteGraphic_NotImplemented" xml:space="preserve">
-    <value>Das Einf?gen von Grafiken aus der Zwischenablage (Raster und Vektor) wird im n?chsten Schritt verf?gbar sein.</value>
+    <value>Das Einfuegen von Grafiken aus der Zwischenablage (Raster und Vektor) wird im naechsten Schritt verfuegbar sein.</value>
   </data>
   <data name="Msg_ClipboardUnavailable" xml:space="preserve">
-    <value>Die Zwischenablage ist vor?bergehend nicht verf?gbar. Bitte versuchen Sie es erneut.</value>
+    <value>Die Zwischenablage ist voruebergehend nicht verfuegbar. Bitte versuchen Sie es erneut.</value>
   </data>
   <data name="Err_RasterImageLoad" xml:space="preserve">
     <value>Bild konnte nicht hinzugefuegt werden: {0}</value>

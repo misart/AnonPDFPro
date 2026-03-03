@@ -10374,7 +10374,7 @@ namespace AnonPDF
                 return "Save changes to the project?";
             }
 
-            return "Czy zapisaÄ‡ zmiany w projekcie?";
+            return "Czy zapisać zmiany w projekcie?";
         }
 
         private string GetCloseProjectSaveButtonText()
@@ -12202,15 +12202,15 @@ namespace AnonPDF
                 case VectorShapeType.Region:
                     return isPl ? "Region" : isDe ? "Region" : "Region";
                 case VectorShapeType.Polyline:
-                    return isPl ? "Linia Ĺ‚amana" : isDe ? "Polylinie" : "Polyline";
+                    return isPl ? "Linia łamana" : isDe ? "Polylinie" : "Polyline";
                 case VectorShapeType.Rectangle:
-                    return isPl ? "ProstokÄ…t" : isDe ? "Rechteck" : "Rectangle";
+                    return isPl ? "Prostokąt" : isDe ? "Rechteck" : "Rectangle";
                 case VectorShapeType.Ellipse:
                     return isPl ? "Elipsa" : isDe ? "Ellipse" : "Ellipse";
                 case VectorShapeType.Triangle:
-                    return isPl ? "TrĂłjkÄ…t" : isDe ? "Dreieck" : "Triangle";
+                    return isPl ? "Trójkąt" : isDe ? "Dreieck" : "Triangle";
                 case VectorShapeType.Arc:
-                    return isPl ? "Ĺuk" : isDe ? "Bogen" : "Arc";
+                    return isPl ? "Łuk" : isDe ? "Bogen" : "Arc";
                 default:
                     return shapeType.ToString();
             }
@@ -12221,11 +12221,11 @@ namespace AnonPDF
             string lang = (Resources.Culture ?? CultureInfo.CurrentUICulture).TwoLetterISOLanguageName;
             if (string.Equals(lang, "pl", StringComparison.OrdinalIgnoreCase))
             {
-                return "Dodaj ksztaĹ‚t";
+                return "Dodaj kształt";
             }
             if (string.Equals(lang, "de", StringComparison.OrdinalIgnoreCase))
             {
-                return "Form hinzufĂĽgen";
+                return "Form hinzufuegen";
             }
             return "Add shape";
         }
@@ -12539,7 +12539,7 @@ namespace AnonPDF
                     Left = 12,
                     Top = 12,
                     Width = 560,
-                    Text = isPl ? "KsztaĹ‚t:" : isDe ? "Form:" : "Shape:"
+                    Text = isPl ? "Kształt:" : isDe ? "Form:" : "Shape:"
                 };
 
                 var shapesPanel = new FlowLayoutPanel
@@ -12643,7 +12643,7 @@ namespace AnonPDF
                     Checked = !HasVisibleVectorColor(working.StrokeColorArgb)
                 };
 
-                var labelStrokeWidth = new Label { Left = 300, Top = 120, Width = 95, Text = isPl ? "GruboĹ›Ä‡:" : isDe ? "StĂ¤rke:" : "Width:" };
+                var labelStrokeWidth = new Label { Left = 300, Top = 120, Width = 95, Text = isPl ? "Grubość:" : isDe ? "Staerke:" : "Width:" };
                 var numericStrokeWidth = new NumericUpDown
                 {
                     Left = 398,
@@ -12665,7 +12665,7 @@ namespace AnonPDF
                     DropDownStyle = ComboBoxStyle.DropDownList
                 };
                 comboStrokeStyle.DropDownWidth = 170;
-                comboStrokeStyle.Items.Add(isPl ? "CiÄ…gĹ‚a" : isDe ? "Durchgezogen" : "Solid");
+                comboStrokeStyle.Items.Add(isPl ? "Ciągła" : isDe ? "Durchgezogen" : "Solid");
                 comboStrokeStyle.Items.Add(isPl ? "Przerywana" : isDe ? "Gestrichelt" : "Dash");
                 comboStrokeStyle.Items.Add(isPl ? "Kropkowana" : isDe ? "Gepunktet" : "Dot");
                 comboStrokeStyle.Items.Add(isPl ? "Kreska-kropka" : isDe ? "Strich-Punkt" : "Dash-dot");
@@ -12689,7 +12689,7 @@ namespace AnonPDF
                         break;
                 }
 
-                var labelFillColor = new Label { Left = 12, Top = 184, Width = 120, Text = isPl ? "Kolor wypeĹ‚nienia:" : isDe ? "FĂĽllfarbe:" : "Fill color:" };
+                var labelFillColor = new Label { Left = 12, Top = 184, Width = 120, Text = isPl ? "Kolor wypełnienia:" : isDe ? "Fuellfarbe:" : "Fill color:" };
                 System.Drawing.Color fillBaseColor = System.Drawing.Color.FromArgb(working.FillColorArgb);
                 var buttonFillColor = new Button
                 {
@@ -12716,11 +12716,11 @@ namespace AnonPDF
                     Left = 140,
                     Top = 210,
                     Width = 200,
-                    Text = isPl ? "Brak koloru wypeĹ‚nienia" : isDe ? "Keine FĂĽllfarbe" : "No fill color",
+                    Text = isPl ? "Brak koloru wypełnienia" : isDe ? "Keine Fuellfarbe" : "No fill color",
                     Checked = !HasVisibleVectorColor(working.FillColorArgb) || NormalizeVectorFillOpacity(working.FillOpacity) <= 0f
                 };
 
-                var labelFillOpacity = new Label { Left = 300, Top = 184, Width = 95, Text = isPl ? "WypeĹ‚nienie (%):" : isDe ? "FĂĽllung (%):" : "Fill (%):" };
+                var labelFillOpacity = new Label { Left = 300, Top = 184, Width = 95, Text = isPl ? "Wypełnienie (%):" : isDe ? "Fuellung (%):" : "Fill (%):" };
                 var numericFillOpacity = new NumericUpDown
                 {
                     Left = 398,
@@ -12732,7 +12732,7 @@ namespace AnonPDF
                     Increment = 5,
                     Value = (decimal)Math.Round(NormalizeVectorFillOpacity(working.FillOpacity) * 100f)
                 };
-                var labelFillPattern = new Label { Left = 482, Top = 184, Width = 60, Text = isPl ? "WzĂłr:" : isDe ? "Muster:" : "Pattern:" };
+                var labelFillPattern = new Label { Left = 482, Top = 184, Width = 60, Text = isPl ? "Wzór:" : isDe ? "Muster:" : "Pattern:" };
                 var comboFillPattern = new ComboBox
                 {
                     Left = 540,
@@ -12741,9 +12741,9 @@ namespace AnonPDF
                     DropDownStyle = ComboBoxStyle.DropDownList
                 };
                 comboFillPattern.DropDownWidth = 170;
-                comboFillPattern.Items.Add(isPl ? "PeĹ‚ny" : isDe ? "Voll" : "Solid");
-                comboFillPattern.Items.Add(isPl ? "UkoĹ›ny" : isDe ? "Diagonal" : "Diagonal");
-                comboFillPattern.Items.Add(isPl ? "KrzyĹĽowy" : isDe ? "Kreuz" : "Cross");
+                comboFillPattern.Items.Add(isPl ? "Pełny" : isDe ? "Voll" : "Solid");
+                comboFillPattern.Items.Add(isPl ? "Ukośny" : isDe ? "Diagonal" : "Diagonal");
+                comboFillPattern.Items.Add(isPl ? "Krzyżowy" : isDe ? "Kreuz" : "Cross");
                 comboFillPattern.Items.Add(isPl ? "Kropki" : isDe ? "Punkte" : "Dots");
                 switch (working.FillPattern)
                 {
