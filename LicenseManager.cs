@@ -64,23 +64,21 @@ namespace AnonPDF
                 userBaseDir = installBaseDir;
             }
 
+            // Configuration source is always the application directory.
+            // User directory may contain license files for standalone mode only.
             string installConfigPath = Path.Combine(installBaseDir, "config.json");
-            string userConfigPath = Path.Combine(userBaseDir, "config.json");
             JObject installConfig = ParseConfigFile(installConfigPath);
-            JObject userConfig = ParseConfigFile(userConfigPath);
-
-            bool hasUserConfig = userConfig != null;
-            string sourceBaseDir = hasUserConfig ? userBaseDir : installBaseDir;
-            string configFilePath = hasUserConfig ? userConfigPath : installConfigPath;
+            string sourceBaseDir = installBaseDir;
+            string configFilePath = installConfigPath;
 
             return new AppConfig(
-                licenseFile: GetConfigValue(userConfig, installConfig, "licenseFile", "license.json"),
-                publicKeyFile: GetConfigValue(userConfig, installConfig, "publicKeyFile", "license_public.xml"),
-                serverBaseUrl: GetConfigValue(userConfig, installConfig, "serverBaseUrl", "https://misart.pl/anonpdfpro"),
-                versionInfoUrl: GetConfigValue(userConfig, installConfig, "versionInfoUrl", string.Empty),
-                updateMode: GetConfigValue(userConfig, installConfig, "updateMode", "central"),
-                defaultTheme: GetConfigValue(userConfig, installConfig, "defaultTheme", string.Empty),
-                licenseId: GetConfigValue(userConfig, installConfig, "licenseId", string.Empty),
+                licenseFile: GetConfigValue(installConfig, "licenseFile", "license.json"),
+                publicKeyFile: GetConfigValue(installConfig, "publicKeyFile", "license_public.xml"),
+                serverBaseUrl: GetConfigValue(installConfig, "serverBaseUrl", "https://misart.pl/anonpdfpro"),
+                versionInfoUrl: GetConfigValue(installConfig, "versionInfoUrl", string.Empty),
+                updateMode: GetConfigValue(installConfig, "updateMode", "central"),
+                defaultTheme: GetConfigValue(installConfig, "defaultTheme", string.Empty),
+                licenseId: GetConfigValue(installConfig, "licenseId", string.Empty),
                 configFilePath: configFilePath,
                 installBaseDir: installBaseDir,
                 userBaseDir: userBaseDir,
@@ -105,15 +103,9 @@ namespace AnonPDF
             }
         }
 
-        private static string GetConfigValue(JObject user, JObject install, string key, string fallback)
+        private static string GetConfigValue(JObject source, string key, string fallback)
         {
-            string value = (string)user?[key];
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-
-            value = (string)install?[key];
+            string value = (string)source?[key];
             if (!string.IsNullOrWhiteSpace(value))
             {
                 return value;
@@ -158,11 +150,15 @@ namespace AnonPDF
             var candidates = new List<string>();
             if (IsStandaloneUpdateMode)
             {
+                // Standalone mode: prefer user-local license files, fallback to app-local files.
                 AddCandidate(candidates, Path.Combine(UserBaseDir, relativePath));
+                AddCandidate(candidates, Path.Combine(InstallBaseDir, relativePath));
             }
-
-            AddCandidate(candidates, Path.Combine(SourceBaseDir, relativePath));
-            AddCandidate(candidates, Path.Combine(InstallBaseDir, relativePath));
+            else
+            {
+                // Central mode (or empty/other value): use only app-local files.
+                AddCandidate(candidates, Path.Combine(InstallBaseDir, relativePath));
+            }
 
             foreach (string candidate in candidates)
             {
