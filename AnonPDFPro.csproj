@@ -257,6 +257,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="pdf-icon.ico" />
+    <Content Include="materialdesignicons-subset.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="UserGuide_pl.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
