@@ -1392,6 +1392,18 @@ Czy zamknąć aplikację i uruchomić instalator teraz?</value>
   <data name="Footnotes_Context_DeleteSelection" xml:space="preserve">
     <value>Usuń zaznaczenie</value>
   </data>
+  <data name="Footnotes_Context_DuplicateSelection" xml:space="preserve">
+    <value>Powiel zaznaczenie</value>
+  </data>
+  <data name="Footnotes_Context_DuplicateObject" xml:space="preserve">
+    <value>Powiel obiekt</value>
+  </data>
+  <data name="Footnotes_Context_DeleteDuplicatedObjects" xml:space="preserve">
+    <value>Usuń powielone obiekty</value>
+  </data>
+  <data name="Footnotes_Context_DeleteObject" xml:space="preserve">
+    <value>Usuń obiekt</value>
+  </data>
   <data name="Footnotes_Context_ScopeNone" xml:space="preserve">
     <value>Brak zakresu</value>
   </data>
@@ -1406,6 +1418,39 @@ Czy zamknąć aplikację i uruchomić instalator teraz?</value>
   </data>
   <data name="Footnotes_Context_CatalogUnavailable" xml:space="preserve">
     <value>Brak danych słownika</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_Title" xml:space="preserve">
+    <value>Powiel zaznaczenie</value>
+  </data>
+  <data name="Footnotes_DuplicateObject_Title" xml:space="preserve">
+    <value>Powiel obiekt</value>
+  </data>
+  <data name="Footnotes_DeleteDuplicatedObjects_Title" xml:space="preserve">
+    <value>Usuń powielone obiekty</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_AllPages" xml:space="preserve">
+    <value>Wszystkie strony</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_Range" xml:space="preserve">
+    <value>Strony od - do:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_FromPage" xml:space="preserve">
+    <value>Od:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_ToPage" xml:space="preserve">
+    <value>Do:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_PageCount" xml:space="preserve">
+    <value>Liczba stron:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_Direction" xml:space="preserve">
+    <value>Kierunek:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_PreviousPages" xml:space="preserve">
+    <value>Poprzednie strony</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_NextPages" xml:space="preserve">
+    <value>Kolejne strony</value>
   </data>
   <data name="Footnotes_LegalBases_Saved" xml:space="preserve">
     <value>Słownik podstaw prawnych został zapisany.</value>

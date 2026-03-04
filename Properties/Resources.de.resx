@@ -1287,6 +1287,18 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
   <data name="Footnotes_Context_DeleteSelection" xml:space="preserve">
     <value>Markierung entfernen</value>
   </data>
+  <data name="Footnotes_Context_DuplicateSelection" xml:space="preserve">
+    <value>Markierung duplizieren</value>
+  </data>
+  <data name="Footnotes_Context_DuplicateObject" xml:space="preserve">
+    <value>Objekt duplizieren</value>
+  </data>
+  <data name="Footnotes_Context_DeleteDuplicatedObjects" xml:space="preserve">
+    <value>Duplizierte Objekte löschen</value>
+  </data>
+  <data name="Footnotes_Context_DeleteObject" xml:space="preserve">
+    <value>Objekt löschen</value>
+  </data>
   <data name="Footnotes_Context_ScopeNone" xml:space="preserve">
     <value>Kein Umfang</value>
   </data>
@@ -1301,6 +1313,39 @@ Die Anwendung wechselt in den DEMO-Modus.</value>
   </data>
   <data name="Footnotes_Context_CatalogUnavailable" xml:space="preserve">
     <value>Keine Wörterbuchdaten</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_Title" xml:space="preserve">
+    <value>Markierung duplizieren</value>
+  </data>
+  <data name="Footnotes_DuplicateObject_Title" xml:space="preserve">
+    <value>Objekt duplizieren</value>
+  </data>
+  <data name="Footnotes_DeleteDuplicatedObjects_Title" xml:space="preserve">
+    <value>Duplizierte Objekte löschen</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_AllPages" xml:space="preserve">
+    <value>Alle Seiten</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_Range" xml:space="preserve">
+    <value>Seitenbereich:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_FromPage" xml:space="preserve">
+    <value>Von:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_ToPage" xml:space="preserve">
+    <value>Bis:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_PageCount" xml:space="preserve">
+    <value>Anzahl der Seiten:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_Direction" xml:space="preserve">
+    <value>Richtung:</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_PreviousPages" xml:space="preserve">
+    <value>Vorherige Seiten</value>
+  </data>
+  <data name="Footnotes_DuplicateSelection_NextPages" xml:space="preserve">
+    <value>Nächste Seiten</value>
   </data>
   <data name="Footnotes_LegalBases_Saved" xml:space="preserve">
     <value>Das Rechtsgrundlagen-Wörterbuch wurde gespeichert.</value>

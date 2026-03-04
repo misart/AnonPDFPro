@@ -108,6 +108,8 @@ namespace AnonPDF
         private readonly int markerWidth = 7;
         private readonly int markerHeight = 7;
         private const float MarkerCleanupVerticalPadding = 0.75f;
+        private readonly string duplicationSessionId = Guid.NewGuid().ToString("N");
+        private int duplicationGroupSequence;
         private System.Drawing.Point startPoint;
         private bool isDrawing;
         private bool isMarkerCtrlBoxMode;
@@ -4963,6 +4965,7 @@ namespace AnonPDF
             RectangleF copyBounds = source.AnnotationBounds;
             copyBounds.Offset(12f, 12f);
             copyBounds = ConstrainAnnotationBoundsToViewer(copyBounds);
+            string duplicateGroupId = CreateDuplicateGroupId();
 
             TextAnnotation copy = new TextAnnotation
             {
@@ -4973,7 +4976,8 @@ namespace AnonPDF
                 AnnotationAlignment = source.AnnotationAlignment,
                 AnnotationRotation = source.AnnotationRotation,
                 AnnotationIsLocked = source.AnnotationIsLocked,
-                AnnotationBounds = copyBounds
+                AnnotationBounds = copyBounds,
+                DuplicateGroupId = duplicateGroupId
             };
 
             textAnnotations.Add(copy);
@@ -5463,6 +5467,7 @@ namespace AnonPDF
             }
 
             EnsureVectorShapeId(source);
+            string duplicateGroupId = CreateDuplicateGroupId();
             var copy = new VectorShapeObject
             {
                 Id = Guid.NewGuid().ToString("N"),
@@ -5480,7 +5485,8 @@ namespace AnonPDF
                 FillPattern = source.FillPattern,
                 IsLocked = source.IsLocked,
                 CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = DateTime.UtcNow,
+                DuplicateGroupId = duplicateGroupId
             };
             NormalizeVectorShape(copy);
             ConstrainVectorShapeToPage(copy);
@@ -14631,21 +14637,16 @@ namespace AnonPDF
                     return;
                 }
 
-                if (selectedArrowObject != null &&
-                    selectedArrowObject.PageNumber == currentPage &&
-                    (IsPointNearArrowLine(selectedArrowObject, startPoint) || TryGetArrowHandleAtPoint(selectedArrowObject, startPoint, out _)))
-                {
-                    EditArrowObject(selectedArrowObject);
-                    pdfViewer.Invalidate();
-                    return;
-                }
-
                 if (TryShowVectorNodeContextMenu(startPoint))
                 {
                     return;
                 }
 
                 if (TryShowCommentContextMenu(startPoint))
+                {
+                    return;
+                }
+                if (TryShowObjectContextMenu(startPoint))
                 {
                     return;
                 }
@@ -15197,9 +15198,140 @@ namespace AnonPDF
                 return false;
             }
 
+            string duplicateGroupId = string.IsNullOrWhiteSpace(comment.DuplicateGroupId) ? null : comment.DuplicateGroupId.Trim();
             var menu = new ContextMenuStrip();
             menu.Items.Add(GetEditCommentContextMenuText(), null, (_, __) => EditCommentAnnotation(comment));
-            menu.Items.Add(GetDeleteCommentContextMenuText(), null, (_, __) => RemoveCommentAnnotation(comment));
+            var duplicateObjectItem = new ToolStripMenuItem(GetDuplicateObjectContextMenuText())
+            {
+                Enabled = numPages > 1
+            };
+            duplicateObjectItem.Click += (_, __) => DuplicateCommentAnnotationAcrossPages(comment);
+            menu.Items.Add(duplicateObjectItem);
+            var deleteDuplicatedObjectsItem = new ToolStripMenuItem(GetDeleteDuplicatedObjectsContextMenuText())
+            {
+                Enabled = !string.IsNullOrWhiteSpace(duplicateGroupId)
+            };
+            deleteDuplicatedObjectsItem.Click += (_, __) => DeleteDuplicatedObjectsByGroupId(duplicateGroupId, comment.PageNumber);
+            menu.Items.Add(deleteDuplicatedObjectsItem);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(GetDeleteObjectContextMenuText(), null, (_, __) => DeleteObjectFromContext(comment));
+            menu.Show(pdfViewer, location);
+            return true;
+        }
+
+        private bool TryShowObjectContextMenu(Point location)
+        {
+            if (pdf == null || numPages <= 0)
+            {
+                return false;
+            }
+
+            float dpiX;
+            float dpiY;
+            using (Graphics graphics = pdfViewer.CreateGraphics())
+            {
+                dpiX = graphics.DpiX;
+                dpiY = graphics.DpiY;
+            }
+
+            object hitObject = null;
+            foreach (object candidate in GetOrderedObjectsForCurrentPage().Reverse())
+            {
+                if (candidate is TextAnnotation textAnnotation &&
+                    GetAnnotationScreenRect(textAnnotation, dpiX, dpiY).Contains(location))
+                {
+                    hitObject = textAnnotation;
+                    break;
+                }
+
+                if (candidate is RasterObject rasterObject &&
+                    IsPointInsideRasterObject(rasterObject, location))
+                {
+                    hitObject = rasterObject;
+                    break;
+                }
+
+                if (candidate is ArrowObject arrowObject &&
+                    (IsPointNearArrowLine(arrowObject, location) || TryGetArrowHandleAtPoint(arrowObject, location, out _)))
+                {
+                    hitObject = arrowObject;
+                    break;
+                }
+
+                if (candidate is VectorShapeObject vectorShape &&
+                    IsPointNearVectorShape(vectorShape, location))
+                {
+                    hitObject = vectorShape;
+                    break;
+                }
+            }
+
+            if (hitObject == null)
+            {
+                return false;
+            }
+
+            string duplicateGroupId = GetDuplicateGroupIdForObject(hitObject);
+
+            var menu = new ContextMenuStrip();
+            var duplicateObjectItem = new ToolStripMenuItem(GetDuplicateObjectContextMenuText())
+            {
+                Enabled = numPages > 1
+            };
+
+            if (hitObject is TextAnnotation hitText)
+            {
+                selectedTextAnnotation = hitText;
+                selectedRasterObject = null;
+                selectedArrowObject = null;
+                selectedVectorShape = null;
+                ClearGroupSelection();
+                duplicateObjectItem.Click += (_, __) => DuplicateTextAnnotationAcrossPages(hitText);
+            }
+            else if (hitObject is RasterObject hitRaster)
+            {
+                selectedTextAnnotation = null;
+                selectedRasterObject = hitRaster;
+                selectedArrowObject = null;
+                selectedVectorShape = null;
+                ClearGroupSelection();
+                duplicateObjectItem.Click += (_, __) => DuplicateRasterObjectAcrossPages(hitRaster);
+            }
+            else if (hitObject is ArrowObject hitArrow)
+            {
+                selectedTextAnnotation = null;
+                selectedRasterObject = null;
+                selectedArrowObject = hitArrow;
+                selectedVectorShape = null;
+                ClearGroupSelection();
+                duplicateObjectItem.Click += (_, __) => DuplicateArrowObjectAcrossPages(hitArrow);
+            }
+            else if (hitObject is VectorShapeObject hitVector)
+            {
+                selectedTextAnnotation = null;
+                selectedRasterObject = null;
+                selectedArrowObject = null;
+                selectedVectorShape = hitVector;
+                ClearGroupSelection();
+                duplicateObjectItem.Click += (_, __) => DuplicateVectorShapeAcrossPages(hitVector);
+            }
+            else
+            {
+                return false;
+            }
+
+            var copyObjectItem = new ToolStripMenuItem(Resources.Menu_CopyToClipboard);
+            copyObjectItem.Click += (_, __) => TryCopySelectedObjectsToInternalClipboard();
+            menu.Items.Add(copyObjectItem);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(duplicateObjectItem);
+            var deleteDuplicatedObjectsItem = new ToolStripMenuItem(GetDeleteDuplicatedObjectsContextMenuText())
+            {
+                Enabled = !string.IsNullOrWhiteSpace(duplicateGroupId)
+            };
+            deleteDuplicatedObjectsItem.Click += (_, __) => DeleteDuplicatedObjectsByGroupId(duplicateGroupId, currentPage);
+            menu.Items.Add(deleteDuplicatedObjectsItem);
+            menu.Items.Add(GetDeleteObjectContextMenuText(), null, (_, __) => DeleteObjectFromContext(hitObject));
             menu.Show(pdfViewer, location);
             return true;
         }
@@ -15224,6 +15356,12 @@ namespace AnonPDF
             var menu = new ContextMenuStrip();
             menu.Items.Add(GetDeleteSelectionContextMenuText(), null, (_, __) => RemoveRedactionBlock(block));
             menu.Items.Add(Resources.Menu_CopyToClipboard, null, (_, __) => CopyRedactionBlockToClipboard(block));
+            var duplicateSelectionMenuItem = new ToolStripMenuItem(GetDuplicateSelectionContextMenuText())
+            {
+                Enabled = numPages > 1
+            };
+            duplicateSelectionMenuItem.Click += (_, __) => DuplicateRedactionBlock(block);
+            menu.Items.Add(duplicateSelectionMenuItem);
             menu.Items.Add(new ToolStripSeparator());
 
             bool hasDynamicScopes = exclusionScopesCatalog.Count > 0;
@@ -15499,6 +15637,61 @@ namespace AnonPDF
         private string GetDeleteSelectionContextMenuText()
         {
             return LocalizedText("Footnotes_Context_DeleteSelection");
+        }
+
+        private string GetDuplicateSelectionContextMenuText()
+        {
+            return LocalizedText("Footnotes_Context_DuplicateSelection");
+        }
+
+        private string GetDuplicateObjectContextMenuText()
+        {
+            return LocalizedText("Footnotes_Context_DuplicateObject");
+        }
+
+        private string GetDuplicateSelectionDialogTitle()
+        {
+            return LocalizedText("Footnotes_DuplicateSelection_Title");
+        }
+
+        private string GetDuplicateObjectDialogTitle()
+        {
+            return LocalizedText("Footnotes_DuplicateObject_Title");
+        }
+
+        private string GetDeleteDuplicatedObjectsContextMenuText()
+        {
+            return LocalizedText("Footnotes_Context_DeleteDuplicatedObjects");
+        }
+
+        private string GetDeleteDuplicatedObjectsDialogTitle()
+        {
+            return LocalizedText("Footnotes_DeleteDuplicatedObjects_Title");
+        }
+
+        private string GetDeleteObjectContextMenuText()
+        {
+            return LocalizedText("Footnotes_Context_DeleteObject");
+        }
+
+        private string GetDuplicateSelectionAllPagesText()
+        {
+            return LocalizedText("Footnotes_DuplicateSelection_AllPages");
+        }
+
+        private string GetDuplicateSelectionRangeText()
+        {
+            return LocalizedText("Footnotes_DuplicateSelection_Range");
+        }
+
+        private string GetDuplicateSelectionFromPageText()
+        {
+            return LocalizedText("Footnotes_DuplicateSelection_FromPage");
+        }
+
+        private string GetDuplicateSelectionToPageText()
+        {
+            return LocalizedText("Footnotes_DuplicateSelection_ToPage");
         }
 
         private string GetScopeNoneContextMenuText()
@@ -20984,8 +21177,836 @@ namespace AnonPDF
             removeNodeItem.Click += (_, __) => RemoveVectorNode(target, nodeIndex);
             menu.Items.Add(removeNodeItem);
 
+            menu.Items.Add(new ToolStripSeparator());
+            var duplicateObjectItem = new ToolStripMenuItem(GetDuplicateObjectContextMenuText())
+            {
+                Enabled = numPages > 1
+            };
+            duplicateObjectItem.Click += (_, __) => DuplicateVectorShapeAcrossPages(target);
+            menu.Items.Add(duplicateObjectItem);
+            var deleteDuplicatedObjectsItem = new ToolStripMenuItem(GetDeleteDuplicatedObjectsContextMenuText())
+            {
+                Enabled = !string.IsNullOrWhiteSpace(target.DuplicateGroupId)
+            };
+            deleteDuplicatedObjectsItem.Click += (_, __) => DeleteDuplicatedObjectsByGroupId(target.DuplicateGroupId, target.PageNumber);
+            menu.Items.Add(deleteDuplicatedObjectsItem);
+            menu.Items.Add(GetDeleteObjectContextMenuText(), null, (_, __) => DeleteObjectFromContext(target));
+
             menu.Show(pdfViewer, location);
             return true;
+        }
+
+        private string GetDuplicateGroupIdForObject(object obj)
+        {
+            switch (obj)
+            {
+                case RedactionBlock block:
+                    return string.IsNullOrWhiteSpace(block.DuplicateGroupId) ? null : block.DuplicateGroupId.Trim();
+                case TextAnnotation textAnnotation:
+                    return string.IsNullOrWhiteSpace(textAnnotation.DuplicateGroupId) ? null : textAnnotation.DuplicateGroupId.Trim();
+                case CommentAnnotation commentAnnotation:
+                    return string.IsNullOrWhiteSpace(commentAnnotation.DuplicateGroupId) ? null : commentAnnotation.DuplicateGroupId.Trim();
+                case RasterObject rasterObject:
+                    return string.IsNullOrWhiteSpace(rasterObject.DuplicateGroupId) ? null : rasterObject.DuplicateGroupId.Trim();
+                case ArrowObject arrowObject:
+                    return string.IsNullOrWhiteSpace(arrowObject.DuplicateGroupId) ? null : arrowObject.DuplicateGroupId.Trim();
+                case VectorShapeObject vectorShapeObject:
+                    return string.IsNullOrWhiteSpace(vectorShapeObject.DuplicateGroupId) ? null : vectorShapeObject.DuplicateGroupId.Trim();
+                default:
+                    return null;
+            }
+        }
+
+        private void DeleteObjectFromContext(object hitObject)
+        {
+            if (hitObject == null)
+            {
+                return;
+            }
+
+            if (hitObject is TextAnnotation textAnnotation)
+            {
+                DeleteTextObjectWithConfirmation(textAnnotation);
+                return;
+            }
+
+            if (hitObject is RasterObject rasterObject)
+            {
+                DeleteRasterObjectWithConfirmation(rasterObject);
+                return;
+            }
+
+            if (hitObject is ArrowObject arrowObject)
+            {
+                DeleteArrowObjectWithConfirmation(arrowObject);
+                return;
+            }
+
+            if (hitObject is VectorShapeObject vectorShapeObject)
+            {
+                DeleteVectorShapeWithConfirmation(vectorShapeObject);
+                return;
+            }
+
+            if (hitObject is CommentAnnotation commentAnnotation)
+            {
+                if (!EnsureCurrentPageEditable(true))
+                {
+                    return;
+                }
+
+                RemoveCommentAnnotation(commentAnnotation);
+            }
+        }
+
+        private void DeleteDuplicatedObjectsByGroupId(string duplicateGroupId, int sourcePage)
+        {
+            if (string.IsNullOrWhiteSpace(duplicateGroupId))
+            {
+                return;
+            }
+
+            sourcePage = Math.Max(1, Math.Min(numPages, sourcePage));
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDeleteDuplicatedObjectsDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            int rangeStart = Math.Max(1, Math.Min(fromPage, toPage));
+            int rangeEnd = Math.Min(numPages, Math.Max(fromPage, toPage));
+            bool IsPageInDeleteRange(int pageNumber)
+            {
+                return pageNumber >= rangeStart && pageNumber <= rangeEnd;
+            }
+
+            string normalizedGroupId = duplicateGroupId.Trim();
+
+            List<TextAnnotation> textToRemove = textAnnotations
+                .Where(obj => obj != null &&
+                              IsPageInDeleteRange(obj.PageNumber) &&
+                              string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            List<RasterObject> rasterToRemove = rasterObjects
+                .Where(obj => obj != null &&
+                              IsPageInDeleteRange(obj.PageNumber) &&
+                              string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            List<ArrowObject> arrowsToRemove = arrowObjects
+                .Where(obj => obj != null &&
+                              IsPageInDeleteRange(obj.PageNumber) &&
+                              string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            List<VectorShapeObject> vectorToRemove = vectorShapes
+                .Where(obj => obj != null &&
+                              IsPageInDeleteRange(obj.PageNumber) &&
+                              string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            List<CommentAnnotation> commentsToRemove = commentAnnotations
+                .Where(obj => obj != null &&
+                              IsPageInDeleteRange(obj.PageNumber) &&
+                              string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            List<RedactionBlock> redactionsToRemove = redactionBlocks
+                .Where(obj => obj != null &&
+                              IsPageInDeleteRange(obj.PageNumber) &&
+                              string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            int totalToRemove =
+                textToRemove.Count +
+                rasterToRemove.Count +
+                arrowsToRemove.Count +
+                vectorToRemove.Count +
+                commentsToRemove.Count +
+                redactionsToRemove.Count;
+            if (totalToRemove <= 0)
+            {
+                return;
+            }
+
+            var changedPages = new HashSet<int>();
+            foreach (TextAnnotation text in textToRemove) { changedPages.Add(text.PageNumber); }
+            foreach (RasterObject raster in rasterToRemove) { changedPages.Add(raster.PageNumber); }
+            foreach (ArrowObject arrow in arrowsToRemove) { changedPages.Add(arrow.PageNumber); }
+            foreach (VectorShapeObject vectorShape in vectorToRemove) { changedPages.Add(vectorShape.PageNumber); }
+            foreach (CommentAnnotation comment in commentsToRemove) { changedPages.Add(comment.PageNumber); }
+            foreach (RedactionBlock block in redactionsToRemove) { changedPages.Add(block.PageNumber); }
+
+            var removedTextIds = new HashSet<string>(textToRemove.Where(t => !string.IsNullOrWhiteSpace(t.Id)).Select(t => t.Id), StringComparer.Ordinal);
+            var removedRasterIds = new HashSet<string>(rasterToRemove.Where(r => !string.IsNullOrWhiteSpace(r.Id)).Select(r => r.Id), StringComparer.Ordinal);
+            var removedArrowIds = new HashSet<string>(arrowsToRemove.Where(a => !string.IsNullOrWhiteSpace(a.Id)).Select(a => a.Id), StringComparer.Ordinal);
+            var removedVectorIds = new HashSet<string>(vectorToRemove.Where(v => !string.IsNullOrWhiteSpace(v.Id)).Select(v => v.Id), StringComparer.Ordinal);
+
+            if (redactionsToRemove.Count > 0)
+            {
+                redactionBlocks.RemoveAll(block =>
+                    block != null &&
+                    IsPageInDeleteRange(block.PageNumber) &&
+                    string.Equals(block.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+                UpdateSelectionNavigationButtons();
+            }
+            if (textToRemove.Count > 0)
+            {
+                textAnnotations.RemoveAll(obj =>
+                    obj != null &&
+                    IsPageInDeleteRange(obj.PageNumber) &&
+                    string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (rasterToRemove.Count > 0)
+            {
+                rasterObjects.RemoveAll(obj =>
+                    obj != null &&
+                    IsPageInDeleteRange(obj.PageNumber) &&
+                    string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (arrowsToRemove.Count > 0)
+            {
+                arrowObjects.RemoveAll(obj =>
+                    obj != null &&
+                    IsPageInDeleteRange(obj.PageNumber) &&
+                    string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (vectorToRemove.Count > 0)
+            {
+                vectorShapes.RemoveAll(obj =>
+                    obj != null &&
+                    IsPageInDeleteRange(obj.PageNumber) &&
+                    string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+            }
+            if (commentsToRemove.Count > 0)
+            {
+                commentAnnotations.RemoveAll(obj =>
+                    obj != null &&
+                    IsPageInDeleteRange(obj.PageNumber) &&
+                    string.Equals(obj.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+            }
+
+            EnsureObjectLayerOrder();
+            objectLayerOrder.RemoveAll(entry =>
+                entry != null &&
+                ((entry.Type == LayerObjectType.Text && removedTextIds.Contains(entry.Id)) ||
+                 (entry.Type == LayerObjectType.Raster && removedRasterIds.Contains(entry.Id)) ||
+                 (entry.Type == LayerObjectType.Arrow && removedArrowIds.Contains(entry.Id)) ||
+                 (entry.Type == LayerObjectType.VectorShape && removedVectorIds.Contains(entry.Id))));
+
+            if (selectedTextAnnotation != null &&
+                string.Equals(selectedTextAnnotation.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedTextAnnotation = null;
+            }
+            if (selectedRasterObject != null &&
+                string.Equals(selectedRasterObject.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedRasterObject = null;
+            }
+            if (selectedArrowObject != null &&
+                string.Equals(selectedArrowObject.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedArrowObject = null;
+            }
+            if (selectedVectorShape != null &&
+                string.Equals(selectedVectorShape.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedVectorShape = null;
+            }
+
+            selectedTextAnnotations.RemoveWhere(annotation =>
+                annotation != null && string.Equals(annotation.DuplicateGroupId, normalizedGroupId, StringComparison.OrdinalIgnoreCase));
+            selectedRasterObjectIds.RemoveWhere(id => removedRasterIds.Contains(id));
+            selectedArrowObjectIds.RemoveWhere(id => removedArrowIds.Contains(id));
+            selectedVectorShapeIds.RemoveWhere(id => removedVectorIds.Contains(id));
+
+            bool refreshCommentOverlay = commentsToRemove.Count > 0;
+            if (refreshCommentOverlay)
+            {
+                ResetCommentNoteMoveState();
+            }
+
+            foreach (int page in changedPages)
+            {
+                if (page < 1 || page > allPageStatuses.Count)
+                {
+                    continue;
+                }
+
+                allPageStatuses[page - 1].HasSelections = redactionBlocks.Any(block => block != null && block.PageNumber == page);
+            }
+
+            FinalizeDuplicatedObjectsOnPages(changedPages, refreshCommentOverlay);
+            UpdateCurrentPageObjectsMarker();
+        }
+
+        private string CreateDuplicateGroupId()
+        {
+            duplicationGroupSequence++;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "dup-{0}-{1:D6}",
+                duplicationSessionId,
+                duplicationGroupSequence);
+        }
+
+        private void DuplicateRedactionBlock(RedactionBlock sourceBlock)
+        {
+            if (sourceBlock == null || numPages <= 1)
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDuplicateSelectionDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            List<int> targetPages = BuildDuplicateSelectionTargetPages(sourceBlock.PageNumber, numPages, fromPage, toPage);
+            if (targetPages.Count == 0)
+            {
+                return;
+            }
+
+            string duplicateGroupId = CreateDuplicateGroupId();
+            HashSet<int> changedPages = new HashSet<int>();
+            foreach (int targetPage in targetPages)
+            {
+                var duplicateBlock = CloneRedactionBlockForPage(sourceBlock, targetPage, duplicateGroupId);
+                redactionBlocks.Add(duplicateBlock);
+                changedPages.Add(targetPage);
+            }
+
+            if (changedPages.Count == 0)
+            {
+                return;
+            }
+
+            foreach (int page in changedPages)
+            {
+                if (page < 1 || page > allPageStatuses.Count)
+                {
+                    continue;
+                }
+
+                allPageStatuses[page - 1].HasSelections = true;
+            }
+
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                foreach (int page in changedPages.OrderBy(p => p))
+                {
+                    if (page < 1 || page > pagesListView.Items.Count)
+                    {
+                        continue;
+                    }
+
+                    PageItemStatus status = allPageStatuses[page - 1];
+                    ListViewItem pageItem = pagesListView.Items[page - 1];
+                    UpdateItemTag(pageItem, page, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                    pagesListView.Invalidate(pageItem.Bounds);
+                }
+            }
+            else
+            {
+                ApplyFilter((string)filterComboBox.SelectedItem);
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            UpdateSelectionNavigationButtons();
+            renderTimer.Stop();
+            renderTimer.Start();
+            pdfViewer.Invalidate();
+        }
+
+        private void DuplicateTextAnnotationAcrossPages(TextAnnotation sourceAnnotation)
+        {
+            if (sourceAnnotation == null || numPages <= 1)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDuplicateObjectDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            List<int> targetPages = BuildDuplicateSelectionTargetPages(sourceAnnotation.PageNumber, numPages, fromPage, toPage);
+            if (targetPages.Count == 0)
+            {
+                return;
+            }
+
+            string duplicateGroupId = CreateDuplicateGroupId();
+            HashSet<int> changedPages = new HashSet<int>();
+            foreach (int targetPage in targetPages)
+            {
+                var clone = new TextAnnotation
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    PageNumber = targetPage,
+                    AnnotationText = sourceAnnotation.AnnotationText,
+                    AnnotationFont = CloneFontSafe(sourceAnnotation.AnnotationFont),
+                    AnnotationColor = sourceAnnotation.AnnotationColor,
+                    AnnotationAlignment = sourceAnnotation.AnnotationAlignment,
+                    AnnotationRotation = sourceAnnotation.AnnotationRotation,
+                    AnnotationBounds = sourceAnnotation.AnnotationBounds,
+                    AnnotationIsLocked = sourceAnnotation.AnnotationIsLocked,
+                    DuplicateGroupId = duplicateGroupId
+                };
+                textAnnotations.Add(clone);
+                changedPages.Add(targetPage);
+            }
+
+            EnsureObjectLayerOrder();
+            FinalizeDuplicatedObjectsOnPages(changedPages, refreshCommentOverlay: false);
+        }
+
+        private void DuplicateRasterObjectAcrossPages(RasterObject sourceRaster)
+        {
+            if (sourceRaster == null || numPages <= 1)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDuplicateObjectDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            List<int> targetPages = BuildDuplicateSelectionTargetPages(sourceRaster.PageNumber, numPages, fromPage, toPage);
+            if (targetPages.Count == 0)
+            {
+                return;
+            }
+
+            string duplicateGroupId = CreateDuplicateGroupId();
+            var changedPages = new HashSet<int>();
+            var now = DateTime.UtcNow;
+            foreach (int targetPage in targetPages)
+            {
+                var clone = new RasterObject
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    PageNumber = targetPage,
+                    Bounds = sourceRaster.Bounds,
+                    InitialBounds = sourceRaster.Bounds,
+                    Rotation = sourceRaster.Rotation,
+                    Opacity = sourceRaster.Opacity,
+                    TransparentBackground = sourceRaster.TransparentBackground,
+                    LockAspect = sourceRaster.LockAspect,
+                    IsLocked = sourceRaster.IsLocked,
+                    SourceType = sourceRaster.SourceType,
+                    FilePath = sourceRaster.FilePath,
+                    EmbeddedBytes = sourceRaster.EmbeddedBytes == null ? null : (byte[])sourceRaster.EmbeddedBytes.Clone(),
+                    MimeType = sourceRaster.MimeType,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                    DuplicateGroupId = duplicateGroupId
+                };
+
+                ConstrainRasterObjectToPage(clone);
+                clone.InitialBounds = clone.Bounds;
+                rasterObjects.Add(clone);
+                changedPages.Add(targetPage);
+            }
+
+            EnsureObjectLayerOrder();
+            FinalizeDuplicatedObjectsOnPages(changedPages, refreshCommentOverlay: false);
+        }
+
+        private void DuplicateArrowObjectAcrossPages(ArrowObject sourceArrow)
+        {
+            if (sourceArrow == null || numPages <= 1)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDuplicateObjectDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            List<int> targetPages = BuildDuplicateSelectionTargetPages(sourceArrow.PageNumber, numPages, fromPage, toPage);
+            if (targetPages.Count == 0)
+            {
+                return;
+            }
+
+            string duplicateGroupId = CreateDuplicateGroupId();
+            var changedPages = new HashSet<int>();
+            var now = DateTime.UtcNow;
+            foreach (int targetPage in targetPages)
+            {
+                var clone = new ArrowObject
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    PageNumber = targetPage,
+                    Start = sourceArrow.Start,
+                    End = sourceArrow.End,
+                    LineColorArgb = sourceArrow.LineColorArgb,
+                    Thickness = NormalizeArrowThickness(sourceArrow.Thickness),
+                    HeadLength = NormalizeArrowHeadLength(sourceArrow.HeadLength),
+                    HeadWidth = NormalizeArrowHeadWidth(sourceArrow.HeadWidth),
+                    IsLocked = sourceArrow.IsLocked,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                    DuplicateGroupId = duplicateGroupId
+                };
+
+                ConstrainArrowToPage(clone);
+                arrowObjects.Add(clone);
+                changedPages.Add(targetPage);
+            }
+
+            EnsureObjectLayerOrder();
+            FinalizeDuplicatedObjectsOnPages(changedPages, refreshCommentOverlay: false);
+        }
+
+        private void DuplicateVectorShapeAcrossPages(VectorShapeObject sourceShape)
+        {
+            if (sourceShape == null || numPages <= 1)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDuplicateObjectDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            List<int> targetPages = BuildDuplicateSelectionTargetPages(sourceShape.PageNumber, numPages, fromPage, toPage);
+            if (targetPages.Count == 0)
+            {
+                return;
+            }
+
+            string duplicateGroupId = CreateDuplicateGroupId();
+            var changedPages = new HashSet<int>();
+            var now = DateTime.UtcNow;
+            foreach (int targetPage in targetPages)
+            {
+                var clone = new VectorShapeObject
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    PageNumber = targetPage,
+                    ShapeType = sourceShape.ShapeType,
+                    Points = (sourceShape.Points ?? new List<PointF>())
+                        .Select(point => new PointF(point.X, point.Y))
+                        .ToList(),
+                    StrokeColorArgb = sourceShape.StrokeColorArgb,
+                    StrokeWidth = sourceShape.StrokeWidth,
+                    FillColorArgb = sourceShape.FillColorArgb,
+                    FillPatternColorArgb = sourceShape.FillPatternColorArgb,
+                    FillOpacity = sourceShape.FillOpacity,
+                    StrokeStyle = sourceShape.StrokeStyle,
+                    FillPattern = sourceShape.FillPattern,
+                    IsLocked = sourceShape.IsLocked,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                    DuplicateGroupId = duplicateGroupId
+                };
+
+                NormalizeVectorShape(clone);
+                ConstrainVectorShapeToPage(clone);
+                vectorShapes.Add(clone);
+                changedPages.Add(targetPage);
+            }
+
+            EnsureObjectLayerOrder();
+            FinalizeDuplicatedObjectsOnPages(changedPages, refreshCommentOverlay: false);
+        }
+
+        private void DuplicateCommentAnnotationAcrossPages(CommentAnnotation sourceComment)
+        {
+            if (sourceComment == null || numPages <= 1)
+            {
+                return;
+            }
+
+            if (!EnsureCurrentPageEditable(true))
+            {
+                return;
+            }
+
+            if (!PromptForDuplicateSelectionOptions(numPages, GetDuplicateObjectDialogTitle(), out int fromPage, out int toPage))
+            {
+                return;
+            }
+
+            List<int> targetPages = BuildDuplicateSelectionTargetPages(sourceComment.PageNumber, numPages, fromPage, toPage);
+            if (targetPages.Count == 0)
+            {
+                return;
+            }
+
+            string duplicateGroupId = CreateDuplicateGroupId();
+            var changedPages = new HashSet<int>();
+            var now = DateTime.UtcNow;
+            foreach (int targetPage in targetPages)
+            {
+                var clone = new CommentAnnotation
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    PageNumber = targetPage,
+                    Bounds = sourceComment.Bounds,
+                    CommentText = sourceComment.CommentText,
+                    IsMarkerSelection = sourceComment.IsMarkerSelection,
+                    NoteX = sourceComment.NoteX,
+                    NoteY = sourceComment.NoteY,
+                    NoteWidth = sourceComment.NoteWidth,
+                    NoteHeight = sourceComment.NoteHeight,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                    DuplicateGroupId = duplicateGroupId
+                };
+
+                NormalizeCommentAnnotation(clone);
+                commentAnnotations.Add(clone);
+                changedPages.Add(targetPage);
+            }
+
+            FinalizeDuplicatedObjectsOnPages(changedPages, refreshCommentOverlay: true);
+        }
+
+        private void FinalizeDuplicatedObjectsOnPages(ISet<int> changedPages, bool refreshCommentOverlay)
+        {
+            if (changedPages == null || changedPages.Count == 0)
+            {
+                return;
+            }
+
+            foreach (int page in changedPages)
+            {
+                if (page < 1 || page > allPageStatuses.Count)
+                {
+                    continue;
+                }
+
+                allPageStatuses[page - 1].HasObjects = HasAnyObjectsOnPage(page);
+            }
+
+            if ((string)filterComboBox.SelectedItem == allComboItem)
+            {
+                foreach (int page in changedPages.OrderBy(p => p))
+                {
+                    if (page < 1 || page > pagesListView.Items.Count)
+                    {
+                        continue;
+                    }
+
+                    PageItemStatus status = allPageStatuses[page - 1];
+                    ListViewItem pageItem = pagesListView.Items[page - 1];
+                    UpdateItemTag(pageItem, page, status.HasSelections, status.HasSearchResults, status.MarkedForDeletion, status.HasObjects);
+                    pagesListView.Invalidate(pageItem.Bounds);
+                }
+            }
+            else
+            {
+                ApplyFilter((string)filterComboBox.SelectedItem);
+            }
+
+            projectWasChangedAfterLastSave = true;
+            saveProjectButton.Enabled = true;
+            saveProjectMenuItem.Enabled = true;
+            if (refreshCommentOverlay)
+            {
+                commentNoteRectsDoc.Clear();
+                commentPreviewOverlayReady = false;
+            }
+            renderTimer.Stop();
+            renderTimer.Start();
+            pdfViewer.Invalidate();
+        }
+
+        private static RedactionBlock CloneRedactionBlockForPage(RedactionBlock source, int pageNumber, string duplicateGroupId = null)
+        {
+            var clone = new RedactionBlock(source.Bounds, pageNumber)
+            {
+                FootnoteNumber = source.FootnoteNumber,
+                ScopeId = string.IsNullOrWhiteSpace(source.ScopeId) ? null : source.ScopeId.Trim(),
+                ClassificationSource = string.IsNullOrWhiteSpace(source.ClassificationSource) ? ClassificationSourceNone : source.ClassificationSource.Trim(),
+                MatchedTag = string.IsNullOrWhiteSpace(source.MatchedTag) ? null : source.MatchedTag.Trim(),
+                InterestSubject = string.IsNullOrWhiteSpace(source.InterestSubject) ? null : source.InterestSubject.Trim(),
+                IsMarkerSelection = source.IsMarkerSelection,
+                DuplicateGroupId = string.IsNullOrWhiteSpace(duplicateGroupId) ? null : duplicateGroupId.Trim()
+            };
+
+            clone.BasisIds = (source.BasisIds ?? new List<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return clone;
+        }
+
+        private static List<int> BuildDuplicateSelectionTargetPages(
+            int sourcePage,
+            int totalPages,
+            int fromPage,
+            int toPage)
+        {
+            var pages = new List<int>();
+            if (totalPages <= 1 || sourcePage < 1 || sourcePage > totalPages)
+            {
+                return pages;
+            }
+
+            int startPage = Math.Max(1, Math.Min(totalPages, Math.Min(fromPage, toPage)));
+            int endPage = Math.Max(1, Math.Min(totalPages, Math.Max(fromPage, toPage)));
+            for (int page = startPage; page <= endPage; page++)
+            {
+                if (page != sourcePage)
+                {
+                    pages.Add(page);
+                }
+            }
+
+            return pages;
+        }
+
+        private bool PromptForDuplicateSelectionOptions(
+            int totalPages,
+            string dialogTitle,
+            out int fromPage,
+            out int toPage)
+        {
+            fromPage = 1;
+            toPage = totalPages;
+
+            using (Form prompt = new Form())
+            {
+                prompt.Text = string.IsNullOrWhiteSpace(dialogTitle)
+                    ? GetDuplicateSelectionDialogTitle()
+                    : dialogTitle;
+                prompt.StartPosition = FormStartPosition.CenterParent;
+                prompt.FormBorderStyle = FormBorderStyle.FixedDialog;
+                prompt.ClientSize = new Size(370, 130);
+                prompt.MinimizeBox = false;
+                prompt.MaximizeBox = false;
+                prompt.ShowInTaskbar = false;
+
+                var rangeLabel = new Label
+                {
+                    Left = 18,
+                    Top = 18,
+                    AutoSize = true,
+                    Text = GetDuplicateSelectionRangeText(),
+                };
+
+                var fromPageLabel = new Label
+                {
+                    Left = 150,
+                    Top = 20,
+                    AutoSize = true,
+                    Text = GetDuplicateSelectionFromPageText()
+                };
+
+                var fromPageInput = new NumericUpDown
+                {
+                    Left = 180,
+                    Top = 16,
+                    Width = 70,
+                    Minimum = 1,
+                    Maximum = totalPages,
+                    Value = 1
+                };
+
+                var toPageLabel = new Label
+                {
+                    Left = 258,
+                    Top = 20,
+                    AutoSize = true,
+                    Text = GetDuplicateSelectionToPageText()
+                };
+
+                var toPageInput = new NumericUpDown
+                {
+                    Left = 286,
+                    Top = 16,
+                    Width = 66,
+                    Minimum = 1,
+                    Maximum = totalPages,
+                    Value = totalPages
+                };
+
+                var buttonOk = new Button
+                {
+                    Left = 176,
+                    Top = 84,
+                    Width = 84,
+                    DialogResult = DialogResult.OK,
+                    Text = Resources.Merge_OK
+                };
+
+                var buttonCancel = new Button
+                {
+                    Left = 268,
+                    Top = 84,
+                    Width = 84,
+                    DialogResult = DialogResult.Cancel,
+                    Text = Resources.Merge_Cancel
+                };
+
+                fromPageInput.ValueChanged += (_, __) =>
+                {
+                    if (fromPageInput.Value > toPageInput.Value)
+                    {
+                        toPageInput.Value = fromPageInput.Value;
+                    }
+                };
+                toPageInput.ValueChanged += (_, __) =>
+                {
+                    if (toPageInput.Value < fromPageInput.Value)
+                    {
+                        fromPageInput.Value = toPageInput.Value;
+                    }
+                };
+
+                prompt.Controls.Add(rangeLabel);
+                prompt.Controls.Add(fromPageLabel);
+                prompt.Controls.Add(fromPageInput);
+                prompt.Controls.Add(toPageLabel);
+                prompt.Controls.Add(toPageInput);
+                prompt.Controls.Add(buttonOk);
+                prompt.Controls.Add(buttonCancel);
+                prompt.AcceptButton = buttonOk;
+                prompt.CancelButton = buttonCancel;
+
+                if (prompt.ShowDialog(this) != DialogResult.OK)
+                {
+                    return false;
+                }
+
+                fromPage = (int)fromPageInput.Value;
+                toPage = (int)toPageInput.Value;
+                return true;
+            }
         }
 
         private bool TryGetArrowHandleAtPoint(ArrowObject arrowObject, Point location, out ArrowHandleType handleType)
@@ -22601,6 +23622,7 @@ namespace AnonPDF
             }
 
             var now = DateTime.UtcNow;
+            string duplicateGroupId = CreateDuplicateGroupId();
             RectangleF copyBounds = source.Bounds;
             copyBounds.Offset(12f, 12f);
             var copy = new RasterObject
@@ -22619,7 +23641,8 @@ namespace AnonPDF
                 EmbeddedBytes = source.EmbeddedBytes == null ? null : (byte[])source.EmbeddedBytes.Clone(),
                 MimeType = source.MimeType,
                 CreatedAtUtc = now,
-                UpdatedAtUtc = now
+                UpdatedAtUtc = now,
+                DuplicateGroupId = duplicateGroupId
             };
 
             ConstrainRasterObjectToPage(copy);
@@ -22665,6 +23688,7 @@ namespace AnonPDF
             PointF start = new PointF(source.Start.X + 12f, source.Start.Y + 12f);
             PointF end = new PointF(source.End.X + 12f, source.End.Y + 12f);
             var now = DateTime.UtcNow;
+            string duplicateGroupId = CreateDuplicateGroupId();
             var copy = new ArrowObject
             {
                 Id = Guid.NewGuid().ToString("N"),
@@ -22677,7 +23701,8 @@ namespace AnonPDF
                 HeadWidth = NormalizeArrowHeadWidth(source.HeadWidth),
                 IsLocked = source.IsLocked,
                 CreatedAtUtc = now,
-                UpdatedAtUtc = now
+                UpdatedAtUtc = now,
+                DuplicateGroupId = duplicateGroupId
             };
 
             ConstrainArrowToPage(copy);
@@ -25803,6 +26828,8 @@ namespace AnonPDF
 
         public bool AnnotationIsLocked { get; set; }
 
+        public string DuplicateGroupId { get; set; }
+
         public TextAnnotation()
         {
             Id = Guid.NewGuid().ToString("N");
@@ -25814,6 +26841,7 @@ namespace AnonPDF
             AnnotationRotation = 0;
             AnnotationBounds = new RectangleF(0, 0, 100, 30); // Example rectangular area
             AnnotationIsLocked = false;
+            DuplicateGroupId = null;
         }
 
 
@@ -25828,6 +26856,7 @@ namespace AnonPDF
             AnnotationRotation = 0;
             AnnotationBounds = bounds;
             AnnotationIsLocked = isLocked;
+            DuplicateGroupId = null;
         }
 
         public override string ToString()
@@ -27767,6 +28796,7 @@ namespace AnonPDF
         public string MatchedTag { get; set; }
         public string InterestSubject { get; set; }
         public bool IsMarkerSelection { get; set; }
+        public string DuplicateGroupId { get; set; }
 
         public RedactionBlock(System.Drawing.RectangleF bounds, int pageNumber)
         {
@@ -27779,6 +28809,7 @@ namespace AnonPDF
             MatchedTag = null;
             InterestSubject = null;
             IsMarkerSelection = false;
+            DuplicateGroupId = null;
         }
     }
 
@@ -27793,6 +28824,7 @@ namespace AnonPDF
         public float? NoteY { get; set; }
         public float? NoteWidth { get; set; }
         public float? NoteHeight { get; set; }
+        public string DuplicateGroupId { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 
@@ -27800,6 +28832,7 @@ namespace AnonPDF
         {
             Id = Guid.NewGuid().ToString("N");
             CommentText = string.Empty;
+            DuplicateGroupId = null;
         }
     }
 
@@ -28019,6 +29052,7 @@ namespace AnonPDF
         public string FilePath { get; set; }
         public byte[] EmbeddedBytes { get; set; }
         public string MimeType { get; set; }
+        public string DuplicateGroupId { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     }
@@ -28034,6 +29068,7 @@ namespace AnonPDF
         public float HeadLength { get; set; } = 18f;
         public float HeadWidth { get; set; } = 12f;
         public bool IsLocked { get; set; }
+        public string DuplicateGroupId { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     }
@@ -28052,6 +29087,7 @@ namespace AnonPDF
         public string StrokeStyle { get; set; } = "solid";
         public string FillPattern { get; set; } = "solid";
         public bool IsLocked { get; set; }
+        public string DuplicateGroupId { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
     }
